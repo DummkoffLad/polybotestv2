@@ -1,0 +1,337 @@
+# Polymarket Copy-Trading Bot V2 Configuration
+# Copy to config.yaml and customize
+
+# =============================================================================
+# EXECUTION MODE (CRITICAL - determines which adapter is used)
+# =============================================================================
+# Options: DRY_RUN | LIVE
+# - DRY_RUN: Real data reads, NO order placement (NullExecutionAdapter)
+# - LIVE: Real order placement (LiveExecutionAdapter) - requires ARM command
+#
+# SAFETY: Mode is locked at startup. Changing requires process restart.
+mode: DRY_RUN
+
+# =============================================================================
+# LEADER CONFIGURATION
+# =============================================================================
+leader:
+  # Leader's Polymarket address to copy
+  address: "0x0000000000000000000000000000000000000000"  # TODO: Set real address
+  
+  # Polling interval for leader state (seconds)
+  poll_interval_sec: 1.0
+  
+  # Use websockets for leader updates (if available)
+  # NOTE: Polling-first design; websockets are optional optimization
+  use_websocket: false
+
+# =============================================================================
+# YOUR TRADING WALLET (Required for LIVE mode)
+# =============================================================================
+trader:
+  # Your Polymarket proxy/funder wallet address
+  # This is the address that holds your USDC and places orders
+  address: ""  # TODO: Set your wallet address for LIVE mode
+  
+  # Environment variable name containing your private key
+  # The actual key should be in .env file, NOT in this config
+  private_key_env: "POLYMARKET_PRIVATE_KEY"
+  
+  # Signature type for order signing:
+  # 0 = EOA (standard externally owned account)
+  # 1 = POLY_PROXY (Magic wallet)
+  # 2 = GNOSIS_SAFE (default - most common for Polymarket)
+  signature_type: 2
+
+# =============================================================================
+# SCALING CONFIGURATION (Percentage-Based)
+# =============================================================================
+# All values are PERCENTAGES of your capital.
+# - DRY_RUN/PAPER: Uses dry_run_capital as simulated balance
+# - LIVE: Fetches actual wallet balance from Polymarket API
+scaling:
+  # Conservative factor k (0.5-0.8 recommended)
+  # Our target = leader_delta * (our_capital / leader_total_assets) * k
+  k_factor: 0.8
+  
+  # Simulated starting capital for DRY_RUN and PAPER modes (dollars)
+  # This is ONLY used in simulation - LIVE mode fetches real balance
+  dry_run_capital: 100.0
+  
+  # Estimated leader total assets (including leftovers)
+  # Used as proxy since leader cash is unknown
+  # Set to 0 to auto-detect from leader position snapshots
+  leader_estimated_capital: 0.0
+  
+  # === PERCENTAGE-BASED LIMITS ===
+  # All caps are percentages of your capital
+  
+  # Hourly budget limit (% of capital per hour)
+  hourly_budget_pct: 40.0  # 40% of capital per hour max
+  
+  # Per-market gross exposure limit (% of capital)
+  per_market_gross_pct: 16.0  # Max 16% in any single market
+  
+  # Per-side exposure limit (% of capital)
+  per_side_pct: 10.0  # Max 10% on one side (UP or DOWN)
+  
+  # Global total exposure limit (% of capital)
+  global_exposure_pct: 80.0  # Max 80% total exposure
+
+# =============================================================================
+# STATE MACHINE TIMING
+# =============================================================================
+timing:
+  # BURST mode duration after market open (seconds)
+  # Leader trades in bursts at open; we wait for stabilization
+  burst_window_sec: 60
+  
+  # Poll interval during BURST mode (seconds)
+  burst_poll_interval_sec: 1.5
+  
+  # Stabilization detection: max exposure change to consider stable
+  burst_stabilization_threshold: 0.50  # dollars
+  
+  # Number of consecutive stable polls required
+  burst_stabilization_count: 3
+  
+  # RESYNC interval (seconds) - periodic drift correction
+  resync_interval_sec: 60
+  
+  # RESYNC error threshold - only correct if drift exceeds this
+  resync_error_threshold: 0.50  # dollars
+  
+  # FOLLOW mode micro-batch window (seconds)
+  # Aggregates leader trades within window into single adjustment
+  follow_batch_window_sec: 2.0
+
+# =============================================================================
+# COPY-TRADING DELTA LOGIC (Percentage-Based)
+# =============================================================================
+copy_trading:
+  # Delta detection thresholds (percentage-based)
+  epsilon_pct: 0.5  # 1% change in position triggers action
+  epsilon_min_dollars: 0.50  # Minimum absolute $0.50 change
+  
+  # Resync drift thresholds (percentage of target, with hysteresis)
+  resync_drift_start_pct: 5.0  # Start resync if drift > 5%
+  resync_drift_stop_pct: 2.0   # Stop resync when drift < 2%
+  resync_recent_activity_sec: 300
+  
+  # Execution controls
+  max_spread: 0.15 # Skip if bid-ask spread > 5%
+  max_order_pct: 10.0  # Max 10% of position per single order
+  max_order_chunks: 3  # Max chunks per order
+  
+  # Accumulator aging (seconds)
+  buy_accumulator_max_age_sec: 120
+  sell_accumulator_max_age_sec: 60
+  
+  # Expiry safety (requires market close time)
+  expiry_close_minutes: 10
+  expiry_force_seconds: 30
+  
+  # Live reconcile interval
+  reconcile_interval_sec: 30
+
+# =============================================================================
+# SAFETY FEATURES (CRITICAL - Prevent Bad Trades)
+# =============================================================================
+# All orders use MARKET execution: BUY at lowest ask, SELL at highest bid
+# This ensures speed and reliability but loses the spread
+safety:
+  # === PRICE DRIFT PROTECTION (BUY only) ===
+  # Don't buy if current price has drifted too far from leader's entry
+  # SELLs are NOT blocked - leader may be cutting risk and sells are important
+  price_drift_enabled: true
+  max_buy_price_drift_pct: 10.0  # Skip buy if ask > leader's entry + 6%
+  
+  # === SPREAD PROTECTION ===
+  # Skip trade if bid-ask spread is too wide (losing too much on execution)
+  # Market orders lose the spread, so wide spreads = bad fills
+  max_spread_pct: 10.0  # Skip if spread > 6%
+  
+  # === STALE DATA PROTECTION ===
+  max_price_age_sec: 10  # Skip if price is older than 10 seconds
+  
+  # === POSITION LIMITS ===
+  max_concurrent_positions: 20
+  min_position_value: 1.0  # $1 minimum (ignore dust)
+  
+  # === LOSS PROTECTION ===
+  max_session_loss_pct: 20.0  # STOP if session losses exceed 20%
+  per_position_stop_loss_pct: 0  # 0 = disabled (let leader decide exits)
+  
+  # === EXECUTION TIMING ===
+  min_order_interval_sec: 1.0  # Min time between orders to same market
+  market_open_wait_sec: 5  # Wait N seconds after market open
+
+# =============================================================================
+# MINIMUM TRADE SIZES
+# =============================================================================
+minimums:
+  # Market order minimum (dollars) - uncertain, make configurable
+  market_order_dollars: 1.0
+  
+  # Limit order minimum (shares) - uncertain, make configurable
+  limit_order_shares: 5.0
+  
+  # Trade precision (decimal places for shares)
+  share_precision: 2  # 0.01 share precision
+
+# =============================================================================
+# CIRCUIT BREAKERS
+# =============================================================================
+circuit_breakers:
+  # Pause after N consecutive API errors
+  max_consecutive_api_errors: 5
+  
+  # Pause if pending orders exceed this count
+  max_pending_orders: 3
+  
+  # Pause if order fill status unknown for longer than this (seconds)
+  max_unknown_fill_duration_sec: 30
+  
+  # Max orders per minute (rate limiting)
+  max_orders_per_minute: 10
+  
+  # Max new exposure per minute (dollars)
+  max_new_exposure_per_minute: 10.0
+  
+  # Cooldown after circuit breaker triggers (seconds)
+  breaker_cooldown_sec: 60
+
+# =============================================================================
+# LOGGING & TRACING
+# =============================================================================
+logging:
+  # Log level: DEBUG | INFO | WARNING | ERROR
+  level: INFO
+  
+  # Log output: "console" | "file" | "both"
+  output: both
+  
+  # Log file path (relative to data directory)
+  file_path: "logs/bot.jsonl"
+  
+  # Log rotation (MB, 0 = unlimited)
+  log_max_mb: 50
+  log_backup_count: 5
+  
+  # Enable decision trace output
+  trace_enabled: true
+  
+  # Trace output path
+  trace_path: "traces/decisions.jsonl"
+  
+  # Include full snapshots in trace (verbose but useful for debugging)
+  trace_include_snapshots: false
+  
+  # Trace rotation (MB, 0 = unlimited)
+  trace_max_mb: 100
+  trace_backup_count: 5
+
+# =============================================================================
+# DATA COLLECTION
+# =============================================================================
+collector:
+  # Enable data collection
+  enabled: true
+  
+  # Storage format: "jsonl" | "sqlite"
+  storage_format: jsonl
+  
+  # Storage path (relative to data directory)
+  storage_path: "collected/"
+  
+  # Snapshot interval for leader positions (seconds)
+  position_snapshot_interval_sec: 5
+  
+  # Record market price snapshots
+  record_prices: true
+  
+  # Price snapshot interval (seconds)
+  price_snapshot_interval_sec: 2
+
+# =============================================================================
+# SIMULATION / REPLAY
+# =============================================================================
+simulation:
+  # Fill model: "immediate" | "delayed" | "partial"
+  fill_model: immediate
+  
+  # Simulated spread (percentage of price)
+  simulated_spread_pct: 0.5
+  
+  # Simulated slippage (percentage)
+  simulated_slippage_pct: 0.1
+  
+  # Fees (only in crypto 15-min markets, 0 for hourly)
+  fees_pct: 0.0
+  
+  # Random seed for reproducibility (0 = use system time)
+  random_seed: 42
+
+# =============================================================================
+# PERSISTENCE
+# =============================================================================
+persistence:
+  # State file path
+  state_file: "state/bot_state.json"
+  
+  # Auto-save interval (seconds)
+  auto_save_interval_sec: 10
+  
+  # Keep N backup state files
+  backup_count: 5
+
+# =============================================================================
+# API CONFIGURATION (STUBS - confirm before LIVE)
+# =============================================================================
+api:
+  # Polymarket API base URL
+  base_url: "https://clob.polymarket.com"
+  
+  # API timeout (seconds)
+  timeout_sec: 10
+  
+  # Retry count for failed requests
+  retry_count: 3
+  
+  # Retry delay (seconds)
+  retry_delay_sec: 1.0
+  
+  # Rate limit (requests per second)
+  rate_limit_rps: 5.0
+  
+  # TODO: Confirm these endpoints before LIVE
+  endpoints:
+    leader_trades: "/trades"  # TODO: Confirm
+    leader_positions: "/positions"  # TODO: Confirm
+    market_metadata: "/markets"  # TODO: Confirm
+    place_order: "/order"  # TODO: Confirm
+    cancel_order: "/order/{order_id}"  # TODO: Confirm
+    my_positions: "/positions"  # TODO: Confirm
+
+# =============================================================================
+# MARKETS CONFIGURATION
+# =============================================================================
+markets:
+  # Market type filter: "hourly_btc" | "hourly_eth" | "all_hourly"
+  type_filter: "hourly_btc"
+  
+  # Explicit market allowlist (empty = use type_filter)
+  allowlist: []
+  
+  # Market denylist (always excluded)
+  denylist: []
+
+# =============================================================================
+# PREFLIGHT CONFIGURATION
+# =============================================================================
+preflight:
+  # Smoke test duration (seconds of replay, 0 = skip)
+  smoke_test_duration_sec: 30
+  
+  # Required minimum data for smoke test (seconds)
+  min_collected_data_sec: 60
