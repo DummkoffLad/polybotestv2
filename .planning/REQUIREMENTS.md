@@ -74,25 +74,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
-| TEST-03 | TBD | Pending |
-| ANAL-01 | TBD | Pending |
-| ANAL-02 | TBD | Pending |
-| ANAL-03 | TBD | Pending |
-| SIZE-01 | TBD | Pending |
-| SIZE-02 | TBD | Pending |
-| SIZE-03 | TBD | Pending |
-| SIZE-04 | TBD | Pending |
-| RBST-01 | TBD | Pending |
-| RBST-02 | TBD | Pending |
-| RBST-03 | TBD | Pending |
+| TEST-01 | Phase 1 | Pending |
+| TEST-02 | Phase 1 | Pending |
+| TEST-03 | Phase 1 | Pending |
+| ANAL-01 | Phase 2 | Pending |
+| ANAL-02 | Phase 2 | Pending |
+| ANAL-03 | Phase 2 | Pending |
+| SIZE-01 | Phase 3 | Pending |
+| SIZE-02 | Phase 3 | Pending |
+| SIZE-03 | Phase 4 | Pending |
+| SIZE-04 | Phase 4 | Pending |
+| RBST-01 | Phase 5 | Pending |
+| RBST-02 | Phase 5 | Pending |
+| RBST-03 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13
+- Mapped to phases: 13
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-30 after initial definition*
+*Last updated: 2026-01-30 after roadmap creation*
