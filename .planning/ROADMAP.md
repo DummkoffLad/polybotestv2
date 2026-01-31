@@ -46,10 +46,12 @@ Plans:
   2. Equity curve shows capital over time with max drawdown from peak
   3. Replay results show where our sizing/timing differs from leader's actual profits
   4. Profit attribution identifies which trades contributed most to final PnL
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD during planning
+- [ ] 02-01-PLAN.md -- Trade attribution + equity tracker (core analysis types + tests)
+- [ ] 02-02-PLAN.md -- Drawdown analyzer + slippage analyzer (risk metrics + execution quality + tests)
+- [ ] 02-03-PLAN.md -- Report generator + replay integration (wire everything together, console + charts)
 
 ### Phase 3: Dynamic Sizing
 **Goal**: Position sizes adapt to current capital and trade quality rather than fixed rules
@@ -101,7 +103,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Test Coverage | 4/4 | Complete ✓ | 2026-01-31 |
-| 2. Performance Analysis | 0/TBD | Not started | - |
+| 2. Performance Analysis | 0/3 | Planned | - |
 | 3. Dynamic Sizing | 0/TBD | Not started | - |
 | 4. Advanced Sizing | 0/TBD | Not started | - |
 | 5. Validation | 0/TBD | Not started | - |
