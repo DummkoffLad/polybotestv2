@@ -1,4 +1,12 @@
-"""Comprehensive unit tests for Portfolio cost basis, PnL, invariants, and exposure."""
+"""Comprehensive unit tests for Portfolio cost basis, PnL, invariants, and exposure.
+
+KNOWN BUGS DOCUMENTED IN THIS FILE:
+- test_multiple_markets_same_token_id: Portfolio position keying bug
+  Portfolio._positions keyed only by token_id, not (token_id, market_id, side).
+  Same token_id in different markets incorrectly accumulates into single position.
+  See inline "# BUG:" comments in test for details.
+  Tracked for future fix, doesn't block testing.
+"""
 import pytest
 from decimal import Decimal
 from datetime import datetime, timezone
