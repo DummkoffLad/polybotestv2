@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 1 of 5 (Test Coverage)
-Plan: 3 of 4 complete (Test Infrastructure + Strategy Unit Tests + Risk Cap Tests)
-Status: In progress
-Last activity: 2026-01-31 — Completed 01-03-PLAN.md (Risk Cap Enforcement Tests)
+Plan: 4 of 4 complete (Session Replay Integration Tests)
+Status: Phase complete ✓
+Last activity: 2026-01-31 — Completed 01-04-PLAN.md (Session Replay Integration Tests)
 
-Progress: [███████░░░] 75%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: 5min
-- Total execution time: 0.25 hours
+- Total execution time: 0.32 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-test-coverage | 3 | 15min | 5min |
+| 01-test-coverage | 4 | 19min | 5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (4min), 01-02 (8min), 01-03 (3min)
-- Trend: Excellent velocity, fast execution
+- Last 5 plans: 01-01 (4min), 01-02 (8min), 01-03 (3min), 01-04 (4min)
+- Trend: Excellent velocity, consistent 4-8min execution time
 
 *Updated after each plan completion*
 
@@ -53,6 +53,9 @@ Recent decisions affecting current work:
 - Self-contained test helpers with _buy_and_fill (01-03) — Build up positions before testing cap enforcement
 - Test both standard and conservative cap configurations (01-03) — Mirror (30%/26%) vs Conservative (20%/18%) caps
 - Focus on boundary conditions for cap tests (01-03) — Caps bind frequently in sub-$100 operation, boundary behavior critical
+- Single session for integration baselines (01-04) — Reserve other 5 sessions for Phase 5 out-of-sample validation
+- Exact regression baselines over approximations (01-04) — Lock down exact buy/sell/skip counts to catch unintended changes
+- Lazy imports to break circular dependencies (01-04) — simulation/__init__.py uses __getattr__ pattern
 
 ### Pending Todos
 
@@ -68,11 +71,11 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-31 (plan 01-03 execution)
-Stopped at: Completed 01-03-PLAN.md (Risk Cap Enforcement Tests)
+Last session: 2026-01-31 (plan 01-04 execution)
+Stopped at: Completed 01-04-PLAN.md (Session Replay Integration Tests) - PHASE 1 COMPLETE
 Resume file: None
-Next action: Continue with remaining Phase 1 plan (01-04 Smoke Test)
+Next action: Phase 1 complete. Ready for Phase 2 (Simulation Validation)
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-01-31 20:24 UTC*
+*Last updated: 2026-01-31 20:32 UTC*
