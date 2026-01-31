@@ -9,9 +9,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Testing
 
-- [ ] **TEST-01**: Unit test suite covering all 7 strategy implementations with known input/output pairs
-- [ ] **TEST-02**: Unit tests for risk cap enforcement (per-market, per-side, global exposure)
-- [ ] **TEST-03**: Unit tests for portfolio math (cost basis calculation, realized/unrealized PnL)
+- [x] **TEST-01**: Unit test suite covering all 8 strategy implementations with known input/output pairs
+- [x] **TEST-02**: Unit tests for risk cap enforcement (per-market, per-side, global exposure)
+- [x] **TEST-03**: Unit tests for portfolio math (cost basis calculation, realized/unrealized PnL)
 
 ### Analysis & Attribution
 
@@ -74,9 +74,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 | Phase 1 | Pending |
-| TEST-02 | Phase 1 | Pending |
-| TEST-03 | Phase 1 | Pending |
+| TEST-01 | Phase 1 | Complete |
+| TEST-02 | Phase 1 | Complete |
+| TEST-03 | Phase 1 | Complete |
 | ANAL-01 | Phase 2 | Pending |
 | ANAL-02 | Phase 2 | Pending |
 | ANAL-03 | Phase 2 | Pending |
@@ -95,4 +95,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-30 after roadmap creation*
+*Last updated: 2026-01-31 after Phase 1 completion*

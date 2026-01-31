@@ -12,7 +12,7 @@ Transform the existing copy trading bot from a working prototype into a reliable
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Test Coverage** - Validate existing strategy and risk implementations
+- [x] **Phase 1: Test Coverage** - Validate existing strategy and risk implementations
 - [ ] **Phase 2: Performance Analysis** - Track attribution, drawdown, and profit leakage
 - [ ] **Phase 3: Dynamic Sizing** - Adapt position sizing to current capital
 - [ ] **Phase 4: Advanced Sizing** - Optimize capital efficiency and edge-based sizing
@@ -32,10 +32,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Test infrastructure + portfolio math unit tests
-- [ ] 01-02-PLAN.md -- Strategy unit tests (all 8 strategies, parameterized + specific)
-- [ ] 01-03-PLAN.md -- Risk cap enforcement tests (per-market, per-side, global, boundary)
-- [ ] 01-04-PLAN.md -- Session replay integration tests + full suite validation
+- [x] 01-01-PLAN.md -- Test infrastructure + portfolio math unit tests
+- [x] 01-02-PLAN.md -- Strategy unit tests (all 8 strategies, parameterized + specific)
+- [x] 01-03-PLAN.md -- Risk cap enforcement tests (per-market, per-side, global, boundary)
+- [x] 01-04-PLAN.md -- Session replay integration tests + full suite validation
 
 ### Phase 2: Performance Analysis
 **Goal**: Every trade is tracked from entry to outcome with full equity curve visibility
@@ -100,7 +100,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Test Coverage | 0/4 | Planned | - |
+| 1. Test Coverage | 4/4 | Complete ✓ | 2026-01-31 |
 | 2. Performance Analysis | 0/TBD | Not started | - |
 | 3. Dynamic Sizing | 0/TBD | Not started | - |
 | 4. Advanced Sizing | 0/TBD | Not started | - |
@@ -108,4 +108,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 ---
 *Roadmap created: 2026-01-30*
-*Last updated: 2026-01-30*
+*Last updated: 2026-01-31*
