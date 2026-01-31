@@ -25,14 +25,17 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Depends on**: Nothing (first phase)
 **Requirements**: TEST-01, TEST-02, TEST-03
 **Success Criteria** (what must be TRUE):
-  1. All 7 strategy implementations produce expected outputs for known inputs
+  1. All 8 strategy implementations produce expected outputs for known inputs
   2. Risk caps enforce correctly (per-market, per-side, global) in all scenarios
   3. Portfolio cost basis and PnL calculations match manual verification
   4. Test suite runs in under 1 minute and catches regressions
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] TBD during planning
+- [ ] 01-01-PLAN.md -- Test infrastructure + portfolio math unit tests
+- [ ] 01-02-PLAN.md -- Strategy unit tests (all 8 strategies, parameterized + specific)
+- [ ] 01-03-PLAN.md -- Risk cap enforcement tests (per-market, per-side, global, boundary)
+- [ ] 01-04-PLAN.md -- Session replay integration tests + full suite validation
 
 ### Phase 2: Performance Analysis
 **Goal**: Every trade is tracked from entry to outcome with full equity curve visibility
@@ -97,7 +100,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Test Coverage | 0/TBD | Not started | - |
+| 1. Test Coverage | 0/4 | Planned | - |
 | 2. Performance Analysis | 0/TBD | Not started | - |
 | 3. Dynamic Sizing | 0/TBD | Not started | - |
 | 4. Advanced Sizing | 0/TBD | Not started | - |
