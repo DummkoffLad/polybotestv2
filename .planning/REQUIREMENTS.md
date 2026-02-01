@@ -15,9 +15,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Analysis & Attribution
 
-- [ ] **ANAL-01**: Per-trade PnL attribution linking each trade to its final outcome (win/loss/open)
-- [ ] **ANAL-02**: Drawdown tracking with equity curve over session and max drawdown from peak
-- [ ] **ANAL-03**: Profit leakage analysis comparing our sizing/timing vs leader's actual results
+- [x] **ANAL-01**: Per-trade PnL attribution linking each trade to its final outcome (win/loss/open)
+- [x] **ANAL-02**: Drawdown tracking with equity curve over session and max drawdown from peak
+- [x] **ANAL-03**: Profit leakage analysis comparing our sizing/timing vs leader's actual results
 
 ### Small-Budget Sizing
 
@@ -77,9 +77,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 1 | Complete |
 | TEST-03 | Phase 1 | Complete |
-| ANAL-01 | Phase 2 | Pending |
-| ANAL-02 | Phase 2 | Pending |
-| ANAL-03 | Phase 2 | Pending |
+| ANAL-01 | Phase 2 | Complete |
+| ANAL-02 | Phase 2 | Complete |
+| ANAL-03 | Phase 2 | Complete |
 | SIZE-01 | Phase 3 | Pending |
 | SIZE-02 | Phase 3 | Pending |
 | SIZE-03 | Phase 4 | Pending |
@@ -95,4 +95,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-31 after Phase 1 completion*
+*Last updated: 2026-01-31 after Phase 2 completion*
