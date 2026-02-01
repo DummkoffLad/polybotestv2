@@ -8,6 +8,7 @@ Exports:
 - EquitySnapshot, EquityTracker: Timestamped equity curves
 - DrawdownAnalyzer: Peak-to-trough drawdown calculation
 - SlippageAnalyzer, SlippageMeasurement, SizingGap, SelectionGap: Slippage metrics
+- ReportGenerator: Console summaries and chart generation
 """
 
 def __getattr__(name):
@@ -39,4 +40,7 @@ def __getattr__(name):
     elif name == "SelectionGap":
         from .slippage import SelectionGap
         return SelectionGap
+    elif name == "ReportGenerator":
+        from .reports import ReportGenerator
+        return ReportGenerator
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
