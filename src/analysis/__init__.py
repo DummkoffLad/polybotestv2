@@ -1,12 +1,30 @@
 """Performance analysis modules.
 
-Provides equity tracking, drawdown analysis, slippage measurement,
-and trade attribution for evaluating trading strategy performance.
+Provides trade attribution, equity tracking, drawdown analysis, and slippage
+measurement for evaluating trading strategy performance.
+
+Exports:
+- AttributedTrade, TradeAttributor: Per-trade PnL attribution
+- EquitySnapshot, EquityTracker: Timestamped equity curves
+- DrawdownAnalyzer: Peak-to-trough drawdown calculation
+- SlippageAnalyzer, SlippageMeasurement, SizingGap, SelectionGap: Slippage metrics
 """
 
 def __getattr__(name):
     """Lazy imports to avoid circular dependencies."""
-    if name == "DrawdownAnalyzer":
+    if name == "AttributedTrade":
+        from .attribution import AttributedTrade
+        return AttributedTrade
+    elif name == "TradeAttributor":
+        from .attribution import TradeAttributor
+        return TradeAttributor
+    elif name == "EquitySnapshot":
+        from .equity_tracker import EquitySnapshot
+        return EquitySnapshot
+    elif name == "EquityTracker":
+        from .equity_tracker import EquityTracker
+        return EquityTracker
+    elif name == "DrawdownAnalyzer":
         from .drawdown import DrawdownAnalyzer
         return DrawdownAnalyzer
     elif name == "SlippageAnalyzer":
