@@ -14,6 +14,11 @@ py-clob-client>=0.34
 # Websockets (optional, for future use)
 websockets>=12.0
 
+# Analysis & visualization
+pandas>=2.0
+matplotlib>=3.8
+numpy>=1.24
+
 # Data storage
 # sqlite3 is built-in
 
