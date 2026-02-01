@@ -10,30 +10,30 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 2 of 5 (Performance Analysis)
-Plan: 2 of 4 in progress (Drawdown & Slippage Analysis)
+Plan: 2 of 4 complete (Trade Attribution & Equity Tracking, Drawdown & Slippage Analysis)
 Status: In progress
-Last activity: 2026-02-01 — Completed 02-02-PLAN.md (Drawdown & Slippage Analysis)
+Last activity: 2026-02-01 — Completed 02-01-PLAN.md (Trade Attribution & Equity Tracking)
 
-Progress: [████████████░░░░░░░░] 60% (6/10 plans complete across all phases)
+Progress: [██████████████░░░░░░] 70% (7/10 plans complete across all phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: 5min
-- Total execution time: 0.48 hours
+- Total execution time: 0.55 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-test-coverage | 4 | 19min | 5min |
-| 02-performance-analysis | 2 | 10min | 5min |
+| 02-performance-analysis | 3 | 14min | 5min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (8min), 01-03 (3min), 01-04 (4min), 02-01 (4min*), 02-02 (6min)
-- Trend: Excellent velocity, consistent 3-8min execution time
-- *Note: 02-01 running in parallel (Wave 1)
+- Last 5 plans: 01-03 (3min), 01-04 (4min), 02-01 (4min), 02-02 (6min), 02-01 (4min)
+- Trend: Excellent velocity, consistent 3-6min execution time
+- Note: 02-01 and 02-02 ran in parallel (Wave 1)
 
 *Updated after each plan completion*
 
@@ -58,6 +58,9 @@ Recent decisions affecting current work:
 - Single session for integration baselines (01-04) — Reserve other 5 sessions for Phase 5 out-of-sample validation
 - Exact regression baselines over approximations (01-04) — Lock down exact buy/sell/skip counts to catch unintended changes
 - Lazy imports to break circular dependencies (01-04) — simulation/__init__.py uses __getattr__ pattern
+- Lazy pandas import keeps EquityTracker lightweight (02-01) — Core functionality works without pandas, only to_dataframe() requires it
+- Manual snapshot recording for replay integration (02-01) — Portfolio state comes from strategy in replay, not Portfolio object
+- Trade sequencing allows multiple entries per token (02-01) — Same token can have multiple DCA/re-entry trades tracked separately
 - Use pandas cummax() for drawdown calculation (02-02) — Vectorized operation is faster and more reliable than manual peak tracking
 - Volume-weighted slippage aggregation (02-02) — Ensures larger trades have appropriate weight, matches dollar impact on PnL
 - Three gap metrics measured equally (02-02) — Price, sizing, and selection gaps provide comprehensive view of profit leakage
@@ -77,8 +80,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-01 (plan 02-02 execution complete)
-Stopped at: Completed 02-02-PLAN.md — DrawdownAnalyzer and SlippageAnalyzer with 22 tests passing
+Last session: 2026-02-01 (plan 02-01 execution complete)
+Stopped at: Completed 02-01-PLAN.md — AttributedTrade, TradeAttributor, EquitySnapshot, EquityTracker with 19 tests passing
 Resume file: None
 Next action: Continue with remaining Phase 2 plans (02-03, 02-04)
 
