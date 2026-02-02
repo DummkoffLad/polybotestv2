@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Test Coverage** - Validate existing strategy and risk implementations
 - [x] **Phase 2: Performance Analysis** - Track attribution, drawdown, and profit leakage
-- [ ] **Phase 3: Dynamic Sizing** - Adapt position sizing to current capital
+- [x] **Phase 3: Dynamic Sizing** - Adapt position sizing to current capital
 - [ ] **Phase 4: Advanced Sizing** - Optimize capital efficiency and edge-based sizing
 - [ ] **Phase 5: Validation** - Prove robustness through out-of-sample testing
 
@@ -65,10 +65,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- DynamicSizer engine (percentage-based position sizing with TDD)
-- [ ] 03-02-PLAN.md -- CapitalManager floor system (two-tier soft/hard floor protection with TDD)
-- [ ] 03-03-PLAN.md -- TradeQualityScorer and SelectiveFollower (trade filtering with TDD)
-- [ ] 03-04-PLAN.md -- Wire dynamic sizing into MirrorStrategy (integration + regression tests)
+- [x] 03-01-PLAN.md -- DynamicSizer engine (percentage-based position sizing with TDD)
+- [x] 03-02-PLAN.md -- CapitalManager floor system (two-tier soft/hard floor protection with TDD)
+- [x] 03-03-PLAN.md -- TradeQualityScorer and SelectiveFollower (trade filtering with TDD)
+- [x] 03-04-PLAN.md -- Wire dynamic sizing into MirrorStrategy (integration + regression tests)
 
 ### Phase 4: Advanced Sizing
 **Goal**: Each dollar is allocated to maximize risk-adjusted returns
@@ -107,10 +107,10 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Test Coverage | 4/4 | Complete | 2026-01-31 |
 | 2. Performance Analysis | 3/3 | Complete | 2026-01-31 |
-| 3. Dynamic Sizing | 0/4 | In Progress | - |
+| 3. Dynamic Sizing | 4/4 | Complete | 2026-02-02 |
 | 4. Advanced Sizing | 0/TBD | Not started | - |
 | 5. Validation | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-30*
-*Last updated: 2026-02-01 after Phase 3 planning*
+*Last updated: 2026-02-02 after Phase 3 execution complete*

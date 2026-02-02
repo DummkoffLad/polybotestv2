@@ -21,8 +21,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Small-Budget Sizing
 
-- [ ] **SIZE-01**: Dynamic position sizing — caps as % of current capital, adapts to growth/drawdown
-- [ ] **SIZE-02**: Selective following — filter for high-confidence trades, skip low-edge setups
+- [x] **SIZE-01**: Dynamic position sizing — caps as % of current capital, adapts to growth/drawdown
+- [x] **SIZE-02**: Selective following — filter for high-confidence trades, skip low-edge setups
 - [ ] **SIZE-03**: Kelly criterion position sizing proportional to estimated edge and bankroll
 - [ ] **SIZE-04**: Capital efficiency scoring to prioritize best risk-adjusted return per dollar
 
@@ -80,8 +80,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ANAL-01 | Phase 2 | Complete |
 | ANAL-02 | Phase 2 | Complete |
 | ANAL-03 | Phase 2 | Complete |
-| SIZE-01 | Phase 3 | Pending |
-| SIZE-02 | Phase 3 | Pending |
+| SIZE-01 | Phase 3 | Complete |
+| SIZE-02 | Phase 3 | Complete |
 | SIZE-03 | Phase 4 | Pending |
 | SIZE-04 | Phase 4 | Pending |
 | RBST-01 | Phase 5 | Pending |
@@ -95,4 +95,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-31 after Phase 2 completion*
+*Last updated: 2026-02-02 after Phase 3 completion*
