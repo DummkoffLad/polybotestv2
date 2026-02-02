@@ -65,14 +65,16 @@ class LatencySimulator:
         # Use private Random instance for reproducibility
         self._rng = random.Random(config.seed)
 
-    def sample_detection_delay(self) -> timedelta:
+    def _sample_delay(self, base_ms: float) -> timedelta:
         """
-        Sample detection delay with jitter.
+        Sample a delay with jitter.
+
+        Args:
+            base_ms: Base delay in milliseconds
 
         Returns:
-            timedelta representing detection delay
+            timedelta representing sampled delay
         """
-        base_ms = self.config.detection_delay_ms
         if base_ms == 0:
             return timedelta(0)
 
@@ -84,6 +86,15 @@ class LatencySimulator:
         )
 
         return timedelta(milliseconds=delay_ms)
+
+    def sample_detection_delay(self) -> timedelta:
+        """
+        Sample detection delay with jitter.
+
+        Returns:
+            timedelta representing detection delay
+        """
+        return self._sample_delay(self.config.detection_delay_ms)
 
     def sample_execution_delay(self) -> timedelta:
         """
@@ -92,18 +103,7 @@ class LatencySimulator:
         Returns:
             timedelta representing execution delay
         """
-        base_ms = self.config.execution_delay_ms
-        if base_ms == 0:
-            return timedelta(0)
-
-        # Apply jitter: uniform random in [base * (1 - jitter), base * (1 + jitter)]
-        jitter_range = base_ms * self.config.jitter_pct
-        delay_ms = self._rng.uniform(
-            max(0, base_ms - jitter_range),  # Never negative
-            base_ms + jitter_range
-        )
-
-        return timedelta(milliseconds=delay_ms)
+        return self._sample_delay(self.config.execution_delay_ms)
 
     def sample_total_delay(self) -> timedelta:
         """
