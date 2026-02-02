@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 4 of 5 (Advanced Sizing)
-Plan: 3 of 4 complete
-Status: In progress
-Last activity: 2026-02-02 — Completed 04-03-PLAN.md (Adaptive Sizer)
+Plan: 4 of 4 complete
+Status: Phase complete
+Last activity: 2026-02-02 — Completed 04-04-PLAN.md (Kelly Integration)
 
-Progress: [████████████████████░] 100% (14/14 plans complete across 4 phases, Phase 4 complete!)
+Progress: [█████████████████████] 100% (15/15 plans complete across 4 phases, Phase 4 complete!)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
+- Total plans completed: 15
 - Average duration: 4min
-- Total execution time: 1.05 hours
+- Total execution time: 1.13 hours (68 minutes)
 
 **By Phase:**
 
@@ -30,12 +30,12 @@ Progress: [████████████████████░] 100%
 | 01-test-coverage | 4 | 19min | 5min |
 | 02-performance-analysis | 4 | 20min | 5min |
 | 03-dynamic-sizing | 4 | 15min | 4min |
-| 04-advanced-sizing | 3 | 12min | 4min |
+| 04-advanced-sizing | 4 | 20min | 5min |
 
 **Recent Trend:**
-- Last 5 plans: 03-04 (9min), 04-01 (4min), 04-02 (5min), 04-03 (3min)
-- Trend: TDD tasks remain fast (2-5min), integration tasks longer (9min)
-- Note: Phase 4 complete! All adaptive sizing components built
+- Last 5 plans: 04-01 (4min), 04-02 (5min), 04-03 (3min), 04-04 (8min)
+- Trend: TDD tasks remain fast (3-5min), integration tasks longer (8-9min)
+- Note: Phase 4 complete! All Kelly components integrated into MirrorStrategy
 
 *Updated after each plan completion*
 
@@ -95,6 +95,8 @@ Recent decisions affecting current work:
 - Conviction multiplier applied AFTER Kelly sizing (04-03) — Kelly fraction reduces volatility, conviction adjusts for signal strength
 - Phase 3 fallback ensures no trades skipped (04-03) — Cold start is normal, all trades deserve sizing
 - Return tuple (size_or_None, reason_string) (04-03) — Transparency for debugging and monitoring
+- Entry price captured before portfolio mutation (04-04) — pos_before is mutable reference, save values before apply_sell()
+- 95% win rate in tests (04-04) — Kelly rejects 100% win rate as unrealistic, use 19 wins + 1 loss for realism
 
 ### Pending Todos
 
@@ -108,16 +110,34 @@ None yet.
 - Documented in test_multiple_markets_same_token_id
 - Should be tracked for future fix, but doesn't block testing
 
-**Risk cap test baselines updated (03-04 → orchestrator fix):**
-- 6 tests updated for dynamic sizing behavior (smaller positions, new skip reasons)
-- All tests now passing — 361 total (up from 349, added 12 in 04-03)
+**pos_before mutation bug (discovered and fixed in 04-04):**
+- portfolio.get() returns mutable reference, not snapshot
+- apply_sell() modified pos_before.avg_price to 0 before EdgeTracker check
+- Fixed by capturing entry_price and had_position before apply_sell()
+- Bug prevented EdgeTracker from recording any trades (silent failure)
+
+**All tests now passing — 369 total:**
+- Phase 1: 22 tests (test coverage)
+- Phase 2: 9 tests (performance analysis)
+- Phase 3: 20 tests (dynamic sizing)
+- Phase 4: 20 tests (Kelly sizing: 12 unit + 8 integration)
+- Integration: 41 tests (session replay)
+- Existing: 257 tests (portfolio, strategies, core)
 
 ## Session Continuity
 
-Last session: 2026-02-02 (Phase 4 plan 04-03 complete)
-Stopped at: Completed 04-03 (Adaptive Sizer) — 361 tests, 100% pass rate
+Last session: 2026-02-02 (Phase 4 plan 04-04 complete)
+Stopped at: Completed 04-04 (Kelly Integration) — 369 tests, 100% pass rate
 Resume file: None
 Next action: Phase 4 complete! Ready for Phase 5 (Integration & Validation)
+
+**Phase 4 Summary:**
+- 4 plans completed in 20 minutes
+- Built EdgeTracker, KellyCalculator, ConvictionScorer, TradeRanker, AdaptiveSizer
+- Integrated all components into MirrorStrategy
+- Added 20 tests (12 unit + 8 integration)
+- Fixed pos_before mutation bug
+- All 369 tests passing
 
 ---
 *State initialized: 2026-01-30*
