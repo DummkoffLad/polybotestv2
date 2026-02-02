@@ -5,4 +5,16 @@ This module provides tools for out-of-sample testing, parameter sensitivity anal
 latency simulation, and validation reporting.
 """
 
-__all__ = []
+from .data_split import DataSplitManager
+from .sensitivity import (
+    SensitivitySweeper,
+    SensitivityResult,
+    ParamSweepResult,
+)
+
+__all__ = [
+    "DataSplitManager",
+    "SensitivitySweeper",
+    "SensitivityResult",
+    "ParamSweepResult",
+]
