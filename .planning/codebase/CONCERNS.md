@@ -294,6 +294,69 @@
 - Risk: Error handling code is untested; edge cases could crash bot unexpectedly
 - Priority: MEDIUM - resilience requires error testing
 
+## Recording Data & Process Improvements
+
+**Priority: HIGH — Recording quality directly determines backtest/analysis reliability.**
+
+These are questions to answer and improvements to make to the session recording system
+(`src/framework/recorder.py`) before trusting recorded data for strategy decisions.
+
+### Questions to Resolve
+1. **What additional data should we capture per event?** Current recording misses:
+   - Order book depth (not just best bid/ask — how much liquidity at each level?)
+   - Volume context (what's the 1h/24h volume for this market at event time?)
+   - Market metadata (time until resolution, total liquidity, number of active traders)
+   - Other leader activity (are multiple leaders trading the same market simultaneously?)
+   - Our portfolio state at decision time (what was our exposure when we made/skipped the trade?)
+
+2. **Is the price snapshot interval (2s) correct?** For momentum detection:
+   - 2s may miss fast spikes — should we capture on every price change instead?
+   - Should we record both polling snapshots AND event-triggered snapshots?
+   - What resolution do we need for the "afternoon spike" pattern analysis?
+
+3. **What market-wide context matters?** For pattern detection:
+   - Overall market sentiment indicators (total Polymarket volume, trending markets)
+   - Correlated market movements (do YES tokens in related markets move together?)
+   - Time-of-day patterns require consistent timezone handling — is UTC enough?
+
+4. **What's missing for accurate replay?**
+   - Latency: time between leader trade and our detection isn't recorded
+   - Slippage: difference between decision price and fill price (critical for live accuracy)
+   - Rejection data: when orders fail, why? (rate limit, insufficient funds, API error)
+
+### Improvements to Implement
+
+**Data Enrichment:**
+- Record portfolio state snapshot with each event (total deployed, per-market exposure, available capital)
+- Add market metadata fields (resolution date, total volume, liquidity depth)
+- Capture detection latency (`leader_trade.timestamp` vs `datetime.now()` delta)
+- Record the full decision trace: all factors that led to trade/skip, not just skip_reason string
+
+**Recording Reliability:**
+- Line 158: bare `except: pass` in `_record_price_snapshot()` silently drops price failures — should log
+- No validation that recorded data can actually be replayed (roundtrip test needed)
+- No checksums or event counts to detect truncated/corrupted session files
+- File is flushed per-write (good) but no fsync — crash could lose last buffer
+
+**Analysis-Ready Format:**
+- Current JSONL is good for streaming but hard to query — consider also writing a SQLite summary
+- Add session-level statistics in `session_end` record (total events, markets seen, decisions made)
+- Tag events with market category/type for filtering during analysis
+- Include config hash so you can track which config produced which results
+
+**Process Improvements:**
+- Automate post-session analysis: script that reads session JSONL and produces summary stats
+- Build a "data quality report" that flags sessions with missing prices, gaps in snapshots, etc.
+- Create a recording validation step that runs after each session to catch issues immediately
+- Store sessions with metadata index (date, strategy, markets, PnL) for easy lookup
+
+### Pattern Analysis Preparation
+To investigate the "afternoon spike" hypothesis and other market patterns:
+- Need consistent recording across multiple full trading days (not just when bot is actively trading)
+- Record market-wide price movements, not just markets the leader trades
+- Timestamp precision should be milliseconds for latency analysis
+- Consider a separate lightweight "market monitor" that records prices for all active markets continuously, independent of the trading bot
+
 ---
 
 *Concerns audit: 2026-01-30*

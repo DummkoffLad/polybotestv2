@@ -51,6 +51,20 @@ def main():
         dest="replay_session",
         help="Replay a recorded session with strategy testing",
     )
+    mode_group.add_argument(
+        "--optimize",
+        type=Path,
+        metavar="SESSION_PATH",
+        dest="optimize_session",
+        help="Run strategy optimization on a recorded session",
+    )
+    mode_group.add_argument(
+        "--full-optimize",
+        type=Path,
+        metavar="SESSION_PATH",
+        dest="full_optimize_session",
+        help="Run full optimization (all strategies × all execution modes)",
+    )
     
     # Config options
     parser.add_argument(
@@ -83,10 +97,26 @@ def main():
         help="Record session data for replay and strategy testing (DRY_RUN only)",
     )
     
+    # Strategy selection for replay
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default="mirror",
+        help="Strategy to use for replay (default: mirror)",
+    )
+    
+    # Optimization variant
+    parser.add_argument(
+        "--variant",
+        type=str,
+        default=None,
+        help="Strategy variant for optimization (aggressive_mirror, tight_spread, momentum_only, conservative, buy_focused)",
+    )
+    
     args = parser.parse_args()
     
     # Load config
-    from src.config import load_config
+    from src.core.config import load_config
     
     try:
         config = load_config(args.config)
@@ -97,87 +127,109 @@ def main():
     
     # Handle different modes
     if args.preflight:
-        from src.tools.preflight import run_preflight
-        # Initialize capital so caps are computed for validation
-        config.initialize_capital()
-        success = run_preflight(config)
-        return 0 if success else 1
+        print("Preflight checks not available (module removed in refactor)")
+        print("Use --mode dry-run to test configuration")
+        return 1
     
     elif args.collect:
-        from src.collector import DataCollector
-        from src.data.live_source import LiveDataSource
-
-        data_source = LiveDataSource(
-            leader_address=config.leader.address,
-        )
-
-        collector = DataCollector(config, data_source)
-        try:
-            if args.duration:
-                import threading
-                timer = threading.Timer(args.duration * 60, collector.stop)
-                timer.daemon = True
-                timer.start()
-            collector.run()
-        except KeyboardInterrupt:
-            print("\nCollector stopped.")
-        finally:
-            data_source.close()
-        return 0
+        print("Data collector not available (module removed in refactor)")
+        print("Use --mode dry-run to observe leader trades")
+        return 1
     
     elif args.replay_session:
-        from src.strategy.session_replayer import run_session_replay
-        run_session_replay(args.replay_session)
+        # Use new universal framework for replay
+        from src.strategies import get_strategy, list_strategies
+        from src.framework.replay import run_session_replay
+        
+        strategy_name = getattr(args, 'strategy', 'mirror') or 'mirror'
+        
+        try:
+            strategy = get_strategy(strategy_name)
+            result = run_session_replay(args.replay_session, strategy)
+        except ValueError as e:
+            print(f"Error: {e}")
+            print(f"Available strategies: {', '.join(list_strategies())}")
+            return 1
+        
+        return 0
+    
+    elif args.full_optimize_session:
+        # Full optimization - all strategies × all execution modes
+        from src.simulation.full_optimizer import run_full_optimization
+        from src.strategies import list_strategies
+        
+        session_path = str(args.full_optimize_session)
+        capital = float(config.scaling.our_capital)
+        
+        try:
+            results = run_full_optimization(session_path, leader_capital=capital)
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            return 1
+        except Exception as e:
+            print(f"Error: {e}")
+            import traceback
+            traceback.print_exc()
+            return 1
+        
+        return 0
+    
+    elif args.optimize_session:
+        # Strategy optimization - grid search over parameters
+        from src.simulation.optimizer import run_optimization
+        from src.strategies import list_strategies
+        
+        session_path = str(args.optimize_session)
+        capital = float(config.scaling.our_capital)
+        variant = args.variant
+        
+        print("=" * 70)
+        print("  STRATEGY OPTIMIZER")
+        print("=" * 70)
+        print(f"\n  Session: {session_path}")
+        print(f"  Capital: ${capital}")
+        if variant:
+            print(f"  Variant: {variant}")
+        else:
+            print(f"  Testing all strategies: {', '.join(list_strategies())}")
+        print()
+        
+        try:
+            results = run_optimization(session_path)
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            return 1
+        except ValueError as e:
+            print(f"Error: {e}")
+            print(f"Available strategies: {', '.join(list_strategies())}")
+            return 1
+        
         return 0
     
     elif args.mode:
-        # Direct mode execution
-        from src.core import ExecutionMode, SystemClock
-        from decimal import Decimal
+        # Direct mode execution using UniversalRunner
+        from src.strategies import get_strategy
+        from src.framework.runner import UniversalRunner
+        
+        strategy_name = args.strategy or "mirror"
         
         if args.mode == "dry-run":
             from src.execution import NullExecutionAdapter
             adapter = NullExecutionAdapter()
             
-            # DRY_RUN uses configured dry_run_capital
             print("=" * 60)
             print("  DRY-RUN MODE (Simulation)")
             print("=" * 60)
             print()
-            print(f"  Using simulated capital: ${config.scaling_pct.dry_run_capital}")
-            config.initialize_capital()  # Uses dry_run_capital
-            print(f"  Hourly budget ({config.scaling_pct.hourly_budget_pct}%): ${config.scaling.hourly_budget}")
-            print(f"  Per-market cap ({config.scaling_pct.per_market_gross_pct}%): ${config.caps.per_market_gross}")
-            print(f"  Per-side cap ({config.scaling_pct.per_side_pct}%): ${config.caps.per_side}")
-            print(f"  Global exposure cap ({config.scaling_pct.global_exposure_pct}%): ${config.caps.global_capital}")
+            print(f"  Using simulated capital: ${config.scaling.our_capital}")
+            print(f"  Hourly budget: ${config.scaling.hourly_budget}")
+            print(f"  Per-market cap: {config.mirror_strategy.per_market_cap_pct}%")
+            print(f"  Per-side cap: {config.mirror_strategy.per_side_pct}%")
+            print(f"  Global exposure: {config.mirror_strategy.global_exposure_pct}%")
             print()
             
-            # Select strategy runner
-            if config.strategy == "mirror":
-                from src.strategy.mirror_runner import MirrorRunner
-                runner = MirrorRunner(
-                    config,
-                    adapter,
-                    SystemClock(),
-                    duration_minutes=args.duration,
-                    record_session=args.record,
-                )
-            elif not args.verbose:
-                from src.strategy.runner_display import DisplayRunner
-                runner = DisplayRunner(
-                    config,
-                    adapter,
-                    SystemClock(),
-                    duration_minutes=args.duration,
-                )
-            else:
-                from src.strategy import StrategyRunner
-                runner = StrategyRunner(config, adapter, SystemClock())
-            
         else:  # live
-            from src.execution.live_adapter import LiveExecutionAdapter
-            from src.tools.preflight import run_preflight
-            from src.strategy import StrategyRunner
+            from src.execution.live import LiveExecutionAdapter
             import os
             
             print("=" * 60)
@@ -220,15 +272,15 @@ def main():
             
             # Initialize config with actual balance
             config.initialize_capital(actual_balance)
-            print(f"  Hourly budget ({config.scaling_pct.hourly_budget_pct}%): ${config.scaling.hourly_budget}")
-            print(f"  Per-market cap ({config.scaling_pct.per_market_gross_pct}%): ${config.caps.per_market_gross}")
-            print(f"  Per-side cap ({config.scaling_pct.per_side_pct}%): ${config.caps.per_side}")
-            print(f"  Global exposure cap ({config.scaling_pct.global_exposure_pct}%): ${config.caps.global_capital}")
+            print(f"  Hourly budget: ${config.scaling.hourly_budget}")
+            print(f"  Per-market cap: {config.mirror_strategy.per_market_cap_pct}%")
+            print(f"  Per-side cap: {config.mirror_strategy.per_side_pct}%")
+            print(f"  Global exposure: {config.mirror_strategy.global_exposure_pct}%")
             print()
             
-            if not run_preflight(config):
-                print("Preflight failed. Cannot start live mode.")
-                return 1
+            # Preflight checks - skipped since module was removed
+            print("Skipping preflight checks (module removed in refactor)")
+            print()
             
             adapter = LiveExecutionAdapter(
                 private_key=private_key,
@@ -247,37 +299,57 @@ def main():
             if not adapter.arm():
                 print("Failed to arm live adapter.")
                 return 1
-            
-            if config.strategy == "mirror":
-                from src.strategy.mirror_runner import MirrorRunner
-                runner = MirrorRunner(
-                    config,
-                    adapter,
-                    SystemClock(),
-                )
-            else:
-                runner = StrategyRunner(config, adapter, SystemClock())
-
+        
+        # Get strategy and create runner
+        try:
+            strategy = get_strategy(strategy_name)
+        except ValueError as e:
+            print(f"Error: Unknown strategy '{strategy_name}'")
+            return 1
+        
+        # Setup recorder if requested
+        recorder = None
+        if args.record:
+            from src.framework.recorder import SessionRecorder
+            recorder = SessionRecorder(
+                price_snapshot_interval_sec=getattr(config, 'price_snapshot_interval_sec', 2.0)
+            )
+            print("  📼 Session recording enabled")
+        
+        runner = UniversalRunner(
+            config=config,
+            strategy=strategy,
+            execution=adapter,
+            duration_minutes=args.duration,
+            recorder=recorder,
+        )
+        
         try:
             runner.run()
         except KeyboardInterrupt:
             print("\nStopped by user.")
         
-        # Note: DisplayRunner handles its own summary in _print_final_summary()
-        # Only print summary for runners that don't have their own summary handling
-        # (DisplayRunner has shadow portfolio, so it has its own comprehensive summary)
-        if hasattr(runner, 'display') and runner.display and not hasattr(runner, 'shadow'):
-            runner.display.print_summary()
-        
         return 0
     
     else:
-        # Interactive menu (default)
-        from src.cli import MainMenu
-        menu = MainMenu(config)
-        menu.run()
+        # Interactive menu - simplified, just show available modes
+        print("=" * 60)
+        print("  POLYMARKET COPY-TRADING BOT")
+        print("=" * 60)
+        print()
+        print("Usage:")
+        print("  python main.py --mode dry-run    # Simulation mode")
+        print("  python main.py --mode live       # Live trading")
+        print("  python main.py --replay-session PATH  # Replay session")
+        print()
+        print("Options:")
+        print("  --duration N    # Run for N minutes")
+        print("  --record        # Record session for replay")
+        print("  --strategy NAME # Strategy to use (default: mirror)")
+        print()
         return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+

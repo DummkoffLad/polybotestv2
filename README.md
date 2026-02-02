@@ -76,7 +76,14 @@ polybotestv2/
 ├── src/
 │   ├── core/                # Core types and logic
 │   ├── execution/           # Execution adapters (strict separation)
-│   ├── strategy/            # Trading strategy
+│   ├── strategies/          # Trading strategies (NEW universal framework)
+│   │   ├── base.py         # Strategy ABC, MarketEvent, TradeDecision
+│   │   └── mirror/         # Mirror strategy implementation
+│   ├── framework/           # Universal runner/recorder/replayer
+│   │   ├── runner.py       # Universal async runner
+│   │   ├── recorder.py     # Strategy-agnostic session recorder
+│   │   └── replay.py       # Session replayer for any strategy
+│   ├── strategy/            # (Legacy) Trading strategy
 │   ├── collector/           # Data collection
 │   ├── simulator/           # Replay simulation
 │   ├── logging/             # Structured logging & tracing
@@ -85,10 +92,54 @@ polybotestv2/
 ├── tests/                   # Unit and integration tests
 ├── data/                    # Data directory (gitignored)
 │   ├── collected/          # Collected leader/market data
+│   ├── sessions/           # Recorded sessions for replay
 │   ├── traces/             # Decision traces
 │   └── state/              # Persisted state
 ├── main.py                 # Entry point
 └── requirements.txt
+```
+
+## Universal Strategy Framework
+
+The bot uses a universal strategy framework that allows:
+
+1. **Adding new strategies by writing a single file** - implement the `Strategy` interface
+2. **Universal session recording** - works with any strategy
+3. **Universal replay/backtesting** - test any strategy against recorded sessions
+4. **Same interface for live and replay** - strategies don't know the difference
+
+### Creating a New Strategy
+
+```python
+from src.strategies import Strategy, StrategyConfig, MarketEvent, TradeDecision, register_strategy
+
+@register_strategy
+class MyStrategy(Strategy):
+    @property
+    def name(self) -> str:
+        return "mystrategy"
+    
+    def initialize(self, config: StrategyConfig) -> None:
+        # Set up strategy state
+        pass
+    
+    def on_event(self, event: MarketEvent) -> TradeDecision:
+        # Core logic: receive event, return decision
+        return TradeDecision.skip("not implemented")
+    
+    def on_fill(self, event: MarketEvent, decision: TradeDecision) -> None:
+        # Update state after execution
+        pass
+    
+    def get_state(self) -> Dict[str, Any]:
+        return {}
+```
+
+### Replaying Sessions
+
+```bash
+# Replay a session with any strategy
+python main.py --replay-session data/sessions/session_xxx.jsonl --strategy mirror
 ```
 
 ## Execution Modes
