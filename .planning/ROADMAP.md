@@ -62,10 +62,13 @@ Plans:
   2. Capital compounds after wins and contracts after losses
   3. Low-confidence trades are skipped based on spread cost or other filters
   4. Selective following conserves capital for high-edge opportunities
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] TBD during planning
+- [ ] 03-01-PLAN.md -- DynamicSizer engine (percentage-based position sizing with TDD)
+- [ ] 03-02-PLAN.md -- CapitalManager floor system (two-tier soft/hard floor protection with TDD)
+- [ ] 03-03-PLAN.md -- TradeQualityScorer and SelectiveFollower (trade filtering with TDD)
+- [ ] 03-04-PLAN.md -- Wire dynamic sizing into MirrorStrategy (integration + regression tests)
 
 ### Phase 4: Advanced Sizing
 **Goal**: Each dollar is allocated to maximize risk-adjusted returns
@@ -98,16 +101,16 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Test Coverage | 4/4 | Complete ✓ | 2026-01-31 |
-| 2. Performance Analysis | 3/3 | Complete ✓ | 2026-01-31 |
-| 3. Dynamic Sizing | 0/TBD | Not started | - |
+| 1. Test Coverage | 4/4 | Complete | 2026-01-31 |
+| 2. Performance Analysis | 3/3 | Complete | 2026-01-31 |
+| 3. Dynamic Sizing | 0/4 | In Progress | - |
 | 4. Advanced Sizing | 0/TBD | Not started | - |
 | 5. Validation | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-30*
-*Last updated: 2026-01-31 after Phase 2 completion*
+*Last updated: 2026-02-01 after Phase 3 planning*
