@@ -97,10 +97,14 @@ Plans:
   2. Results remain stable when parameters are tweaked by 10-20%
   3. Replay simulations include realistic API latency delays
   4. Validation report shows confidence intervals and robustness metrics
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] TBD during planning
+- [ ] 05-01-PLAN.md -- DataSplitManager (in-sample vs out-of-sample session tracking with TDD)
+- [ ] 05-02-PLAN.md -- SensitivitySweeper (parameter robustness testing with TDD)
+- [ ] 05-03-PLAN.md -- LatencySimulator (detection + execution delay modeling with TDD)
+- [ ] 05-04-PLAN.md -- ValidationReportGenerator (go/no-go decision logic + report formatting with TDD)
+- [ ] 05-05-PLAN.md -- ValidationPipeline (wire components + integration tests)
 
 ## Progress
 
@@ -113,8 +117,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Performance Analysis | 3/3 | Complete | 2026-01-31 |
 | 3. Dynamic Sizing | 4/4 | Complete | 2026-02-02 |
 | 4. Advanced Sizing | 5/5 | Complete | 2026-02-02 |
-| 5. Validation | 0/TBD | Not started | - |
+| 5. Validation | 0/5 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-30*
-*Last updated: 2026-02-02 after Phase 4 execution complete*
+*Last updated: 2026-02-02 after Phase 5 planning complete*
