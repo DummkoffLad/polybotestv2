@@ -339,6 +339,9 @@ class MirrorStrategy(Strategy):
 
         # Get position before applying trade (for PnL estimation on sells)
         pos_before = self.portfolio.get(trade.token_id, trade.market_id, side)
+        # Save values before modification (pos_before is a reference that gets modified!)
+        entry_price = pos_before.avg_price
+        had_position = entry_price > 0
 
         if decision.action == DecisionAction.BUY:
             self.portfolio.apply_buy(trade.token_id, trade.market_id, side, shares, price)
@@ -348,15 +351,15 @@ class MirrorStrategy(Strategy):
 
             # Estimate PnL for consecutive loss tracking
             # Simple heuristic: if sell price > avg_price, it's a win, else loss
-            if pos_before.avg_price > 0:
-                pnl_estimate = (price - pos_before.avg_price) * shares
+            if had_position:
+                pnl_estimate = (price - entry_price) * shares
                 self.sizer.update_after_trade(pnl_estimate)
 
                 # Update edge tracker after sells (trade completion)
-                pnl_pct = (price - pos_before.avg_price) / pos_before.avg_price
+                pnl_pct = (price - entry_price) / entry_price
                 trade_result = TradeResult(
                     token_id=trade.token_id,
-                    entry_price=pos_before.avg_price,
+                    entry_price=entry_price,
                     exit_price=price,
                     pnl_pct=pnl_pct,
                     timestamp=datetime.now(timezone.utc)

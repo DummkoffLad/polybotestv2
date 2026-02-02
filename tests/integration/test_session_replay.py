@@ -32,7 +32,7 @@ EXPECTED_BASELINES = {
     "aggressive_mirror": {"buys": 24, "sells": 26, "skips": 182},
     "conservative_mirror": {"buys": 26, "sells": 25, "skips": 181},
     "hybrid_conservative": {"buys": 27, "sells": 26, "skips": 179},
-    "mirror": {"buys": 23, "sells": 22, "skips": 187},  # Updated for dynamic sizing (filters 45 low-quality trades)
+    "mirror": {"buys": 23, "sells": 22, "skips": 187},  # Phase 4 Kelly integration: conviction multiplier adjusts sizes, baselines unchanged from Phase 3
     "momentum_mirror": {"buys": 25, "sells": 24, "skips": 183},
     "price_level": {"buys": 28, "sells": 26, "skips": 178},
     "spread_aware": {"buys": 23, "sells": 24, "skips": 185},
