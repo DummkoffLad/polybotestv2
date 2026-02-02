@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 
 ## Current Position
 
-Phase: 3 of 5 (Dynamic Sizing)
-Plan: 4 of 4 complete
-Status: Phase complete ✓ (verified — 19/19 must-haves, 303/303 tests passing)
-Last activity: 2026-02-02 — Phase 3 verified, all 4 success criteria passed
+Phase: 4 of 5 (Advanced Sizing)
+Plan: 1 of 4 complete
+Status: In progress
+Last activity: 2026-02-02 — Completed 04-01-PLAN.md (Edge Tracking & Kelly Calculator)
 
-Progress: [████████████████████] 100% (11/11 plans complete across 3 phases, 2 phases remaining)
+Progress: [████████████████████░] 92% (12/13 plans complete across 4 phases, 1 phase remaining)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 12
 - Average duration: 4min
-- Total execution time: 0.85 hours
+- Total execution time: 0.92 hours
 
 **By Phase:**
 
@@ -30,11 +30,12 @@ Progress: [████████████████████] 100% (1
 | 01-test-coverage | 4 | 19min | 5min |
 | 02-performance-analysis | 4 | 20min | 5min |
 | 03-dynamic-sizing | 4 | 15min | 4min |
+| 04-advanced-sizing | 1 | 4min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (4min), 02-03 (6min), 03-02 (2min), 03-03 (2min), 03-04 (9min)
-- Trend: Integration task took longer (9min) than TDD tasks (2min), but still fast overall
-- Note: Phase 3 complete - all dynamic sizing implemented and tested
+- Last 5 plans: 03-02 (2min), 03-03 (2min), 03-04 (9min), 04-01 (4min)
+- Trend: TDD tasks remain fast (2-4min), integration tasks longer (9min)
+- Note: Phase 4 started - edge tracking and Kelly calculator complete
 
 *Updated after each plan completion*
 
@@ -81,6 +82,11 @@ Recent decisions affecting current work:
 - Quality threshold set to 0.40 (03-04) — Permissive to minimize test disruption while still filtering worst trades
 - Equity calculation simplified (03-04) — starting_capital + realized_pnl (deployed cancels out in expansion)
 - Updated mirror baseline to 23/22/187 (03-04) — Quality filtering reduces trade count by ~20%
+- Rolling window size 50 trades (04-01) — Balances recency with statistical significance
+- Minimum 20 trades for Kelly (04-01) — Statistical minimum for meaningful win rate estimation
+- Half Kelly (0.5x) (04-01) — Reduces volatility ~50% while keeping ~75% growth rate
+- 20% max position cap (04-01) — Risk management, prevents single position domination
+- Edge case defaults (04-01) — All wins → avg_loss=0.01, all losses → avg_win=0 (avoids div by zero)
 
 ### Pending Todos
 
@@ -100,10 +106,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-02 (Phase 3 execution and verification complete)
-Stopped at: Phase 3 verified — 303 tests, 100% pass rate, 4/4 success criteria verified
+Last session: 2026-02-02 (Phase 4 plan 04-01 complete)
+Stopped at: Completed 04-01 (Edge Tracking & Kelly Calculator) — 326 tests, 100% pass rate
 Resume file: None
-Next action: Run /gsd:discuss-phase 4 to gather context for Phase 4 (Advanced Sizing)
+Next action: Execute 04-02 (Kelly-Adjusted Sizing integration)
 
 ---
 *State initialized: 2026-01-30*
