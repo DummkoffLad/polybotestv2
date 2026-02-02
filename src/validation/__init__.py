@@ -6,6 +6,11 @@ latency simulation, and validation reporting.
 """
 
 from .data_split import DataSplitManager
+from .latency_sim import (
+    LatencyConfig,
+    LatencySimulator,
+    LatencyImpactResult,
+)
 from .sensitivity import (
     SensitivitySweeper,
     SensitivityResult,
@@ -19,6 +24,9 @@ from .report import (
 
 __all__ = [
     "DataSplitManager",
+    "LatencyConfig",
+    "LatencySimulator",
+    "LatencyImpactResult",
     "SensitivitySweeper",
     "SensitivityResult",
     "ParamSweepResult",
