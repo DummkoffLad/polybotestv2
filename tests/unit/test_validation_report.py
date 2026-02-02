@@ -38,7 +38,7 @@ class TestGoNoGoDecision:
         assert decision.criteria_results["acceptable_downside"] is True
         assert decision.criteria_results["no_critical_fragile"] is True
         assert decision.criteria_results["acceptable_latency"] is True
-        assert "GO" in decision.rationale.upper()
+        assert "PASS" in decision.rationale.upper()
         assert decision.overall_confidence == "high"
 
     def test_negative_mean_pnl_produces_no_go(self):
