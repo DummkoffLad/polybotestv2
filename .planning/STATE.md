@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 4 of 5 (Advanced Sizing)
-Plan: 4 of 4 complete
+Plan: 5 of 5 complete
 Status: Phase complete
-Last activity: 2026-02-02 — Completed 04-04-PLAN.md (Kelly Integration)
+Last activity: 2026-02-02 — Completed 04-05-PLAN.md (Kelly Statistical Validation)
 
-Progress: [█████████████████████] 100% (15/15 plans complete across 4 phases, Phase 4 complete!)
+Progress: [█████████████████████] 100% (16/16 plans complete across 4 phases, Phase 4 complete!)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
-- Average duration: 4min
-- Total execution time: 1.13 hours (68 minutes)
+- Total plans completed: 16
+- Average duration: 4.5min
+- Total execution time: 1.20 hours (72 minutes)
 
 **By Phase:**
 
@@ -30,12 +30,12 @@ Progress: [█████████████████████] 100%
 | 01-test-coverage | 4 | 19min | 5min |
 | 02-performance-analysis | 4 | 20min | 5min |
 | 03-dynamic-sizing | 4 | 15min | 4min |
-| 04-advanced-sizing | 4 | 20min | 5min |
+| 04-advanced-sizing | 5 | 24min | 5min |
 
 **Recent Trend:**
-- Last 5 plans: 04-01 (4min), 04-02 (5min), 04-03 (3min), 04-04 (8min)
-- Trend: TDD tasks remain fast (3-5min), integration tasks longer (8-9min)
-- Note: Phase 4 complete! All Kelly components integrated into MirrorStrategy
+- Last 5 plans: 04-02 (5min), 04-03 (3min), 04-04 (8min), 04-05 (4min)
+- Trend: TDD tasks remain fast (3-5min), integration tasks longer (8min)
+- Note: Phase 4 complete! All Kelly components built, integrated, and statistically validated
 
 *Updated after each plan completion*
 
@@ -97,6 +97,11 @@ Recent decisions affecting current work:
 - Return tuple (size_or_None, reason_string) (04-03) — Transparency for debugging and monitoring
 - Entry price captured before portfolio mutation (04-04) — pos_before is mutable reference, save values before apply_sell()
 - 95% win rate in tests (04-04) — Kelly rejects 100% win rate as unrealistic, use 19 wins + 1 loss for realism
+- Manual t-test implementation (04-05) — scipy not available, implemented paired t-test using numpy only
+- One-sided test for validation (04-05) — Phase 4 must be BETTER, not just different (p < 0.05 AND positive improvement)
+- Fixed seed for bootstrap reproducibility (04-05) — Ensures consistent CI bounds across runs for debugging
+- Profit factor returns None for no-loss case (04-05) — More explicit than infinity when all trades are wins
+- Bootstrap CI allows lower == upper (04-05) — Zero-variance data is valid statistical outcome, not error
 
 ### Pending Todos
 
@@ -116,28 +121,29 @@ None yet.
 - Fixed by capturing entry_price and had_position before apply_sell()
 - Bug prevented EdgeTracker from recording any trades (silent failure)
 
-**All tests now passing — 369 total:**
+**All tests now passing — 384 total:**
 - Phase 1: 22 tests (test coverage)
 - Phase 2: 9 tests (performance analysis)
 - Phase 3: 20 tests (dynamic sizing)
-- Phase 4: 20 tests (Kelly sizing: 12 unit + 8 integration)
+- Phase 4: 35 tests (Kelly sizing: 27 unit + 8 integration)
 - Integration: 41 tests (session replay)
 - Existing: 257 tests (portfolio, strategies, core)
 
 ## Session Continuity
 
-Last session: 2026-02-02 (Phase 4 plan 04-04 complete)
-Stopped at: Completed 04-04 (Kelly Integration) — 369 tests, 100% pass rate
+Last session: 2026-02-02 (Phase 4 plan 04-05 complete)
+Stopped at: Completed 04-05 (Kelly Statistical Validation) — 384 tests, 100% pass rate
 Resume file: None
 Next action: Phase 4 complete! Ready for Phase 5 (Integration & Validation)
 
 **Phase 4 Summary:**
-- 4 plans completed in 20 minutes
-- Built EdgeTracker, KellyCalculator, ConvictionScorer, TradeRanker, AdaptiveSizer
+- 5 plans completed in 24 minutes
+- Built EdgeTracker, KellyCalculator, ConvictionScorer, TradeRanker, AdaptiveSizer, KellyValidator
 - Integrated all components into MirrorStrategy
-- Added 20 tests (12 unit + 8 integration)
+- Statistical validation engine with paired t-test and bootstrap CI
+- Added 35 tests (27 unit + 8 integration)
 - Fixed pos_before mutation bug
-- All 369 tests passing
+- All 384 tests passing
 
 ---
 *State initialized: 2026-01-30*
