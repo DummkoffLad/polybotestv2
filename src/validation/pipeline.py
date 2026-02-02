@@ -94,8 +94,16 @@ class ValidationPipeline:
             sessions_dir=session_dir,
             metadata_path=output_dir / "split_metadata.json"
         )
+
+        # Convert BASELINE_PARAMS strings to floats for SensitivitySweeper
+        # SensitivitySweeper needs numeric values, but SimpleOptimizer needs strings
+        numeric_params = {
+            k: float(v) if isinstance(v, str) else v
+            for k, v in BASELINE_PARAMS.items()
+        }
+
         self.sweeper = SensitivitySweeper(
-            baseline_params=BASELINE_PARAMS,
+            baseline_params=numeric_params,
             sweep_range=0.15  # ±15% from baseline
         )
         self.latency_sim = LatencySimulator(LatencyConfig.baseline())
