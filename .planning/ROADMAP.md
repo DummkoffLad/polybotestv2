@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Test Coverage** - Validate existing strategy and risk implementations
 - [x] **Phase 2: Performance Analysis** - Track attribution, drawdown, and profit leakage
 - [x] **Phase 3: Dynamic Sizing** - Adapt position sizing to current capital
-- [ ] **Phase 4: Advanced Sizing** - Optimize capital efficiency and edge-based sizing
+- [x] **Phase 4: Advanced Sizing** - Optimize capital efficiency and edge-based sizing
 - [ ] **Phase 5: Validation** - Prove robustness through out-of-sample testing
 
 ## Phase Details
@@ -82,11 +82,11 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- EdgeTracker + KellyCalculator (per-token edge tracking + Half Kelly sizing with TDD)
-- [ ] 04-02-PLAN.md -- ConvictionScorer + TradeRanker (leader conviction multiplier + trade prioritization with TDD)
-- [ ] 04-03-PLAN.md -- AdaptiveSizer (cold start fallback bridging Phase 3 and Kelly sizing with TDD)
-- [ ] 04-04-PLAN.md -- Wire Kelly into MirrorStrategy (integration + updated replay baselines)
-- [ ] 04-05-PLAN.md -- KellyValidator (statistical validation with paired t-test + bootstrap CI)
+- [x] 04-01-PLAN.md -- EdgeTracker + KellyCalculator (per-token edge tracking + Half Kelly sizing with TDD)
+- [x] 04-02-PLAN.md -- ConvictionScorer + TradeRanker (leader conviction multiplier + trade prioritization with TDD)
+- [x] 04-03-PLAN.md -- AdaptiveSizer (cold start fallback bridging Phase 3 and Kelly sizing with TDD)
+- [x] 04-04-PLAN.md -- Wire Kelly into MirrorStrategy (integration + updated replay baselines)
+- [x] 04-05-PLAN.md -- KellyValidator (statistical validation with paired t-test + bootstrap CI)
 
 ### Phase 5: Validation
 **Goal**: Strategy performance is proven robust across different data and parameters
@@ -112,9 +112,9 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Test Coverage | 4/4 | Complete | 2026-01-31 |
 | 2. Performance Analysis | 3/3 | Complete | 2026-01-31 |
 | 3. Dynamic Sizing | 4/4 | Complete | 2026-02-02 |
-| 4. Advanced Sizing | 0/5 | Not started | - |
+| 4. Advanced Sizing | 5/5 | Complete | 2026-02-02 |
 | 5. Validation | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-30*
-*Last updated: 2026-02-02 after Phase 3 execution complete*
+*Last updated: 2026-02-02 after Phase 4 execution complete*
