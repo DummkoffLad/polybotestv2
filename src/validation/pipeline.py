@@ -12,6 +12,7 @@ Output: A comprehensive validation report with clear GO/NO-GO recommendation.
 """
 from __future__ import annotations
 
+import numpy as np
 from decimal import Decimal
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -383,15 +384,59 @@ class ValidationPipeline:
 
         return results
 
+    def _bootstrap_confidence_interval(
+        self,
+        pnls: List[Decimal],
+        n_iterations: int = 1000,
+        confidence: float = 0.95
+    ) -> tuple[float, float]:
+        """
+        Calculate bootstrap confidence interval for mean PnL.
+
+        Args:
+            pnls: List of session PnLs
+            n_iterations: Number of bootstrap iterations
+            confidence: Confidence level (default 0.95)
+
+        Returns:
+            Tuple of (lower_bound, upper_bound) for mean PnL
+        """
+        if not pnls:
+            return (0.0, 0.0)
+
+        # Convert to numpy array
+        arr = np.array([float(p) for p in pnls])
+        n = len(arr)
+
+        # Bootstrap resampling
+        bootstrap_means = []
+        rng = np.random.default_rng(seed=42)  # Fixed seed for reproducibility
+
+        for _ in range(n_iterations):
+            # Resample with replacement
+            indices = rng.choice(n, size=n, replace=True)
+            resampled = arr[indices]
+            bootstrap_means.append(np.mean(resampled))
+
+        # Calculate confidence interval using percentiles
+        alpha = 1.0 - confidence
+        lower_percentile = (alpha / 2) * 100
+        upper_percentile = (1.0 - alpha / 2) * 100
+
+        lower_bound = float(np.percentile(bootstrap_means, lower_percentile))
+        upper_bound = float(np.percentile(bootstrap_means, upper_percentile))
+
+        return (lower_bound, upper_bound)
+
     def run_full_validation(self) -> ValidationSummary:
         """
         Run complete validation workflow end-to-end.
 
         Workflow:
         1. Run out-of-sample replays to get session PnLs
-        2. Compute confidence interval via bootstrap (using KellyValidator logic)
-        3. Run sensitivity sweep on representative session
-        4. Run latency analysis on representative session
+        2. Compute confidence interval via bootstrap
+        3. Run sensitivity sweep on first OOS session (representative)
+        4. Run latency analysis on first OOS session
         5. Aggregate results into ValidationSummary
         6. Generate and save report
         7. Print console summary
@@ -399,8 +444,79 @@ class ValidationPipeline:
         Returns:
             ValidationSummary with all validation results and go/no-go decision
         """
-        # TODO: Implementation in Task 2
-        raise NotImplementedError("Task 2 will implement run_full_validation()")
+        print("=" * 60)
+        print("VALIDATION PIPELINE: Starting full validation")
+        print("=" * 60)
+
+        # Step 1: Run out-of-sample replays
+        print("\n[1/4] Running out-of-sample replays...")
+        oos_pnls = self.run_out_of_sample()
+        oos_sessions_tested = len(oos_pnls)
+
+        if oos_sessions_tested == 0:
+            raise ValueError("No out-of-sample sessions to validate on. Call setup_data_split() first.")
+
+        # Compute OOS statistics
+        oos_mean_pnl = sum(oos_pnls) / len(oos_pnls)
+        oos_positive_sessions = sum(1 for pnl in oos_pnls if pnl > 0)
+
+        print(f"  Sessions tested: {oos_sessions_tested}")
+        print(f"  Mean PnL: ${float(oos_mean_pnl):.2f}")
+        print(f"  Positive sessions: {oos_positive_sessions}/{oos_sessions_tested}")
+
+        # Step 2: Compute confidence interval
+        print("\n[2/4] Computing 95% confidence interval...")
+        oos_ci_lower, oos_ci_upper = self._bootstrap_confidence_interval(oos_pnls)
+        print(f"  95% CI: [${oos_ci_lower:.2f}, ${oos_ci_upper:.2f}]")
+
+        # Step 3: Run sensitivity sweep on first OOS session (representative)
+        print("\n[3/4] Running parameter sensitivity sweep...")
+        oos_paths = self.data_split.get_validation_sessions()
+        first_session = oos_paths[0]
+        print(f"  Using session: {first_session.name}")
+
+        sensitivity_result = self.run_sensitivity(first_session)
+        print(f"  Variants tested: {sensitivity_result.total_configs_tested}")
+        print(f"  Fragile params: {len(sensitivity_result.fragile_params)}")
+        print(f"  Robust params: {len(sensitivity_result.robust_params)}")
+
+        if sensitivity_result.fragile_params:
+            print(f"    Fragile: {', '.join(sensitivity_result.fragile_params)}")
+
+        # Step 4: Run latency analysis on first OOS session
+        print("\n[4/4] Running latency impact analysis...")
+        latency_results = self.run_latency_analysis(first_session)
+
+        # Find baseline latency scenario for reporting
+        baseline_latency = next(
+            (r for r in latency_results if r.scenario_name == "baseline"),
+            latency_results[0]
+        )
+        print(f"  Baseline degradation: {baseline_latency.degradation_pct:.1f}%")
+        print(f"  Average delay: {baseline_latency.avg_delay_ms:.0f}ms")
+
+        # Step 5: Aggregate into ValidationSummary
+        print("\n[5/5] Generating validation report...")
+        summary = ValidationSummary(
+            oos_sessions_tested=oos_sessions_tested,
+            oos_mean_pnl=oos_mean_pnl,
+            oos_ci_lower=oos_ci_lower,
+            oos_ci_upper=oos_ci_upper,
+            oos_positive_sessions=oos_positive_sessions,
+            param_variants_tested=sensitivity_result.total_configs_tested,
+            params_fragile=sensitivity_result.fragile_params,
+            params_robust=sensitivity_result.robust_params,
+            latency_degradation_pct=baseline_latency.degradation_pct
+        )
+
+        # Step 6: Generate and save report
+        report_path = self.report_gen.save_report(summary)
+        print(f"  Report saved: {report_path}")
+
+        # Step 7: Print console summary
+        print("\n" + self.report_gen.generate_console_summary(summary))
+
+        return summary
 
 
 def run_validation(
