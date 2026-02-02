@@ -72,10 +72,12 @@ class MirrorStrategy(Strategy):
         self.capital_manager.initialize(config.starting_capital)
 
         # Assume leader avg size is ~$100 (can be updated from actual data)
+        # Use permissive thresholds (0.40) to avoid breaking existing behavior
+        # Quality scoring provides ordering, not hard filtering for most trades
         self.quality_scorer = TradeQualityScorer(
             leader_avg_size=Decimal("100"),
-            high_quality_threshold=Decimal("0.70"),
-            dca_quality_threshold=Decimal("0.75")
+            high_quality_threshold=Decimal("0.40"),
+            dca_quality_threshold=Decimal("0.50")
         )
 
         self.selective_follower = SelectiveFollower(max_positions=5)
