@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 
 ## Current Position
 
-Phase: 4 of 5 (Advanced Sizing)
-Plan: 5 of 5 complete
-Status: Phase complete ✓ (verified — 4/4 success criteria, 384/384 tests passing)
-Last activity: 2026-02-02 — Phase 4 verified, all 4 success criteria passed
+Phase: 5 of 5 (Validation)
+Plan: 1 of 4
+Status: In progress
+Last activity: 2026-02-02 — Completed 05-01 (Data Split Management)
 
-Progress: [█████████████████████] 100% (16/16 plans complete across 4 phases, Phase 4 complete!)
+Progress: [█████████████████████░░░] 85% (17/20 plans complete across all phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
+- Total plans completed: 17
 - Average duration: 4.5min
-- Total execution time: 1.20 hours (72 minutes)
+- Total execution time: 1.27 hours (76 minutes)
 
 **By Phase:**
 
@@ -31,11 +31,12 @@ Progress: [█████████████████████] 100%
 | 02-performance-analysis | 4 | 20min | 5min |
 | 03-dynamic-sizing | 4 | 15min | 4min |
 | 04-advanced-sizing | 5 | 24min | 5min |
+| 05-validation | 1 | 4min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02 (5min), 04-03 (3min), 04-04 (8min), 04-05 (4min)
-- Trend: TDD tasks remain fast (3-5min), integration tasks longer (8min)
-- Note: Phase 4 complete! All Kelly components built, integrated, and statistically validated
+- Last 5 plans: 04-03 (3min), 04-04 (8min), 04-05 (4min), 05-01 (4min)
+- Trend: TDD tasks consistently fast (3-5min), Phase 5 started strong
+- Note: Phase 5 in progress - validation infrastructure being built
 
 *Updated after each plan completion*
 
@@ -102,6 +103,10 @@ Recent decisions affecting current work:
 - Fixed seed for bootstrap reproducibility (04-05) — Ensures consistent CI bounds across runs for debugging
 - Profit factor returns None for no-loss case (04-05) — More explicit than infinity when all trades are wins
 - Bootstrap CI allows lower == upper (04-05) — Zero-variance data is valid statistical outcome, not error
+- Session IDs as filename stems (05-01) — Clean format: session_20260130_032713.jsonl → "session_20260130_032713"
+- Automatic save on classification (05-01) — mark_in_sample/mark_out_of_sample call save() for safety
+- Fail-fast on data leakage (05-01) — mark_out_of_sample raises ValueError if session already in-sample
+- Idempotent OOS marking (05-01) — Safe to mark out-of-sample sessions multiple times
 
 ### Pending Todos
 
@@ -121,29 +126,29 @@ None yet.
 - Fixed by capturing entry_price and had_position before apply_sell()
 - Bug prevented EdgeTracker from recording any trades (silent failure)
 
-**All tests now passing — 384 total:**
+**All tests now passing — 398 total:**
 - Phase 1: 22 tests (test coverage)
 - Phase 2: 9 tests (performance analysis)
 - Phase 3: 20 tests (dynamic sizing)
 - Phase 4: 35 tests (Kelly sizing: 27 unit + 8 integration)
+- Phase 5: 14 tests (validation: data split management)
 - Integration: 41 tests (session replay)
 - Existing: 257 tests (portfolio, strategies, core)
 
 ## Session Continuity
 
-Last session: 2026-02-02 (Phase 4 plan 04-05 complete)
-Stopped at: Completed 04-05 (Kelly Statistical Validation) — 384 tests, 100% pass rate
+Last session: 2026-02-02 (Phase 5 plan 05-01 complete)
+Stopped at: Completed 05-01 (Data Split Management) — 398 tests, 100% pass rate
 Resume file: None
-Next action: Run /gsd:discuss-phase 5 to gather context for Phase 5 (Validation)
+Next action: Execute 05-02 (Parameter Sensitivity Analysis)
 
-**Phase 4 Summary:**
-- 5 plans completed in 24 minutes
-- Built EdgeTracker, KellyCalculator, ConvictionScorer, TradeRanker, AdaptiveSizer, KellyValidator
-- Integrated all components into MirrorStrategy
-- Statistical validation engine with paired t-test and bootstrap CI
-- Added 35 tests (27 unit + 8 integration)
-- Fixed pos_before mutation bug
-- All 384 tests passing
+**Phase 5 Progress (1/4 plans):**
+- Plan 05-01 completed in 4 minutes
+- Built DataSplitManager with data leakage prevention
+- Added 14 tests for session provenance tracking
+- JSON persistence with save/load for reproducible validation
+- Session discovery mechanism for identifying new data
+- All 398 tests passing
 
 ---
 *State initialized: 2026-01-30*
