@@ -72,13 +72,18 @@ class TestOneAtATimeSweep:
         sweeper = SensitivitySweeper(baseline, sweep_range=0.15)
         configs = list(sweeper.one_at_a_time_sweep())
 
-        # Each config should differ from baseline in exactly 1 param
+        # Each config should differ from baseline in at most 1 param
+        # (When testing baseline value itself, diff_count = 0)
         for param_name, value, config in configs:
             diff_count = sum(
                 1 for k, v in config.items()
                 if abs(v - baseline[k]) > 1e-6
             )
-            assert diff_count == 1, f"Config varies {diff_count} params, expected 1"
+            assert diff_count <= 1, f"Config varies {diff_count} params, expected 0 or 1"
+
+            # When value differs from baseline, exactly one param should differ
+            if abs(value - baseline[param_name]) > 1e-6:
+                assert diff_count == 1
 
     def test_skips_non_numeric_parameters(self):
         """Non-numeric params are excluded from sweep."""
@@ -109,14 +114,15 @@ class TestFragilityDetection:
             param_name="kelly_fraction",
             values_tested=[0.425, 0.5, 0.575],
             pnl_results=[
-                Decimal("50.00"),   # low value
+                Decimal("50.00"),   # low value - 50% swing down
                 Decimal("100.00"),  # baseline
-                Decimal("140.00"),  # high value - 40% swing
+                Decimal("140.00"),  # high value - 40% swing up
             ],
             baseline_pnl=Decimal("100.00"),
         )
 
-        assert sweep_result.max_swing_pct == pytest.approx(0.40)  # 40% swing
+        # Max swing is the larger of the two: 50% (from 100 to 50)
+        assert sweep_result.max_swing_pct == pytest.approx(0.50)
         assert sweep_result.is_fragile is True
 
     def test_identifies_robust_parameter_below_30pct_swing(self):
