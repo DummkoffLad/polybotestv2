@@ -6,7 +6,10 @@ from decimal import Decimal
 from typing import Any, Dict, Optional, Tuple
 from ...core.portfolio import Portfolio
 from ...core.types import Side
-from ...core import DynamicSizer, SizingConfig, CapitalManager, TradingMode, TradeQualityScorer, SelectiveFollower
+from ...core import (
+    DynamicSizer, SizingConfig, CapitalManager, TradingMode, TradeQualityScorer, SelectiveFollower,
+    EdgeTracker, TradeResult, KellyCalculator, ConvictionScorer, ConvictionSignals, AdaptiveSizer, TradeRanker
+)
 from ..base import (
     Strategy, StrategyConfig, TradeDecision, DecisionAction, OrderType,
     register_strategy, MIN_LIMIT_ORDER_SHARES, PRICE_EXTREME_HIGH, PRICE_EXTREME_LOW
@@ -34,6 +37,12 @@ class MirrorStrategy(Strategy):
         self.capital_manager: Optional[CapitalManager] = None
         self.quality_scorer: Optional[TradeQualityScorer] = None
         self.selective_follower: Optional[SelectiveFollower] = None
+        # Phase 4: Kelly components
+        self.edge_tracker: Optional[EdgeTracker] = None
+        self.kelly_calculator: Optional[KellyCalculator] = None
+        self.conviction_scorer_kelly: Optional[ConvictionScorer] = None
+        self.adaptive_sizer: Optional[AdaptiveSizer] = None
+        self.trade_ranker: Optional[TradeRanker] = None
     
     @property
     def name(self) -> str: return "mirror"
@@ -81,6 +90,20 @@ class MirrorStrategy(Strategy):
         )
 
         self.selective_follower = SelectiveFollower(max_positions=5)
+
+        # Phase 4: Kelly components
+        self.kelly_calculator = KellyCalculator(kelly_fraction=Decimal("0.5"))  # Half Kelly
+        self.edge_tracker = EdgeTracker(lookback_trades=50, min_trades_for_kelly=20)
+        self.adaptive_sizer = AdaptiveSizer(
+            dynamic_sizer=self.sizer,
+            kelly_calculator=self.kelly_calculator,
+            edge_tracker=self.edge_tracker
+        )
+        self.conviction_scorer_kelly = ConvictionScorer(leader_avg_size=Decimal("100"))
+        self.trade_ranker = TradeRanker(
+            correlation_penalty_pct=Decimal("0.15"),
+            rebalance_edge_gap=Decimal("1.5")
+        )
     
     def _check_hourly_reset(self, event_time: datetime) -> None:
         """Reset hourly budget at hour boundary."""
@@ -186,8 +209,26 @@ class MirrorStrategy(Strategy):
         if not can_open:
             return self._skip(reason)
 
-        # Calculate dynamic size
-        dynamic_dollars = self.sizer.calculate_position_size(current_equity, quality_score)
+        # Calculate conviction multiplier from leader trade size
+        conviction_signals = ConvictionSignals(
+            position_size_dollars=trade.dollars,
+            entry_speed_seconds=15.0,  # Default neutral speed (not available in replay)
+            is_scale_in=trade.token_id in self.leader_tracker
+        )
+        conviction_mult = self.conviction_scorer_kelly.calculate_multiplier(conviction_signals)
+
+        # Use AdaptiveSizer (Kelly when data available, Phase 3 fallback)
+        adaptive_result = self.adaptive_sizer.calculate_position_size(
+            token_id=trade.token_id,
+            current_equity=current_equity,
+            quality_score=quality_score,
+            conviction_multiplier=conviction_mult
+        )
+        dynamic_dollars, sizing_method = adaptive_result
+
+        # Negative edge: skip this token entirely
+        if dynamic_dollars is None:
+            return self._skip("negative_edge")
 
         # Cost check FIRST - original checked cost before budget
         # This means cost_too_high can happen even when budget is exhausted
@@ -310,6 +351,17 @@ class MirrorStrategy(Strategy):
             if pos_before.avg_price > 0:
                 pnl_estimate = (price - pos_before.avg_price) * shares
                 self.sizer.update_after_trade(pnl_estimate)
+
+                # Update edge tracker after sells (trade completion)
+                pnl_pct = (price - pos_before.avg_price) / pos_before.avg_price
+                trade_result = TradeResult(
+                    token_id=trade.token_id,
+                    entry_price=pos_before.avg_price,
+                    exit_price=price,
+                    pnl_pct=pnl_pct,
+                    timestamp=datetime.now(timezone.utc)
+                )
+                self.edge_tracker.record_trade(trade_result)
 
         # Update high water mark after every trade
         current_equity = self._calculate_current_equity()
