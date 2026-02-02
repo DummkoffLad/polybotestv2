@@ -35,8 +35,8 @@ def test_replay_session_file():
     
     # Expected values (current baselines after recent strategy changes)
     # Note: These match the baselines in test_session_replay.py for mirror strategy
-    expected_buys = 25
-    expected_sells = 24
+    expected_buys = 23  # Updated for dynamic sizing (quality filter skips low-quality trades)
+    expected_sells = 22
     
     # Verify exact match
     assert result.buys_executed == expected_buys, f"Expected {expected_buys} buys, got {result.buys_executed}"

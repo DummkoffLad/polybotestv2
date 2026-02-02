@@ -160,9 +160,9 @@ def test_per_market_cap_allows_under_limit():
 
     assert decision.action == DecisionAction.BUY
     assert decision.dollars is not None
-    # Verify we actually deployed around $20 (scale ratio + 1.30x boost)
+    # Dynamic sizing: 1% of $100 equity * quality multiplier produces smaller positions
     deployed = strategy.portfolio.get_total_deployed()
-    assert Decimal("15") <= deployed <= Decimal("30")  # Loose bounds to account for scaling
+    assert Decimal("0.50") <= deployed <= Decimal("30")  # Dynamic sizing produces smaller positions
 
 
 def test_per_market_cap_enforced_after_reaching_limit():
@@ -218,7 +218,7 @@ def test_per_market_cap_different_markets_independent():
     # Market_b buy should succeed
     assert decision.action == DecisionAction.BUY
     assert decision.dollars is not None
-    assert decision.dollars > Decimal("10")  # Should get a decent allocation
+    assert decision.dollars > Decimal("0.50")  # Dynamic sizing: smaller but valid allocation
 
     # Verify market_a exposure unchanged
     assert strategy.portfolio.get_market_exposure("market_a") == market_a_exp
@@ -238,7 +238,7 @@ def test_per_side_cap_allows_under_limit():
 
     assert decision.action == DecisionAction.BUY
     side_exp = strategy.portfolio.get_side_exposure("market_a", Side.UP)
-    assert Decimal("10") <= side_exp <= Decimal("25")
+    assert Decimal("0.50") <= side_exp <= Decimal("25")  # Dynamic sizing: smaller positions
 
 
 def test_per_side_cap_enforced():
@@ -392,8 +392,8 @@ def test_hourly_budget_resets_on_hour_change():
     _buy_and_fill(strategy, "market_a", "token_001", TradeSide.UP, Decimal("0.50"), Decimal("300"))
     _buy_and_fill(strategy, "market_b", "token_101", TradeSide.UP, Decimal("0.55"), Decimal("200"))
 
-    # Verify budget is mostly used
-    assert strategy.hourly_budget_used >= Decimal("40")
+    # Verify budget is partially used (dynamic sizing produces smaller trades ~$1-3 each)
+    assert strategy.hourly_budget_used >= Decimal("2")
 
     # Create event in NEXT hour (hour 14)
     event = _make_event(
@@ -407,7 +407,7 @@ def test_hourly_budget_resets_on_hour_change():
             "price": Decimal("0.50"),
             "shares": Decimal("200"),
         },
-        price_kw={"token_id": "token_201", "ask": Decimal("0.50"), "bid": Decimal("0.48")},
+        price_kw={"token_id": "token_201", "ask": Decimal("0.50"), "bid": Decimal("0.498")},  # Tight spread to pass quality filter
     )
 
     decision = strategy.on_event(event)
@@ -415,7 +415,7 @@ def test_hourly_budget_resets_on_hour_change():
     # After hourly reset, budget should be available again
     assert decision.action == DecisionAction.BUY
     assert decision.dollars is not None
-    assert decision.dollars > Decimal("5")  # Should get a decent allocation
+    assert decision.dollars > Decimal("0.50")  # Dynamic sizing: smaller but valid allocation
 
 
 # ============================================================================
@@ -563,8 +563,8 @@ def test_zero_capital_config():
 
     # Should skip (no capital to deploy)
     assert decision.action == DecisionAction.SKIP
-    # Likely skip_reason is "reserve" (available <= 0) or "min_order"
-    assert decision.skip_reason in ["reserve", "min_order", "min_shares"]
+    # With dynamic sizing, quality filter or floor system may trigger first
+    assert decision.skip_reason in ["reserve", "min_order", "min_shares", "low_quality", "hard_floor_hit"]
 
 
 def test_very_small_budget_caps_bind_immediately():
