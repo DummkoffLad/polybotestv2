@@ -28,9 +28,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Robustness
 
-- [ ] **RBST-01**: Out-of-sample testing with train/test split for optimizer validation
-- [ ] **RBST-02**: Sensitivity analysis showing how results change with small parameter tweaks
-- [ ] **RBST-03**: Latency simulation modeling real API delays in replay
+- [x] **RBST-01**: Out-of-sample testing with train/test split for optimizer validation
+- [x] **RBST-02**: Sensitivity analysis showing how results change with small parameter tweaks
+- [x] **RBST-03**: Latency simulation modeling real API delays in replay
 
 ## v2 Requirements
 
@@ -84,9 +84,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SIZE-02 | Phase 3 | Complete |
 | SIZE-03 | Phase 4 | Complete |
 | SIZE-04 | Phase 4 | Complete |
-| RBST-01 | Phase 5 | Pending |
-| RBST-02 | Phase 5 | Pending |
-| RBST-03 | Phase 5 | Pending |
+| RBST-01 | Phase 5 | Complete |
+| RBST-02 | Phase 5 | Complete |
+| RBST-03 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 13 total
@@ -95,4 +95,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-02-02 after Phase 4 completion*
+*Last updated: 2026-02-02 after Phase 5 completion*
