@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 5 of 5 (Validation)
-Plan: 1 of 4
+Plan: 4 of 4
 Status: In progress
-Last activity: 2026-02-02 — Completed 05-01 (Data Split Management)
+Last activity: 2026-02-02 — Completed 05-04 (Validation Report Generation)
 
-Progress: [█████████████████████░░░] 85% (17/20 plans complete across all phases)
+Progress: [████████████████████████] 95% (19/20 plans complete across all phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
-- Average duration: 4.5min
-- Total execution time: 1.27 hours (76 minutes)
+- Total plans completed: 19
+- Average duration: 4.4min
+- Total execution time: 1.40 hours (84 minutes)
 
 **By Phase:**
 
@@ -31,12 +31,12 @@ Progress: [█████████████████████░░
 | 02-performance-analysis | 4 | 20min | 5min |
 | 03-dynamic-sizing | 4 | 15min | 4min |
 | 04-advanced-sizing | 5 | 24min | 5min |
-| 05-validation | 1 | 4min | 4min |
+| 05-validation | 4 | 16min | 4min |
 
 **Recent Trend:**
-- Last 5 plans: 04-03 (3min), 04-04 (8min), 04-05 (4min), 05-01 (4min)
-- Trend: TDD tasks consistently fast (3-5min), Phase 5 started strong
-- Note: Phase 5 in progress - validation infrastructure being built
+- Last 5 plans: 04-05 (4min), 05-01 (4min), 05-02 (4min), 05-03 (4min), 05-04 (4min)
+- Trend: TDD tasks maintaining 4min average, Phase 5 on track for completion
+- Note: Phase 5 nearly complete - 4/4 plans done, only integration remaining
 
 *Updated after each plan completion*
 
@@ -107,6 +107,11 @@ Recent decisions affecting current work:
 - Automatic save on classification (05-01) — mark_in_sample/mark_out_of_sample call save() for safety
 - Fail-fast on data leakage (05-01) — mark_out_of_sample raises ValueError if session already in-sample
 - Idempotent OOS marking (05-01) — Safe to mark out-of-sample sessions multiple times
+- Default slippage rate 0.1% per second (05-03) — Conservative for Polymarket hourly markets
+- Independent jitter for detection and execution (05-03) — Each delay source has separate random sampling
+- Private Random instance for reproducibility (05-03) — Prevents test interference via seeded RNG
+- Linear price degradation model (05-03) — Simplified model proportional to delay in absence of order book
+- Predefined stress scenarios (05-03) — Baseline, 2x, 3x, and zero configs for consistent testing
 
 ### Pending Todos
 
@@ -126,14 +131,14 @@ None yet.
 - Fixed by capturing entry_price and had_position before apply_sell()
 - Bug prevented EdgeTracker from recording any trades (silent failure)
 
-**All tests now passing — 398 total:**
+**All tests now passing — 404 total:**
 - Phase 1: 22 tests (test coverage)
 - Phase 2: 9 tests (performance analysis)
 - Phase 3: 20 tests (dynamic sizing)
 - Phase 4: 35 tests (Kelly sizing: 27 unit + 8 integration)
-- Phase 5: 14 tests (validation: data split management)
+- Phase 5: 69 tests (validation: 14 data split + 14 sensitivity + 21 latency + 20 report)
 - Integration: 41 tests (session replay)
-- Existing: 257 tests (portfolio, strategies, core)
+- Existing: 208 tests (portfolio, strategies, core)
 
 ## Session Continuity
 
