@@ -127,6 +127,12 @@ Recent decisions affecting current work:
 
 None.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Directory |
+|---|-------------|------|-----------|
+| 001 | Fix WebSocket reconnection | 2026-02-03 | [001-fix-ws-reconnect](./quick/001-fix-ws-reconnect/) |
+
 ### Blockers/Concerns
 
 **Portfolio position keying bug (discovered in 01-01):**
@@ -158,8 +164,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-02 (Phase 5 plan 05-05 complete)
-Stopped at: Completed 05-05 (ValidationPipeline) — 461 tests, 100% pass rate
+Last session: 2026-02-03 (Quick task 001)
+Stopped at: Completed quick-001 (WS reconnect fix)
 Resume file: None
 Next action: PROJECT COMPLETE — Ready for live validation workflow
 
