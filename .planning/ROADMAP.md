@@ -107,12 +107,13 @@ Research insight: Conservative's win on 12 sessions may be luck (only 70-80% con
 ### Phase 6: Statistical Validation
 **Goal**: Confirm conservative's edge is statistically significant, not random noise
 **Depends on**: Phase 5
-**Requirements**: STAT-01, STAT-02, STAT-03
+**Requirements**: STAT-01, STAT-02, STAT-03, STAT-04
 **Success Criteria** (what must be TRUE):
   1. Confidence intervals show statistical bounds on PnL and win rate for each strategy
   2. T-test results show whether conservative's advantage is significant (p < 0.05) or likely noise
   3. Sample size warnings alert when trade count is insufficient for 95% confidence
   4. Decision to proceed with analysis or gather more sessions is data-driven
+  5. Session regime comparison explains why Session 1 (overnight, conservative profitable) differs from Session 2 (daytime, all lost)
 **Plans**: TBD
 
 Plans:

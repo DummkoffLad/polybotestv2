@@ -63,15 +63,17 @@ None yet.
 
 ### Blockers/Concerns
 
-**Statistical Significance Risk (v1.1):**
-- Conservative's win may be luck (only 70-80% confidence with ~100-180 trades)
-- Phase 6 must validate significance before proceeding with expensive analysis
-- Research flag: May need more sessions if p-value > 0.05
+**Statistical Significance Risk (v1.1) — CONFIRMED:**
+- Session 1: 12 hours overnight (low volatility) → conservative ONLY profitable
+- Session 2: 14 hours (2026-02-04) → ALL strategies LOST including conservative
+- Research warning validated: conservative's win was likely noise, not signal
+- Key investigation: What changed? Time of day? Volatility regime? Market type?
+- Phase 6 must now also explain why results flipped completely
 
 **Small Sample Size (v1.1):**
 - 12 sessions may not provide 95% confidence
 - Must calculate actual trade count and confidence intervals
-- If insufficient: gather more sessions before deep analysis
+- Session 2 data adds ~14 more sessions — need combined analysis
 
 **Overfitting Risk (v1.1):**
 - With only 12 sessions, any patterns found are likely noise
@@ -90,6 +92,7 @@ Last session: 2026-02-03
 Stopped at: v1.1 roadmap created, ROADMAP.md and STATE.md updated
 Resume file: None
 Next action: `/gsd:plan-phase 6` to create Phase 6 plan
+Testing script: `full_optimizer.py` — runs all strategies against recorded sessions
 
 **v1.0 Summary (COMPLETE):**
 - 5 phases, 21 plans, 461 tests passing
@@ -100,6 +103,7 @@ Next action: `/gsd:plan-phase 6` to create Phase 6 plan
 - 6 phases planned (Phases 6-11)
 - 26 requirements mapped to phases (100% coverage)
 - Research: Validate significance → Compare → Analyze → Validate → Build → Monitor
+- NEW DATA (2026-02-04): Second run lost money on ALL strategies — must investigate regime difference
 
 ---
 *State initialized: 2026-01-30*

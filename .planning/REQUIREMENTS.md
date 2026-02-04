@@ -12,6 +12,7 @@ Requirements for milestone v1.1: Beat Conservative. Each maps to roadmap phases.
 - [ ] **STAT-01**: Confidence interval calculator reports PnL and win rate bounds for each strategy
 - [ ] **STAT-02**: Statistical significance test (t-test) compares strategies and reports p-values
 - [ ] **STAT-03**: Sample size adequacy check warns if insufficient trades for 95% confidence
+- [ ] **STAT-04**: Session regime comparison identifies why Session 1 (profitable) differs from Session 2 (all lost)
 
 ### Comparison Infrastructure
 
@@ -114,6 +115,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STAT-01 | Phase 6 | Pending |
 | STAT-02 | Phase 6 | Pending |
 | STAT-03 | Phase 6 | Pending |
+| STAT-04 | Phase 6 | Pending |
 | COMP-01 | Phase 7 | Pending |
 | COMP-02 | Phase 7 | Pending |
 | COMP-03 | Phase 7 | Pending |
@@ -139,12 +141,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MNTR-03 | Phase 11 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 26 total
-- Mapped to phases: 26 (100% coverage)
+- v1.1 requirements: 27 total
+- Mapped to phases: 27 (100% coverage)
 - Unmapped: 0
 
 **Phase Distribution:**
-- Phase 6 (Statistical Validation): 3 requirements
+- Phase 6 (Statistical Validation): 4 requirements
 - Phase 7 (Comparison Infrastructure): 6 requirements
 - Phase 8 (Failure Analysis): 5 requirements
 - Phase 9 (Visual Reporting): 3 requirements
