@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 6 of 11 (Statistical Validation)
-Plan: 1 of TBD in current phase
+Plan: 2 of TBD in current phase
 Status: In progress
-Last activity: 2026-02-04 — Completed 06-01-PLAN.md
+Last activity: 2026-02-04 — Completed 06-02-PLAN.md
 
-Progress: [█████░░░░░] 53% (22 of 41+ plans complete across milestones)
+Progress: [█████░░░░░] 54% (23 of 42+ plans complete across milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 22 (v1.0 complete, v1.1 started)
+- Total plans completed: 23 (v1.0 complete, v1.1 in progress)
 - Average duration: 4.5min (all time)
-- Total execution time: 1.56 hours (all time)
+- Total execution time: 1.60 hours (all time)
 
 **By Phase:**
 
@@ -32,12 +32,12 @@ Progress: [█████░░░░░] 53% (22 of 41+ plans complete across 
 | 03-dynamic-sizing | 4 | 15min | 4min | Complete |
 | 04-advanced-sizing | 5 | 24min | 5min | Complete |
 | 05-validation | 5 | 23min | 5min | Complete |
-| 06-statistical-validation | 1 | 4min | 4min | In progress |
+| 06-statistical-validation | 2 | 8min | 4min | In progress |
 
 **Recent Trend:**
-- Last 5 plans: 05-02 (4min), 05-03 (4min), 05-04 (4min), 05-05 (7min), 06-01 (4min)
+- Last 5 plans: 05-03 (4min), 05-04 (4min), 05-05 (7min), 06-01 (4min), 06-02 (4min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
-- Milestone v1.1: In progress (1 plan complete, Phase 6)
+- Milestone v1.1: In progress (2 plans complete, Phase 6)
 
 *Updated after each plan completion*
 
@@ -51,6 +51,7 @@ Recent decisions affecting v1.1 milestone:
 - Conservative as baseline: Only profitable strategy in 12-session overnight test
 - Pattern discovery deferred: v1.2 research track, not blocking strategy work
 - Statistical validation first: Must confirm conservative's edge is real before analysis
+- Scipy direct usage (06-02): Use scipy.stats.ttest_rel directly instead of hand-rolling t-distribution for reliability
 - **scipy.stats.bootstrap (06-01):** Use industry-standard library instead of hand-rolled bootstrap
 - **Fixed seed for reproducibility (06-01):** seed=42 for deterministic test results
 - **Research-backed thresholds (06-01):** 30/100/200 trades for minimum/basic/high confidence
@@ -99,9 +100,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-04
-Stopped at: Completed 06-01-PLAN.md (Statistics module foundation)
+Stopped at: Completed 06-02-PLAN.md (Statistical hypothesis testing)
 Resume file: None
-Next action: Continue with next Phase 6 plan (06-02 or similar)
+Next action: Continue with Phase 6 plans (06-03: Conservative vs others comparison)
 Testing script: `full_optimizer.py` — runs all strategies against recorded sessions
 
 **v1.0 Summary (COMPLETE):**
