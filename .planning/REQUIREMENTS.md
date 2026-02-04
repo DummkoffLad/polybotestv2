@@ -7,12 +7,12 @@
 
 Requirements for milestone v1.1: Beat Conservative. Each maps to roadmap phases.
 
-### Statistical Validation
+### Statistical Validation (Complete)
 
-- [ ] **STAT-01**: Confidence interval calculator reports PnL and win rate bounds for each strategy
-- [ ] **STAT-02**: Statistical significance test (t-test) compares strategies and reports p-values
-- [ ] **STAT-03**: Sample size adequacy check warns if insufficient trades for 95% confidence
-- [ ] **STAT-04**: Session regime comparison identifies why Session 1 (profitable) differs from Session 2 (all lost)
+- [x] **STAT-01**: Confidence interval calculator reports PnL and win rate bounds for each strategy
+- [x] **STAT-02**: Statistical significance test (t-test) compares strategies and reports p-values
+- [x] **STAT-03**: Sample size adequacy check warns if insufficient trades for 95% confidence
+- [x] **STAT-04**: Session regime comparison identifies why Session 1 (profitable) differs from Session 2 (all lost)
 
 ### Comparison Infrastructure
 
@@ -113,10 +113,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STAT-01 | Phase 6 | Pending |
-| STAT-02 | Phase 6 | Pending |
-| STAT-03 | Phase 6 | Pending |
-| STAT-04 | Phase 6 | Pending |
+| STAT-01 | Phase 6 | Complete |
+| STAT-02 | Phase 6 | Complete |
+| STAT-03 | Phase 6 | Complete |
+| STAT-04 | Phase 6 | Complete |
 | COMP-01 | Phase 7 | Pending |
 | COMP-02 | Phase 7 | Pending |
 | COMP-03 | Phase 7 | Pending |
@@ -157,4 +157,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after v1.1 roadmap creation*
+*Last updated: 2026-02-04 after Phase 6 completion*

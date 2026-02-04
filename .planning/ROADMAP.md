@@ -117,9 +117,9 @@ Research insight: Conservative's win on 12 sessions may be luck (only 70-80% con
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- Statistics foundation: ConfidenceIntervalCalculator (bootstrap CIs) + SampleSizeChecker (TDD)
-- [ ] 06-02-PLAN.md -- Strategy comparison: StrategyComparator with paired t-test using scipy.stats.ttest_rel (TDD)
-- [ ] 06-03-PLAN.md -- Regime analysis: RegimeAnalyzer for session classification + regime comparison with Welch's t-test (TDD)
+- [x] 06-01-PLAN.md -- Statistics foundation: ConfidenceIntervalCalculator (bootstrap CIs) + SampleSizeChecker (TDD)
+- [x] 06-02-PLAN.md -- Strategy comparison: StrategyComparator with paired t-test using scipy.stats.ttest_rel (TDD)
+- [x] 06-03-PLAN.md -- Regime analysis: RegimeAnalyzer for session classification + regime comparison with Welch's t-test (TDD)
 
 ### Phase 7: Comparison Infrastructure
 **Goal**: Run all strategies side-by-side with complete decision visibility
@@ -215,7 +215,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11
 | 3. Dynamic Sizing | v1.0 | 4/4 | Complete | 2026-02-02 |
 | 4. Advanced Sizing | v1.0 | 5/5 | Complete | 2026-02-02 |
 | 5. Validation | v1.0 | 5/5 | Complete | 2026-02-02 |
-| 6. Statistical Validation | v1.1 | 0/3 | Planned | - |
+| 6. Statistical Validation | v1.1 | 3/3 | Complete | 2026-02-04 |
 | 7. Comparison Infrastructure | v1.1 | 0/TBD | Not started | - |
 | 8. Failure Analysis | v1.1 | 0/TBD | Not started | - |
 | 9. Visual Reporting | v1.1 | 0/TBD | Not started | - |
@@ -224,4 +224,4 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11
 
 ---
 *Roadmap created: 2026-01-30*
-*Last updated: 2026-02-04 after Phase 6 planning*
+*Last updated: 2026-02-04 after Phase 6 execution*
