@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 6 of 11 (Statistical Validation)
-Plan: 2 of TBD in current phase
-Status: In progress
-Last activity: 2026-02-04 — Completed 06-02-PLAN.md
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-02-04 — Completed 06-03-PLAN.md
 
-Progress: [█████░░░░░] 54% (23 of 42+ plans complete across milestones)
+Progress: [█████░░░░░] 57% (24 of 42+ plans complete across milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 23 (v1.0 complete, v1.1 in progress)
-- Average duration: 4.5min (all time)
-- Total execution time: 1.60 hours (all time)
+- Total plans completed: 24 (v1.0 complete, v1.1 in progress)
+- Average duration: 4.4min (all time)
+- Total execution time: 1.65 hours (all time)
 
 **By Phase:**
 
@@ -32,12 +32,12 @@ Progress: [█████░░░░░] 54% (23 of 42+ plans complete across 
 | 03-dynamic-sizing | 4 | 15min | 4min | Complete |
 | 04-advanced-sizing | 5 | 24min | 5min | Complete |
 | 05-validation | 5 | 23min | 5min | Complete |
-| 06-statistical-validation | 2 | 8min | 4min | In progress |
+| 06-statistical-validation | 3 | 11min | 4min | Complete |
 
 **Recent Trend:**
-- Last 5 plans: 05-03 (4min), 05-04 (4min), 05-05 (7min), 06-01 (4min), 06-02 (4min)
+- Last 5 plans: 05-04 (4min), 05-05 (7min), 06-01 (4min), 06-02 (4min), 06-03 (3min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
-- Milestone v1.1: In progress (2 plans complete, Phase 6)
+- Milestone v1.1: In progress (3 plans complete, Phase 6 complete)
 
 *Updated after each plan completion*
 
@@ -55,6 +55,9 @@ Recent decisions affecting v1.1 milestone:
 - **scipy.stats.bootstrap (06-01):** Use industry-standard library instead of hand-rolled bootstrap
 - **Fixed seed for reproducibility (06-01):** seed=42 for deterministic test results
 - **Research-backed thresholds (06-01):** 30/100/200 trades for minimum/basic/high confidence
+- **Overnight hours (06-03):** {22, 23, 0, 1, 2, 3, 4, 5} for regime classification (10PM-6AM)
+- **Volatility threshold (06-03):** 5.0% avg absolute price change separates high/low vol regimes
+- **Welch's t-test (06-03):** Use equal_var=False for independent regime comparison
 
 ### Pending Todos
 
@@ -100,9 +103,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-04
-Stopped at: Completed 06-02-PLAN.md (Statistical hypothesis testing)
+Stopped at: Completed 06-03-PLAN.md (Session regime analysis)
 Resume file: None
-Next action: Continue with Phase 6 plans (06-03: Conservative vs others comparison)
+Next action: Phase 6 complete - ready for Phase 7 (conservative strategy analysis)
 Testing script: `full_optimizer.py` — runs all strategies against recorded sessions
 
 **v1.0 Summary (COMPLETE):**
@@ -118,5 +121,5 @@ Testing script: `full_optimizer.py` — runs all strategies against recorded ses
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-04 after 06-01-PLAN.md completion*
+*Last updated: 2026-02-04 after 06-03-PLAN.md completion*
 *Milestone: v1.1 Beat Conservative*
