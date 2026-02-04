@@ -14,14 +14,14 @@ Requirements for milestone v1.1: Beat Conservative. Each maps to roadmap phases.
 - [x] **STAT-03**: Sample size adequacy check warns if insufficient trades for 95% confidence
 - [x] **STAT-04**: Session regime comparison identifies why Session 1 (profitable) differs from Session 2 (all lost)
 
-### Comparison Infrastructure
+### Comparison Infrastructure (Complete)
 
-- [ ] **COMP-01**: Side-by-side equity curves visualize all strategies on same chart
-- [ ] **COMP-02**: Metrics comparison table shows Sharpe, win rate, profit factor, max drawdown per strategy
-- [ ] **COMP-03**: Trade-by-trade listing is sortable and filterable by outcome, strategy, market
-- [ ] **COMP-04**: StrategyComparator runs all strategies on same session and aggregates results
-- [ ] **COMP-05**: QuantStats HTML tear sheets are generated for each strategy
-- [ ] **COMP-06**: Decision matrix shows event × strategy with buy/sell/skip decisions
+- [x] **COMP-01**: Side-by-side equity curves visualize all strategies on same chart
+- [x] **COMP-02**: Metrics comparison table shows Sharpe, win rate, profit factor, max drawdown per strategy
+- [x] **COMP-03**: Trade-by-trade listing is sortable and filterable by outcome, strategy, market
+- [x] **COMP-04**: StrategyComparator runs all strategies on same session and aggregates results
+- [x] **COMP-05**: QuantStats HTML tear sheets are generated for each strategy
+- [x] **COMP-06**: Decision matrix shows event × strategy with buy/sell/skip decisions
 
 ### Failure Analysis
 
@@ -117,12 +117,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STAT-02 | Phase 6 | Complete |
 | STAT-03 | Phase 6 | Complete |
 | STAT-04 | Phase 6 | Complete |
-| COMP-01 | Phase 7 | Pending |
-| COMP-02 | Phase 7 | Pending |
-| COMP-03 | Phase 7 | Pending |
-| COMP-04 | Phase 7 | Pending |
-| COMP-05 | Phase 7 | Pending |
-| COMP-06 | Phase 7 | Pending |
+| COMP-01 | Phase 7 | Complete |
+| COMP-02 | Phase 7 | Complete |
+| COMP-03 | Phase 7 | Complete |
+| COMP-04 | Phase 7 | Complete |
+| COMP-05 | Phase 7 | Complete |
+| COMP-06 | Phase 7 | Complete |
 | FAIL-01 | Phase 8 | Pending |
 | FAIL-02 | Phase 8 | Pending |
 | FAIL-03 | Phase 8 | Pending |
@@ -157,4 +157,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-04 after Phase 6 completion*
+*Last updated: 2026-02-04 after Phase 7 completion*
