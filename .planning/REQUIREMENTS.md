@@ -1,57 +1,96 @@
 # Requirements: Polymarket Copy Trading Bot
 
-**Defined:** 2026-01-30
-**Core Value:** Reproduce the leader's profitable trades at a smaller scale with sizing that maximizes returns while protecting capital
+**Defined:** 2026-02-03
+**Core Value:** Build a strategy that beats conservative on fresh recorded sessions
 
-## v1 Requirements
+## v1.1 Requirements
 
-Requirements for this milestone. Each maps to roadmap phases.
+Requirements for milestone v1.1: Beat Conservative. Each maps to roadmap phases.
 
-### Testing
+### Statistical Validation
+
+- [ ] **STAT-01**: Confidence interval calculator reports PnL and win rate bounds for each strategy
+- [ ] **STAT-02**: Statistical significance test (t-test) compares strategies and reports p-values
+- [ ] **STAT-03**: Sample size adequacy check warns if insufficient trades for 95% confidence
+
+### Comparison Infrastructure
+
+- [ ] **COMP-01**: Side-by-side equity curves visualize all strategies on same chart
+- [ ] **COMP-02**: Metrics comparison table shows Sharpe, win rate, profit factor, max drawdown per strategy
+- [ ] **COMP-03**: Trade-by-trade listing is sortable and filterable by outcome, strategy, market
+- [ ] **COMP-04**: StrategyComparator runs all strategies on same session and aggregates results
+- [ ] **COMP-05**: QuantStats HTML tear sheets are generated for each strategy
+- [ ] **COMP-06**: Decision matrix shows event × strategy with buy/sell/skip decisions
+
+### Failure Analysis
+
+- [ ] **FAIL-01**: Enhanced per-trade attribution includes failure categorization field
+- [ ] **FAIL-02**: Failure taxonomy categorizes trades as timing, sizing, filter, capital, or correct_skip
+- [ ] **FAIL-03**: Counterfactual PnL calculation shows "what if we followed" for skipped trades
+- [ ] **FAIL-04**: FailureModeAnalyzer detects patterns and suggests fixes
+- [ ] **FAIL-05**: Sizing impact analysis compares "what if A used B's sizing" counterfactuals
+
+### Visual Reporting
+
+- [ ] **VISU-01**: Decision timeline chart shows strategies × time with buy/sell/skip markers
+- [ ] **VISU-02**: PnL attribution waterfall shows cumulative diff by trade
+- [ ] **VISU-03**: Interactive Plotly charts support drill-down to individual trades
+
+### Validation Protocol
+
+- [ ] **VALD-01**: Train/test session split methodology reserves 30% sessions for validation
+- [ ] **VALD-02**: Out-of-sample testing requirement enforces validation before deployment
+- [ ] **VALD-03**: Execution cost modeling includes spread and slippage estimates
+- [ ] **VALD-04**: Walk-forward validation tests strategy on rolling time windows
+
+### New Strategy
+
+- [ ] **STRT-01**: New strategy implementation based on validated causal insights from analysis
+- [ ] **STRT-02**: Strategy design is mechanism-focused (principles, not copied conservative configs)
+
+### Monitoring
+
+- [ ] **MNTR-01**: Rolling performance windows track 6-session and 12-session metrics
+- [ ] **MNTR-02**: Statistical alerts trigger on 2σ performance degradation
+- [ ] **MNTR-03**: Regime detection identifies spread, volume, or market type shifts
+
+## v1.0 Requirements (Previous Milestone - Complete)
+
+### Testing (Complete)
 
 - [x] **TEST-01**: Unit test suite covering all 8 strategy implementations with known input/output pairs
 - [x] **TEST-02**: Unit tests for risk cap enforcement (per-market, per-side, global exposure)
 - [x] **TEST-03**: Unit tests for portfolio math (cost basis calculation, realized/unrealized PnL)
 
-### Analysis & Attribution
+### Analysis & Attribution (Complete)
 
 - [x] **ANAL-01**: Per-trade PnL attribution linking each trade to its final outcome (win/loss/open)
 - [x] **ANAL-02**: Drawdown tracking with equity curve over session and max drawdown from peak
 - [x] **ANAL-03**: Profit leakage analysis comparing our sizing/timing vs leader's actual results
 
-### Small-Budget Sizing
+### Small-Budget Sizing (Complete)
 
 - [x] **SIZE-01**: Dynamic position sizing — caps as % of current capital, adapts to growth/drawdown
 - [x] **SIZE-02**: Selective following — filter for high-confidence trades, skip low-edge setups
 - [x] **SIZE-03**: Kelly criterion position sizing proportional to estimated edge and bankroll
 - [x] **SIZE-04**: Capital efficiency scoring to prioritize best risk-adjusted return per dollar
 
-### Robustness
+### Robustness (Complete)
 
 - [x] **RBST-01**: Out-of-sample testing with train/test split for optimizer validation
 - [x] **RBST-02**: Sensitivity analysis showing how results change with small parameter tweaks
 - [x] **RBST-03**: Latency simulation modeling real API delays in replay
 
-## v2 Requirements
+## v1.2 Requirements (Future)
 
-Deferred to future release. Tracked but not in current roadmap.
+Deferred to future milestone. Tracked but not in current roadmap.
 
-### Simulation Enhancements
+### Pattern Discovery
 
-- **SIM-01**: Slippage consistency — ensure slippage is applied uniformly across all replay paths
-- **SIM-02**: Order book depth modeling — scale slippage with order size vs liquidity
-- **SIM-03**: Cross-market correlation tracking for position risk
-
-### Advanced Optimization
-
-- **OPT-01**: Walk-forward optimization — optimize on past period, test on next, repeat
-- **OPT-02**: Monte Carlo simulation — randomize trade order to test robustness
-
-### Production Readiness
-
-- **PROD-01**: End-to-end PnL verification against known live results
-- **PROD-02**: Live execution testing with Polymarket testnet/sandbox
-- **PROD-03**: Circuit breaker for stuck orders or API failures
+- **PTRN-01**: Market context recording captures price levels, timing, volatility during sessions
+- **PTRN-02**: Pattern search tool finds correlations between market state and profitable trades
+- **PTRN-03**: Pattern validation tests discovered patterns on out-of-sample data
+- **PTRN-04**: Custom algorithm development based on validated patterns
 
 ## Out of Scope
 
@@ -59,14 +98,12 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Fee modeling | Polymarket 1h crypto markets do not charge fees — confirmed by user |
-| Live trading deployment | Focus is simulation quality first |
-| New data sources or leader discovery | Leader already identified and proven |
-| UI or dashboard | CLI output sufficient |
-| ML-based position sizing | Insufficient data (need 1000+ trades), will overfit |
-| Multi-leader tracking | Single leader focus |
-| Multi-timeframe analysis | 1h markets resolve in 1h, no timeframes |
-| Portfolio optimization (quadratic) | $100 budget can't diversify meaningfully |
+| ML-based strategy optimization | Insufficient data (~200 trades), will overfit |
+| Real-time dashboard | CLI output sufficient, adds complexity |
+| Multi-leader tracking | Single leader focus for this milestone |
+| Live trading deployment | Focus is building/validating strategy first |
+| Order book depth modeling | Polymarket 1h markets have thin books, won't improve |
+| Monte Carlo confidence intervals | Complex, lower ROI vs bootstrap CIs already in validation |
 
 ## Traceability
 
@@ -74,25 +111,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 | Phase 1 | Complete |
-| TEST-02 | Phase 1 | Complete |
-| TEST-03 | Phase 1 | Complete |
-| ANAL-01 | Phase 2 | Complete |
-| ANAL-02 | Phase 2 | Complete |
-| ANAL-03 | Phase 2 | Complete |
-| SIZE-01 | Phase 3 | Complete |
-| SIZE-02 | Phase 3 | Complete |
-| SIZE-03 | Phase 4 | Complete |
-| SIZE-04 | Phase 4 | Complete |
-| RBST-01 | Phase 5 | Complete |
-| RBST-02 | Phase 5 | Complete |
-| RBST-03 | Phase 5 | Complete |
+| STAT-01 | TBD | Pending |
+| STAT-02 | TBD | Pending |
+| STAT-03 | TBD | Pending |
+| COMP-01 | TBD | Pending |
+| COMP-02 | TBD | Pending |
+| COMP-03 | TBD | Pending |
+| COMP-04 | TBD | Pending |
+| COMP-05 | TBD | Pending |
+| COMP-06 | TBD | Pending |
+| FAIL-01 | TBD | Pending |
+| FAIL-02 | TBD | Pending |
+| FAIL-03 | TBD | Pending |
+| FAIL-04 | TBD | Pending |
+| FAIL-05 | TBD | Pending |
+| VISU-01 | TBD | Pending |
+| VISU-02 | TBD | Pending |
+| VISU-03 | TBD | Pending |
+| VALD-01 | TBD | Pending |
+| VALD-02 | TBD | Pending |
+| VALD-03 | TBD | Pending |
+| VALD-04 | TBD | Pending |
+| STRT-01 | TBD | Pending |
+| STRT-02 | TBD | Pending |
+| MNTR-01 | TBD | Pending |
+| MNTR-02 | TBD | Pending |
+| MNTR-03 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 13 total
-- Mapped to phases: 13
-- Unmapped: 0
+- v1.1 requirements: 26 total
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 26
 
 ---
-*Requirements defined: 2026-01-30*
-*Last updated: 2026-02-02 after Phase 5 completion*
+*Requirements defined: 2026-02-03*
+*Last updated: 2026-02-03 after milestone v1.1 definition*
