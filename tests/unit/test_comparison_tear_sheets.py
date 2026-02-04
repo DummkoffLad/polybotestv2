@@ -6,6 +6,10 @@ Tests define expected behavior for QuantStats tear sheet generation:
 - Return series conversion from equity DataFrame
 """
 
+# Configure matplotlib to use non-interactive backend before any imports
+import matplotlib
+matplotlib.use('Agg')
+
 import pytest
 import tempfile
 import json
@@ -380,7 +384,12 @@ class TestErrorHandling:
             generate_single_tear_sheet(mock_result, output_path, session_id="")
 
     def test_invalid_output_path_raises_error(self, tmp_path):
-        """Invalid output path raises appropriate error."""
+        """Invalid output path raises appropriate error.
+
+        Note: This test uses platform-specific invalid path characters.
+        On Windows, characters like <>:"|?* are invalid in filenames.
+        """
+        import sys
         events = [
             make_test_event("2026-02-04T10:01:00+00:00", "token_a", "BUY", 10.0, 0.5, 0.49, 0.51),
         ]
@@ -391,12 +400,16 @@ class TestErrorHandling:
             comparator = StrategyComparator(session_path, strategies)
             comparison = comparator.run_comparison()
 
-            # Use an invalid path (directory that can't be created)
-            # On Windows, paths with invalid characters will fail
-            invalid_path = Path("/nonexistent/root/path/tearsheet.html")
+            # Use a path with invalid characters for the platform
+            if sys.platform == 'win32':
+                # Windows: use invalid characters like <>:"|?*
+                invalid_path = Path(str(tmp_path) + "/invalid<>file.html")
+            else:
+                # Unix: try null byte which is always invalid
+                invalid_path = Path("/tmp/invalid\x00file.html")
 
             # Should raise an appropriate error
-            with pytest.raises((OSError, PermissionError, FileNotFoundError)):
+            with pytest.raises((OSError, PermissionError, FileNotFoundError, ValueError)):
                 generate_single_tear_sheet(
                     comparison.strategy_results[0],
                     invalid_path,
