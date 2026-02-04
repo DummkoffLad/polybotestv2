@@ -1,25 +1,17 @@
 """Statistical validation module for trading bot.
 
-Provides confidence interval calculations and sample size adequacy checks.
+Provides confidence interval calculations, sample size adequacy checks,
+and hypothesis testing for strategy comparison.
 """
 
-# Import modules as they become available
-__all__ = []
+from .confidence import ConfidenceIntervalCalculator
+from .sample_size import SampleSizeChecker, SampleSizeWarning
+from .hypothesis import StrategyComparator, ComparisonResult
 
-try:
-    from .confidence import ConfidenceIntervalCalculator
-    __all__.extend(["ConfidenceIntervalCalculator"])
-except ImportError:
-    pass
-
-try:
-    from .sample_size import SampleSizeChecker, SampleSizeWarning
-    __all__.extend(["SampleSizeChecker", "SampleSizeWarning"])
-except ImportError:
-    pass
-
-try:
-    from .hypothesis import StrategyComparator, ComparisonResult
-    __all__.extend(["StrategyComparator", "ComparisonResult"])
-except ImportError:
-    pass
+__all__ = [
+    "ConfidenceIntervalCalculator",
+    "SampleSizeChecker",
+    "SampleSizeWarning",
+    "StrategyComparator",
+    "ComparisonResult",
+]
