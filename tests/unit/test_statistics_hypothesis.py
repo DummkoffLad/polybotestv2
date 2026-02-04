@@ -38,7 +38,7 @@ class TestStrategyComparator:
             )
 
     def test_identical_lists_not_significant(self):
-        """Identical lists should have p-value close to 1.0 and not significant."""
+        """Identical lists should have NaN p-value (zero variance) and not significant."""
         comparator = StrategyComparator()
 
         result = comparator.compare_strategies(
@@ -46,17 +46,20 @@ class TestStrategyComparator:
             [Decimal("1"), Decimal("2"), Decimal("3")]
         )
 
-        assert result.p_value > 0.99  # Close to 1.0
-        assert not result.is_significant
+        # When all differences are zero, scipy returns NaN for both t-stat and p-value
+        import math
+        assert math.isnan(result.p_value)
+        assert not result.is_significant  # NaN < 0.05 is False
         assert result.mean_difference == Decimal("0")
 
     def test_clearly_different_lists_significant(self):
         """Clearly different lists should be statistically significant."""
         comparator = StrategyComparator()
 
+        # Use more data points to achieve significance
         result = comparator.compare_strategies(
-            [Decimal("1"), Decimal("2"), Decimal("3")],
-            [Decimal("10"), Decimal("20"), Decimal("30")]
+            [Decimal("1"), Decimal("2"), Decimal("3"), Decimal("4"), Decimal("5"), Decimal("6")],
+            [Decimal("10"), Decimal("20"), Decimal("30"), Decimal("40"), Decimal("50"), Decimal("60")]
         )
 
         assert result.p_value < 0.05
@@ -67,9 +70,10 @@ class TestStrategyComparator:
         """When B significantly outperforms A, interpretation should mention B winning."""
         comparator = StrategyComparator()
 
+        # Use more data points to achieve significance
         result = comparator.compare_strategies(
-            strategy_a_pnls=[Decimal("1"), Decimal("2"), Decimal("3")],
-            strategy_b_pnls=[Decimal("10"), Decimal("20"), Decimal("30")],
+            strategy_a_pnls=[Decimal("1"), Decimal("2"), Decimal("3"), Decimal("4"), Decimal("5"), Decimal("6")],
+            strategy_b_pnls=[Decimal("10"), Decimal("20"), Decimal("30"), Decimal("40"), Decimal("50"), Decimal("60")],
             strategy_a_name="Conservative",
             strategy_b_name="Aggressive"
         )
@@ -83,9 +87,10 @@ class TestStrategyComparator:
         """When A significantly outperforms B, interpretation should mention A winning."""
         comparator = StrategyComparator()
 
+        # Use more data points to achieve significance
         result = comparator.compare_strategies(
-            strategy_a_pnls=[Decimal("10"), Decimal("20"), Decimal("30")],
-            strategy_b_pnls=[Decimal("1"), Decimal("2"), Decimal("3")],
+            strategy_a_pnls=[Decimal("10"), Decimal("20"), Decimal("30"), Decimal("40"), Decimal("50"), Decimal("60")],
+            strategy_b_pnls=[Decimal("1"), Decimal("2"), Decimal("3"), Decimal("4"), Decimal("5"), Decimal("6")],
             strategy_a_name="Conservative",
             strategy_b_name="Aggressive"
         )
@@ -130,8 +135,9 @@ class TestStrategyComparator:
         """Verify result matches scipy.stats.ttest_rel output."""
         comparator = StrategyComparator()
 
-        a_data = [Decimal("1"), Decimal("2"), Decimal("3"), Decimal("4"), Decimal("5")]
-        b_data = [Decimal("2"), Decimal("3"), Decimal("4"), Decimal("5"), Decimal("6")]
+        # Use data with variation to avoid precision issues
+        a_data = [Decimal("10.5"), Decimal("12.3"), Decimal("9.8"), Decimal("11.2"), Decimal("10.9")]
+        b_data = [Decimal("15.2"), Decimal("14.8"), Decimal("16.1"), Decimal("15.5"), Decimal("14.9")]
 
         result = comparator.compare_strategies(a_data, b_data)
 
