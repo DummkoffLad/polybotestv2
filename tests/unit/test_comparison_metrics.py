@@ -103,6 +103,7 @@ def profitable_strategy_result(sample_equity_df_profitable):
     """Create a StrategyResult for profitable strategy."""
     replay_result = ReplayResult(
         session_id="test_session_001",
+        strategy_name="profitable",
         events_processed=20,
         buys_executed=8,
         sells_executed=5,
@@ -124,6 +125,7 @@ def losing_strategy_result(sample_equity_df_losing):
     """Create a StrategyResult for losing strategy."""
     replay_result = ReplayResult(
         session_id="test_session_001",
+        strategy_name="losing",
         events_processed=20,
         buys_executed=10,
         sells_executed=8,
@@ -145,6 +147,7 @@ def volatile_strategy_result(sample_equity_df_volatile):
     """Create a StrategyResult for volatile strategy."""
     replay_result = ReplayResult(
         session_id="test_session_001",
+        strategy_name="volatile",
         events_processed=20,
         buys_executed=12,
         sells_executed=10,
@@ -258,6 +261,7 @@ class TestCalculateStrategyMetrics:
 
         replay_result = ReplayResult(
             session_id="test",
+            strategy_name="no_trades",
             events_processed=5,
             buys_executed=0,
             sells_executed=0,
@@ -286,6 +290,7 @@ class TestCalculateStrategyMetrics:
 
         replay_result = ReplayResult(
             session_id="test",
+            strategy_name="single_trade",
             events_processed=5,
             buys_executed=1,
             sells_executed=1,
@@ -472,6 +477,7 @@ class TestMetricsEdgeCases:
 
         replay_result = ReplayResult(
             session_id="test",
+            strategy_name="flat",
             events_processed=10,
             buys_executed=0,
             sells_executed=0,
@@ -499,6 +505,7 @@ class TestMetricsEdgeCases:
 
         replay_result = ReplayResult(
             session_id="test",
+            strategy_name="all_wins",
             events_processed=5,
             buys_executed=4,
             sells_executed=4,
@@ -525,6 +532,7 @@ class TestMetricsEdgeCases:
 
         replay_result = ReplayResult(
             session_id="test",
+            strategy_name="all_losses",
             events_processed=5,
             buys_executed=4,
             sells_executed=4,
