@@ -1,719 +1,574 @@
-# Architecture Patterns: Copy Trading Bot Simulation & Optimization
+# Architecture Research: Strategy Debugging & Comparison Integration
 
-**Domain:** Copy trading bot simulation, backtesting, and strategy optimization
-**Researched:** 2026-01-30
-**Confidence:** MEDIUM (based on existing codebase analysis and established backtesting patterns)
+**Domain:** Event-driven trading bot with session replay
+**Researched:** 2026-02-03
+**Confidence:** HIGH (existing codebase reviewed + verified patterns)
 
 ## Executive Summary
 
-Copy trading bot simulation systems require a clear separation between **replay infrastructure** (event sequencing, historical data) and **execution simulation** (order fills, slippage, market impact). The key architectural challenge is adding realism without rewriting the replay engine.
+The existing architecture already contains 80% of the debugging/comparison infrastructure needed. The system uses event sourcing via JSONL session recordings, SessionReplayer for deterministic replay, and analysis components (attribution, equity tracking, drawdown, slippage). The remaining 20% is organizational: refactor SimpleOptimizer into a proper StrategyComparator, enhance TradeAttributor with failure categorization, and add visual diff tooling.
 
-**Recommended approach:** Insert a **Market Simulator** layer between Strategy and Execution that intercepts trade decisions and models realistic fill behavior. This allows gradual enhancement of simulation realism while preserving existing replay logic.
+**Key architectural insight:** Don't build new infrastructure. Extend what exists. The event-driven pattern with session replay IS the debugging architecture.
 
-## Current Architecture Analysis
+## Existing Architecture Analysis
 
-### Existing Layered Structure
-
-```
-Data Layer (live_source, blockchain_detector)
-    ↓ MarketEvent
-Strategy Layer (base.Strategy → concrete strategies)
-    ↓ TradeDecision
-Execution Layer (ExecutionAdapter: live, dry_run, hybrid)
-    ↓ Fills
-Framework Layer (runner, recorder, replay)
-    ↓
-Simulation Layer (optimizer, limit_order_sim, metrics)
-```
-
-**Current replay flow:**
-1. `SessionReplayer.load()` reads JSONL session file
-2. `SessionReplayer.replay(strategy)` feeds events to strategy
-3. Strategy produces TradeDecision
-4. **Instant fill assumed** with fixed spread cost
-5. Portfolio updated with full fill amount
-
-**Problem:** No modeling of:
-- Order book depth (partial fills)
-- Slippage (price impact from order size)
-- Fill timing (limit orders waiting for price)
-- Market dynamics (spread changes during fill)
-
-### Existing Limit Order Simulator (Not Integrated)
-
-**Location:** `src/simulation/limit_order_sim.py`
-
-**What it does:**
-- Models limit orders with TTL (time-to-live)
-- Checks if bid/ask crosses limit price
-- Tracks filled/expired orders
-- **Standalone:** Not connected to SessionReplayer
-
-**Gap:** Needs integration point in replay flow.
-
-## Recommended Component Architecture
-
-### 1. Market Simulator Layer (NEW)
-
-**Purpose:** Intercept trade decisions and model realistic execution.
-
-**Component boundaries:**
+### Current Components
 
 ```
-Strategy → TradeDecision → [MARKET SIMULATOR] → ExecutionResult → Portfolio
-                                    ↑
-                           (Market state, order book)
+src/
+├── strategies/
+│   ├── base.py                 # Strategy ABC, TradeDecision, registry
+│   ├── mirror.py              # 9 concrete strategies
+│   └── ...
+├── framework/
+│   └── replay.py              # SessionReplayer (deterministic event replay)
+├── simulation/
+│   └── optimizer.py           # SimpleOptimizer (multi-strategy runner)
+├── analysis/
+│   ├── attribution.py         # TradeAttributor (entry/exit/PnL)
+│   ├── equity_tracker.py      # EquityTracker (equity curve)
+│   ├── drawdown.py            # DrawdownAnalyzer
+│   ├── slippage.py            # SlippageAnalyzer (3 gap types)
+│   └── reports.py             # ReportGenerator (console + charts)
+└── data/
+    └── models.py              # MarketEvent, LeaderTrade, PriceSnapshot
 ```
 
-**Responsibilities:**
-- Receive TradeDecision from strategy
-- Model execution realism (slippage, partial fills, timing)
-- Return ExecutionResult with actual fill price/quantity
-- Track pending orders (for limit orders)
-- Update market state from price snapshots
+### Data Flow (Current)
 
-**Interface:**
+```
+Session Recording (.jsonl)
+  ↓
+SessionReplayer.load()
+  → Parse events (price_snapshot, leader_trade)
+  → Deduplicate (content-based dedup key)
+  → Store chronologically
+  ↓
+SessionReplayer.run(strategy, config_overrides)
+  → strategy.on_event(event) → TradeDecision
+  → strategy.on_fill(event, decision)
+  → [if track_analysis=True]
+      → TradeAttributor.record_entry()
+      → SlippageAnalyzer.measure_trade_slippage()
+      → EquityTracker.record_snapshot()
+  ↓
+ReplayResult
+  → realized_pnl, unrealized_pnl, resolved_pnl
+  → trades list (ExecutedTrade records)
+  → analysis dict (attribution, equity_df, drawdown, slippage)
+```
+
+### Integration Points (Already Working)
+
+1. **Event Sourcing Foundation**
+   - Session recordings = immutable event log
+   - SessionReplayer = replay engine with historical price snapshots
+   - Content-based deduplication prevents duplicate OrderFilled events
+
+2. **Analysis Pipeline (Phase 5 validation)**
+   - TradeAttributor: per-trade entry/exit with realized PnL
+   - EquityTracker: timestamped equity snapshots → DataFrame
+   - DrawdownAnalyzer: max drawdown, duration, recovery time
+   - SlippageAnalyzer: execution gap, sizing gap, selection gap
+   - ReportGenerator: console summaries + matplotlib charts
+
+3. **Multi-Strategy Comparison (Exists as SimpleOptimizer)**
+   - SimpleOptimizer.run_all_strategies() runs all registered strategies
+   - SimpleOptimizer.run_grid() for parameter sweeps
+   - Comparison table with buys/sells/PnL side-by-side
+   - Best strategy selection via resolved_pnl score
+
+**What already works:**
+- Run same session through multiple strategies ✓
+- Per-trade attribution with entry/exit ✓
+- Slippage/sizing/selection gap analysis ✓
+- Comparison table output ✓
+
+## What Needs to Be Built
+
+### Component 1: StrategyComparator (Refactor of SimpleOptimizer)
+
+**Current state:** SimpleOptimizer mixes optimization (grid search) with comparison (run_all_strategies).
+
+**Needed change:** Extract comparison logic into dedicated StrategyComparator.
 
 ```python
-class MarketSimulator(ABC):
-    """Abstract interface for execution simulation."""
+# src/debugging/comparator.py
 
-    def submit_order(self, decision: TradeDecision,
-                     market_state: MarketState) -> ExecutionResult:
-        """Submit order for execution. Returns immediate or pending result."""
-        pass
+class StrategyComparator:
+    """Run multiple strategies on same session and compare results."""
 
-    def update_market(self, prices: PriceSnapshot) -> List[ExecutionResult]:
-        """Update market state, check pending orders. Returns fills."""
-        pass
-
-    def get_pending_orders(self) -> List[PendingOrder]:
-        """Return orders awaiting fill."""
-        pass
-```
-
-**Implementations:**
-
-| Implementation | Realism Level | Use Case |
-|----------------|---------------|----------|
-| `InstantSimulator` | None (current behavior) | Fast optimization, baseline |
-| `SpreadSimulator` | Basic (fixed spread cost) | Quick backtests |
-| `LimitOrderSimulator` | Medium (order book crossing) | Realistic timing |
-| `SlippageSimulator` | High (depth, impact) | Production-quality backtest |
-
-### 2. Position Sizing Component (REFACTOR)
-
-**Current state:** Sizing logic scattered across:
-- `src/framework/runner.py` (lines 152-161): Scale calculation
-- Strategy `_buy()` methods: Receive `scaled` amount, apply multipliers
-- `src/core/config.py`: `ScalingConfig` (our_capital, leader_capital, k_factor)
-
-**Problem:** Position sizing concerns mixed with execution logic.
-
-**Recommended structure:**
-
-```
-┌─────────────────────────────────────────────────┐
-│           Position Sizer (NEW)                  │
-│  - Capital allocation                           │
-│  - Risk limits                                  │
-│  - Size calculation                             │
-└─────────────────────────────────────────────────┘
-         ↓ sized_amount
-┌─────────────────────────────────────────────────┐
-│              Strategy                           │
-│  - Entry/exit signals                           │
-│  - Multipliers (burst, momentum, etc)           │
-└─────────────────────────────────────────────────┘
-         ↓ TradeDecision(size=adjusted_amount)
-┌─────────────────────────────────────────────────┐
-│         Market Simulator                        │
-│  - Slippage                                     │
-│  - Partial fills                                │
-└─────────────────────────────────────────────────┘
-```
-
-**Component: PositionSizer**
-
-**Responsibilities:**
-- Calculate base position size from leader's trade
-- Apply capital scaling (our_capital / leader_capital * k_factor)
-- Enforce risk limits (hourly budget, cash reserve)
-- Portfolio-aware sizing (consider existing positions)
-
-**Does NOT:**
-- Make entry/exit decisions (Strategy's job)
-- Apply strategy-specific multipliers (Strategy's job)
-- Model execution realism (MarketSimulator's job)
-
-**Interface:**
-
-```python
-class PositionSizer:
-    """Calculates position sizes based on capital and risk limits."""
-
-    def size_for_trade(self, leader_amount: Decimal,
-                       portfolio: Portfolio,
-                       config: ScalingConfig) -> Decimal:
-        """Calculate our position size for leader's trade."""
-        base_scale = config.our_capital / config.leader_capital * config.k_factor
-        scaled_amount = leader_amount * base_scale
-
-        # Apply risk limits
-        return self._apply_constraints(scaled_amount, portfolio, config)
-
-    def _apply_constraints(self, amount: Decimal,
-                          portfolio: Portfolio,
-                          config: ScalingConfig) -> Decimal:
-        """Enforce hourly budget, cash reserve, position limits."""
-        # Budget checks
-        # Reserve checks
-        # Max position size
-        pass
-```
-
-**Location:** `src/core/position_sizer.py` (new file in core layer)
-
-**Why core layer:** Capital management is a fundamental concern, not strategy-specific.
-
-### 3. Slippage Models (NEW)
-
-**Purpose:** Model price impact and market depth.
-
-**Models to implement:**
-
-#### Fixed Spread Model (Simple)
-```python
-class FixedSpreadModel:
-    """Buy at ask, sell at bid. No additional slippage."""
-
-    def get_fill_price(self, side: OrderSide,
-                       bid: Decimal, ask: Decimal,
-                       size: Decimal) -> Decimal:
-        return ask if side == OrderSide.BUY else bid
-```
-
-#### Square Root Impact Model (Standard)
-```python
-class SqrtImpactModel:
-    """Slippage = spread + sqrt(size/liquidity) * volatility."""
-
-    def get_fill_price(self, side: OrderSide,
-                       bid: Decimal, ask: Decimal,
-                       size: Decimal,
-                       avg_volume: Decimal) -> Decimal:
-        mid = (bid + ask) / 2
-        spread = ask - bid
-
-        # Market impact: larger orders move price more
-        impact_factor = (size / avg_volume).sqrt() * spread
-
-        if side == OrderSide.BUY:
-            return mid + spread/2 + impact_factor
-        else:
-            return mid - spread/2 - impact_factor
-```
-
-#### Order Book Depth Model (Realistic)
-```python
-class DepthModel:
-    """Walk order book levels to fill order."""
-
-    def __init__(self, levels: List[Tuple[Decimal, Decimal]]):
-        """levels: [(price, size), ...] for bid or ask side."""
-        self.levels = levels
-
-    def get_fill_price(self, side: OrderSide,
-                       size: Decimal) -> FillResult:
-        """Fill against order book levels. May return partial."""
-        filled = Decimal("0")
-        total_cost = Decimal("0")
-
-        for price, available in self.levels:
-            if filled >= size:
-                break
-
-            fill_qty = min(size - filled, available)
-            total_cost += fill_qty * price
-            filled += fill_qty
-
-        if filled == 0:
-            return FillResult(filled=0, avg_price=None, status="UNFILLED")
-
-        avg_price = total_cost / filled
-        status = "FULL" if filled == size else "PARTIAL"
-
-        return FillResult(filled=filled, avg_price=avg_price, status=status)
-```
-
-**Slippage model selection:**
-
-| Market Condition | Recommended Model |
-|------------------|-------------------|
-| Deep liquid markets (major events) | Fixed spread |
-| Normal markets | Square root impact |
-| Thin markets (niche events) | Order book depth |
-| Unknown liquidity | Conservative (2x spread penalty) |
-
-### 4. Integration Point: Replay with Simulation
-
-**Challenge:** Add simulation realism without rewriting SessionReplayer.
-
-**Solution:** Inject MarketSimulator into replay flow.
-
-**Modified replay architecture:**
-
-```python
-class SessionReplayer:
-    def __init__(self, session_path: Path,
-                 market_simulator: Optional[MarketSimulator] = None):
+    def __init__(self, session_path: Path):
         self.session_path = session_path
-        self.simulator = market_simulator or InstantSimulator()
+        self.results: Dict[str, ComparisonResult] = {}
 
-    def replay(self, strategy: Strategy) -> ReplayResult:
-        """Replay session through strategy with simulation."""
-        for event in self.events:
-            if event["type"] == "price_snapshot":
-                # Update simulator with market state
-                fills = self.simulator.update_market(event["prices"])
+    def add_strategy(self, strategy: Strategy, config_overrides: Dict = None):
+        """Queue a strategy for comparison."""
+        pass
 
-                # Process any fills from pending orders
-                for fill in fills:
-                    self._apply_fill(fill)
+    def run_comparison(self, track_analysis: bool = True) -> ComparisonReport:
+        """Run all queued strategies and produce comparison report.
 
-            elif event["type"] == "market_event":
-                # Strategy produces decision
-                decision = strategy.on_event(event)
+        For each strategy:
+        1. Create SessionReplayer
+        2. Run with track_analysis=True
+        3. Collect ReplayResult + analysis
 
-                if decision.action != Action.HOLD:
-                    # Submit to simulator instead of instant fill
-                    result = self.simulator.submit_order(
-                        decision,
-                        self._get_market_state(event)
-                    )
+        Returns:
+            ComparisonReport with:
+            - results: Dict[strategy_name, ReplayResult]
+            - ranked: List[strategy_name] sorted by resolved_pnl
+            - diff_matrix: Trade-by-trade differences
+            - failure_analysis: Categorized skip reasons
+        """
+        pass
 
-                    if result.status == "FILLED":
-                        self._apply_fill(result)
-                    elif result.status == "PENDING":
-                        # Order awaiting fill (limit order)
-                        pass
+    def generate_diff_report(self) -> DiffReport:
+        """Compare trade decisions event-by-event.
+
+        For each event:
+        - Which strategies bought?
+        - Which strategies skipped? (with reasons)
+        - Which strategies sold?
+
+        Produces:
+        - Decision matrix (event x strategy)
+        - Divergence points (where strategies disagreed)
+        - Skip reason distribution by strategy
+        """
+        pass
 ```
 
-**Backward compatibility:** `InstantSimulator` preserves current behavior.
+**Integration:** StrategyComparator uses SessionReplayer internally (composition, not duplication).
 
-**Gradual enhancement path:**
-1. Start: `InstantSimulator` (no change)
-2. Add: `SpreadSimulator` (fixed spread cost)
-3. Add: `LimitOrderSimulator` (integrate existing limit_order_sim.py)
-4. Add: `SlippageSimulator` (market impact modeling)
+### Component 2: Enhanced TradeAttributor with Failure Categorization
 
-## Data Flow Diagrams
+**Current state:** TradeAttributor tracks entry/exit/PnL but doesn't categorize WHY trades failed.
 
-### Current Flow (Instant Fills)
+**Needed enhancement:** Add failure mode taxonomy.
 
-```
-SessionReplayer
-    ↓ load JSONL
-[Event 1: leader trade] → Strategy → TradeDecision(BUY, 100 shares)
-    ↓ instant fill
-Portfolio.apply_buy(100 shares @ fixed price)
-    ↓
-[Event 2: price update] → Strategy → ...
-```
+```python
+# Extend AttributedTrade dataclass
 
-**Problem:** No realism in fill modeling.
+@dataclass
+class AttributedTrade:
+    # ... existing fields ...
 
-### Proposed Flow (With Simulation)
+    # Failure mode analysis (new)
+    failure_mode: Optional[str] = None  # "timing", "sizing", "filter", "capital"
+    failure_detail: Optional[str] = None  # Detailed explanation
+    counterfactual_pnl: Optional[Decimal] = None  # What if we had followed?
 
-```
-SessionReplayer
-    ↓ load JSONL
-[Event 1: leader trade] → Strategy → TradeDecision(BUY, 100 shares)
-    ↓
-MarketSimulator.submit_order(decision, market_state)
-    ↓ check liquidity, slippage
-ExecutionResult(FILLED, 95 shares @ adjusted price)  [partial fill!]
-    ↓
-Portfolio.apply_buy(95 shares @ slippage-adjusted price)
-    ↓
-[Event 2: price update] → MarketSimulator.update_market()
-    ↓ check pending orders
-ExecutionResult(FILLED, 5 shares @ new price)  [rest of order fills]
-    ↓
-Portfolio.apply_buy(5 shares @ new price)
+    def categorize_failure(self, skip_reason: str, leader_outcome: Decimal):
+        """Categorize why this trade failed and compute counterfactual.
+
+        Failure taxonomy:
+        - "timing": We skipped due to late signal, trade was profitable
+        - "sizing": We traded but undersized, left PnL on table
+        - "filter": Strategy filter rejected, but trade was good
+        - "capital": Insufficient capital, trade was profitable
+        - "correct_skip": We skipped, trade would have lost
+        """
+        pass
 ```
 
-**Benefit:** Models partial fills, slippage, timing.
+**Usage:**
+```python
+# During replay, for skipped trades:
+if decision.action == DecisionAction.SKIP:
+    # Record skip in TradeAttributor
+    attributor.record_skip(
+        event=event,
+        skip_reason=decision.skip_reason,
+        strategy_name=strategy.name
+    )
 
-## Build Order & Dependencies
-
-### Phase 1: Extract Position Sizing (Foundation)
-
-**Goal:** Separate sizing concerns from strategy logic.
-
-**Tasks:**
-1. Create `src/core/position_sizer.py`
-2. Move capital scaling logic from `runner.py` to `PositionSizer`
-3. Update strategies to use `PositionSizer.size_for_trade()`
-4. Add tests for risk constraints
-
-**Deliverable:** Position sizing in dedicated component.
-
-**Why first:** Sizing logic needed by all simulators. Clean this before adding complexity.
-
-**Dependencies:** None (refactor only)
-
-### Phase 2: Create Market Simulator Abstraction (Architecture)
-
-**Goal:** Define interfaces and instant simulator.
-
-**Tasks:**
-1. Create `src/simulation/market_simulator.py` with abstract interface
-2. Implement `InstantSimulator` (preserves current behavior)
-3. Update `SessionReplayer` to accept optional `MarketSimulator`
-4. Add integration tests (instant simulator = current behavior)
-
-**Deliverable:** Simulation abstraction in place, no behavior change.
-
-**Why second:** Establishes extension point without breaking existing code.
-
-**Dependencies:** None (adds abstraction, defaults to current behavior)
-
-### Phase 3: Add Spread & Slippage Models (Realism)
-
-**Goal:** Model basic market costs.
-
-**Tasks:**
-1. Implement `SpreadSimulator` (fixed bid-ask spread cost)
-2. Implement `SqrtImpactModel` for slippage
-3. Implement `SlippageSimulator` combining spread + impact
-4. Add configuration for slippage parameters
-5. Compare results: instant vs spread vs slippage
-
-**Deliverable:** Basic market cost modeling.
-
-**Why third:** Lowest-hanging fruit for realism improvement.
-
-**Dependencies:** Phase 2 (needs simulator abstraction)
-
-### Phase 4: Integrate Limit Order Simulator (Timing)
-
-**Goal:** Model order fill timing with limit orders.
-
-**Tasks:**
-1. Refactor `src/simulation/limit_order_sim.py` to implement `MarketSimulator`
-2. Handle pending orders in replay flow
-3. Add TTL (time-to-live) and expiration logic
-4. Compare instant vs limit order results
-
-**Deliverable:** Limit order simulation in replay.
-
-**Why fourth:** Requires more complex state management (pending orders).
-
-**Dependencies:** Phase 2 (needs simulator abstraction), Phase 3 (should model spread + timing)
-
-### Phase 5: Add Order Book Depth Modeling (Advanced)
-
-**Goal:** Model partial fills from order book.
-
-**Tasks:**
-1. Extend `PriceSnapshot` to include order book depth (optional)
-2. Implement `DepthSimulator` that walks order book levels
-3. Handle partial fills in portfolio logic
-4. Add depth data collection in recorder (if available from API)
-
-**Deliverable:** Realistic partial fill modeling.
-
-**Why last:** Requires order book data, which may not be available in historical sessions.
-
-**Dependencies:** Phase 4 (partial fills require limit order handling)
-
-### Phase 6: Parallelize Optimizer (Performance)
-
-**Goal:** Speed up grid search.
-
-**Tasks:**
-1. Profile current optimizer performance
-2. Implement parallel replay with `ProcessPoolExecutor`
-3. Add progress reporting
-4. Benchmark: sequential vs parallel
-
-**Deliverable:** Faster optimization.
-
-**Why last:** Optimization speed doesn't affect simulation quality. Do after realism is correct.
-
-**Dependencies:** Phases 1-4 (optimize after simulation is realistic)
-
-## Dependency Graph
-
-```
-Phase 1 (Position Sizing)
-    ↓ sizing logic extracted
-Phase 2 (Simulator Abstraction)
-    ↓ extension point created
-    ├─→ Phase 3 (Spread/Slippage)
-    │       ↓ basic costs modeled
-    └─→ Phase 4 (Limit Orders)
-            ↓ timing modeled
-        Phase 5 (Order Book Depth)
-            ↓ partial fills modeled
-        Phase 6 (Parallel Optimizer)
+# After session ends, compute counterfactuals:
+attributor.compute_counterfactuals(final_prices)
 ```
 
-**Critical path:** 1 → 2 → 4 (position sizing, abstraction, limit orders)
+### Component 3: Visual Diff Generator
 
-**Parallel work:** Phase 3 (slippage) can happen alongside Phase 4 (limit orders)
+**Current state:** Comparison output is text table only.
 
-## Validation Strategy
+**Needed:** Visual timeline showing where strategies diverged.
 
-### How to Verify Simulation Realism
+```python
+# src/debugging/visual_diff.py
 
-**1. Sanity Checks (Instant → Realistic):**
-- Realistic simulation should have **lower** returns (costs added)
-- Partial fills should reduce position sizes
-- Limit orders should have **delayed** fills (timestamps after decision)
+class VisualDiffGenerator:
+    """Generate visual comparison charts for strategies."""
 
-**2. Comparison Matrix:**
+    def generate_decision_timeline(self, comparison: ComparisonReport) -> Path:
+        """Timeline chart showing buy/sell/skip decisions per strategy.
 
-| Metric | Instant Fill | + Spread | + Slippage | + Limit Orders | + Depth |
-|--------|--------------|----------|------------|----------------|---------|
-| Total trades | 100 | 100 | 100 | 95 (5 expired) | 95 |
-| Avg fill price | $0.50 | $0.505 | $0.512 | $0.509 | $0.515 |
-| Total cost | $5000 | $5050 | $5120 | $5090 | $5150 |
-| Partial fills | 0 | 0 | 0 | 0 | 8 |
-| Avg fill delay | 0s | 0s | 0s | 1.2s | 1.5s |
+        X-axis: Time
+        Y-axis: Strategies (one row per strategy)
+        Colors: Green=buy, Red=sell, Gray=skip
 
-**Expected trend:** Each layer of realism adds cost and reduces fills.
+        Makes divergence points visually obvious.
+        """
+        pass
 
-**3. A/B Testing:**
-- Run same session with instant vs realistic simulator
-- Compare: final portfolio value, trade count, fill rates
-- Document: which strategies are most affected by realism
+    def generate_pnl_attribution_chart(self, comparison: ComparisonReport) -> Path:
+        """Waterfall chart showing where PnL differences came from.
 
-**4. Historical Validation:**
-- If live trading data exists: compare backtest vs actual results
-- Simulation should be **pessimistic** (worse than live)
-- Gap indicates missing costs (fees, etc)
+        For each strategy pair:
+        - Starting equity (same)
+        - Trade 1 diff
+        - Trade 2 diff
+        - ...
+        - Final equity diff
+
+        Shows exactly which trades caused performance divergence.
+        """
+        pass
+
+    def generate_failure_mode_breakdown(self, attributed_trades: List[AttributedTrade]) -> Path:
+        """Pie chart of failure modes.
+
+        Categories:
+        - Correct skips (saved money)
+        - Timing failures (late to profitable trades)
+        - Sizing failures (too small)
+        - Filter failures (rejected good trades)
+        - Capital failures (couldn't execute)
+        """
+        pass
+```
+
+### Component 4: FailureModeAnalyzer
+
+**Purpose:** Aggregate failure patterns across strategies.
+
+```python
+# src/debugging/failure_analyzer.py
+
+@dataclass
+class FailurePattern:
+    """A recurring failure pattern across multiple trades."""
+    failure_mode: str
+    occurrence_count: int
+    total_missed_pnl: Decimal
+    example_trades: List[AttributedTrade]
+    fix_suggestion: str  # Actionable suggestion
+
+class FailureModeAnalyzer:
+    """Analyze failure patterns and suggest fixes."""
+
+    def analyze_failures(self, attributed_trades: List[AttributedTrade]) -> FailureReport:
+        """Identify recurring failure patterns.
+
+        Patterns detected:
+        1. "Repeated capital constraints" → suggest higher hourly_budget
+        2. "Filter rejects profitable trades" → suggest looser filters
+        3. "Consistent undersizing" → suggest higher k_factor
+        4. "Late to moves" → architectural latency issue
+
+        Returns:
+            FailureReport with:
+            - patterns: List[FailurePattern]
+            - ranked_by_impact: Sorted by total_missed_pnl
+            - fix_suggestions: Actionable recommendations
+        """
+        pass
+```
+
+## New Components Summary
+
+| Component | Purpose | Integration Point | Lines of Code |
+|-----------|---------|------------------|---------------|
+| StrategyComparator | Multi-strategy runner | Uses SessionReplayer | ~200 |
+| Enhanced TradeAttributor | Failure categorization | Extends existing AttributedTrade | ~100 |
+| VisualDiffGenerator | Matplotlib charts | Uses ComparisonReport | ~300 |
+| FailureModeAnalyzer | Pattern detection | Uses AttributedTrade list | ~200 |
+| ComparisonReport | Data structure | Aggregates ReplayResults | ~50 |
+
+**Total new code:** ~850 lines (vs 6000+ lines existing analysis infrastructure)
+
+## Modified Components
+
+### SessionReplayer (Minor Enhancement)
+
+**Add:** Event-level callback hook for decision capture.
+
+```python
+# In SessionReplayer.run()
+
+# NEW: Optional decision callback
+if decision_callback:
+    decision_callback(event, decision, strategy.name)
+```
+
+**Why:** Allows StrategyComparator to capture decisions event-by-event for diff generation.
+
+### SimpleOptimizer (Refactor)
+
+**Change:** Extract comparison logic → StrategyComparator, keep optimization logic.
+
+```python
+# OLD: SimpleOptimizer.run_all_strategies()
+# NEW: StrategyComparator.run_comparison()
+
+# OLD: SimpleOptimizer.print_summary()
+# NEW: ComparisonReport.print_table()
+```
+
+**Why:** Single Responsibility Principle. Optimizer optimizes, Comparator compares.
+
+## Data Flow (Enhanced)
+
+```
+Session Recording (.jsonl)
+  ↓
+StrategyComparator.add_strategy(strategy_1)
+StrategyComparator.add_strategy(strategy_2)
+StrategyComparator.add_strategy(strategy_3)
+  ↓
+StrategyComparator.run_comparison()
+  ↓
+  For each strategy:
+    SessionReplayer.load()
+    SessionReplayer.run(track_analysis=True, decision_callback=capture_fn)
+      → TradeAttributor (with failure categorization)
+      → EquityTracker
+      → SlippageAnalyzer
+    → ReplayResult + analysis dict
+  ↓
+  Aggregate:
+    ComparisonReport
+      → results: Dict[strategy_name, ReplayResult]
+      → ranked: List[strategy_name]
+      → diff_matrix: DataFrame (event x strategy x decision)
+      → failure_summary: Dict[strategy_name, FailureReport]
+  ↓
+  Output:
+    1. Console table (existing)
+    2. Visual timeline (new: VisualDiffGenerator)
+    3. PnL attribution waterfall (new)
+    4. Failure mode breakdown (new: FailureModeAnalyzer)
+    5. Fix suggestions (new)
+```
+
+## Build Order (Recommended Phases)
+
+### Phase 1: Comparison Infrastructure (Foundation)
+**Goal:** Refactor existing optimizer into clean comparator.
+
+1. Create `src/debugging/__init__.py`
+2. Create `ComparisonReport` dataclass
+3. Refactor `SimpleOptimizer` → extract `StrategyComparator`
+4. Add decision callback hook to `SessionReplayer`
+5. Generate diff matrix (event x strategy decisions)
+
+**Output:** Clean comparison runner with decision matrix
+
+**Tests:** Compare 3 strategies, verify decision matrix captures all events
+
+### Phase 2: Failure Analysis (Attribution Enhancement)
+**Goal:** Categorize WHY trades failed, not just THAT they failed.
+
+1. Extend `AttributedTrade` with failure fields
+2. Add `categorize_failure()` method
+3. Implement failure taxonomy (timing, sizing, filter, capital, correct_skip)
+4. Compute counterfactual PnL for skipped trades
+5. Create `FailureModeAnalyzer`
+
+**Output:** Per-trade failure categorization + aggregated patterns
+
+**Tests:** Verify failure modes correctly categorized, counterfactuals accurate
+
+### Phase 3: Visual Diff (Charts & Reports)
+**Goal:** Make comparison visual, not just tabular.
+
+1. Create `VisualDiffGenerator`
+2. Decision timeline chart (strategies x time)
+3. PnL attribution waterfall (cumulative diff)
+4. Failure mode pie chart
+5. Save charts to `data/reports/comparison/`
+
+**Output:** Visual comparison suite
+
+**Tests:** Generate charts for 3-strategy comparison, verify readability
+
+### Phase 4: Actionable Insights (Intelligence Layer)
+**Goal:** Don't just report failures, suggest fixes.
+
+1. Pattern detection in `FailureModeAnalyzer`
+2. Fix suggestion engine (capital → increase budget, filter → loosen, etc.)
+3. Impact ranking (which failure costs most PnL?)
+4. Configuration diff tool (show config differences that caused divergence)
+
+**Output:** Actionable failure report with fix suggestions
+
+**Tests:** Verify suggestions match known failure modes
+
+## Integration with Existing Systems
+
+### With Validation Pipeline (Phase 5)
+
+The validation pipeline uses SessionReplayer for train/test splits. StrategyComparator integrates seamlessly:
+
+```python
+# Validation pipeline can use StrategyComparator
+comparator = StrategyComparator(test_session_path)
+for strategy in strategies_to_validate:
+    comparator.add_strategy(strategy, config)
+
+report = comparator.run_comparison()
+# Pick best performer on test set
+```
+
+### With Runner (Live Trading)
+
+FailureModeAnalyzer insights inform live strategy selection:
+
+```python
+# After validation, analyze failure modes
+analyzer = FailureModeAnalyzer()
+failure_report = analyzer.analyze_failures(attributed_trades)
+
+# If "repeated capital constraints" detected → increase hourly_budget
+# If "filter rejects profitable trades" → switch to less conservative strategy
+```
+
+### With Analysis Components
+
+StrategyComparator USES existing analysis components, doesn't replace them:
+
+```python
+# StrategyComparator internally calls:
+replayer.run(track_analysis=True)
+# Which populates:
+result.analysis = {
+    'trade_summary': TradeAttributor.get_summary(),
+    'drawdown': DrawdownAnalyzer.analyze(),
+    'slippage': SlippageAnalyzer.aggregate_slippage(),
+    # ... etc
+}
+```
+
+**No duplication.** Comparison is a thin orchestration layer over existing analysis.
+
+## Architectural Patterns Applied
+
+### 1. Event Sourcing (Already Implemented)
+
+Session recordings are append-only event logs. This enables perfect replay determinism and time travel debugging.
+
+**Source:** [Event Sourcing with Event Stores and Versioning in 2026](https://www.johal.in/event-sourcing-with-event-stores-and-versioning-in-2026/) confirms modern trading systems use append-only event stores for tamper-evident audit trails.
+
+### 2. Replay as Debugging (Core Pattern)
+
+The ability to replay historical events through different strategies IS the debugging architecture. This is not a new pattern to build—it's the foundation already in place.
+
+**Source:** [Event Sourcing pattern - Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing) notes that "a hallmark of event sourcing is replayability – the ability to reprocess past events, which is useful for evolving systems when business requirements change by applying new logic to historical events without altering original data."
+
+### 3. Strategy Pattern + Registry
+
+Existing strategy registry (`register_strategy`, `get_strategy`, `list_strategies`) enables dynamic strategy loading for comparison without hardcoding.
+
+### 4. Observer Pattern (Decision Callback)
+
+Adding decision callback to SessionReplayer follows observer pattern: comparator observes each decision without coupling.
+
+### 5. FMEA-Inspired Failure Categorization
+
+FailureModeAnalyzer applies failure mode taxonomy from systems engineering to trading.
+
+**Source:** [Failure Mode and Effects Analysis (FMEA)](https://asq.org/quality-resources/fmea) methodology categorizes failures by Severity, Occurrence, Detection. We adapt this to trading: failure_mode (type), occurrence_count (frequency), total_missed_pnl (severity).
+
+### 6. Comparison Best Practices (2026 Standards)
+
+Modern backtesting requires standardized test conditions (same session, same starting capital, same events) to ensure fair comparison.
+
+**Source:** [How to Compare Two Trading Strategies Using Backtest Results](https://www.fxreplay.com/learn/how-to-compare-two-trading-strategies-using-backtest-results) emphasizes: "Always standardize your test conditions, otherwise the results aren't comparable."
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Embedding Simulation in Strategy
+### 1. Don't Build Parallel Infrastructure
 
-**Bad:**
-```python
-class ConservativeStrategy(Strategy):
-    def _buy(self, event: MarketEvent, scaled: Decimal) -> TradeDecision:
-        # Calculate slippage inside strategy
-        slippage = self._estimate_slippage(scaled)
-        adjusted = scaled * (1 - slippage)
-        return TradeDecision(action=Action.BUY, size=adjusted)
-```
+**Wrong:** Create new "DebugRunner" that duplicates SessionReplayer logic.
 
-**Why bad:**
-- Strategy logic mixed with execution modeling
-- Cannot swap slippage models
-- Testing requires mocking market conditions
+**Right:** Compose SessionReplayer. StrategyComparator is a thin wrapper.
 
-**Instead:** Keep strategies pure (signal generation), delegate to MarketSimulator.
+### 2. Don't Mutate Strategies During Comparison
 
-### Anti-Pattern 2: Tight Coupling to Session Format
+**Wrong:** Run strategy_1, mutate its state, run strategy_2 with contaminated state.
 
-**Bad:**
-```python
-class MarketSimulator:
-    def submit_order(self, decision: TradeDecision):
-        # Read directly from session file
-        prices = self._load_from_jsonl(self.session_path)
-```
+**Right:** Each strategy gets fresh instance via `get_strategy(name)`.
 
-**Why bad:**
-- Simulator cannot work with live data
-- Session format changes break simulator
-- Cannot test without session file
+### 3. Don't Compare Apples to Oranges
 
-**Instead:** Pass market state as parameters, decouple from data source.
+**Wrong:** Run strategies with different config_overrides and compare PnL.
 
-### Anti-Pattern 3: Stateful Replay
+**Right:** Comparison uses same base config. Parameter sweeps are separate (optimizer, not comparator).
 
-**Bad:**
-```python
-class SessionReplayer:
-    def replay(self, strategy: Strategy):
-        # Simulator stores state globally
-        global pending_orders
-        pending_orders = []
-```
+### 4. Don't Ignore Statistical Significance
 
-**Why bad:**
-- Cannot run multiple replays in parallel
-- State leaks between runs
-- Testing requires global cleanup
+**Wrong:** Declare strategy A "better" than B based on single session.
 
-**Instead:** Simulator encapsulates state, reset between replays.
+**Right:** Comparison is per-session. Validation pipeline runs multiple sessions for significance.
 
-### Anti-Pattern 4: Premature Optimization
+### 5. Don't Over-Engineer Failure Categorization
 
-**Bad:**
-```python
-# Implement full order book matching engine before testing spread model
-class OrderBookSimulator:
-    def __init__(self):
-        self.order_book = RedBlackTree()  # Complex data structure
-        self.matching_engine = PriceTimePriority()
-```
+**Wrong:** Create 50 failure subcategories that overlap and confuse.
 
-**Why bad:**
-- High complexity, low immediate value
-- Unknown if order book data is available
-- Delays testing of basic improvements
+**Right:** Start with 5 clear categories (timing, sizing, filter, capital, correct_skip). Expand only if needed.
 
-**Instead:** Start simple (fixed spread), measure impact, then add complexity if needed.
+## Summary: Architectural Decisions
 
-## Key Abstractions
+| Decision | Rationale |
+|----------|-----------|
+| **Refactor, don't rebuild** | 80% of infrastructure exists. Extract and enhance, don't duplicate. |
+| **Comparator uses Replayer** | Composition over duplication. SessionReplayer is the engine. |
+| **Failure categorization in AttributedTrade** | Per-trade detail enables aggregation. Store raw data, compute patterns later. |
+| **Visual diff is separate** | Charts are presentation layer. ComparisonReport is data layer. Decouple. |
+| **Event-level callback hook** | Observer pattern. Comparator observes decisions without coupling. |
+| **Failure taxonomy: 5 categories** | Simple, actionable, expandable. Avoid analysis paralysis. |
+| **Fix suggestions, not just reports** | Actionable intelligence. "Increase hourly_budget by 20%" not just "capital constrained". |
 
-### ExecutionResult
+## Confidence Assessment
 
-```python
-@dataclass
-class ExecutionResult:
-    """Result of order submission to market simulator."""
-    status: str  # "FILLED", "PARTIAL", "PENDING", "REJECTED"
-    filled_qty: Decimal
-    avg_fill_price: Optional[Decimal]
-    fill_time: Optional[datetime]
-    remaining_qty: Decimal = Decimal("0")
-    order_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-```
+| Area | Confidence | Source |
+|------|------------|--------|
+| Event sourcing foundation | HIGH | Existing codebase implements event sourcing correctly |
+| SessionReplayer integration | HIGH | Codebase reviewed, replay.py is production-ready |
+| Analysis components | HIGH | Phase 5 validation pipeline uses them successfully |
+| Comparison patterns | MEDIUM | WebSearch + industry patterns, not yet implemented |
+| Failure categorization | MEDIUM | FMEA methodology adapted to trading, needs testing |
+| Visual diff design | MEDIUM | Standard matplotlib charts, straightforward implementation |
 
-### MarketState
+## Open Questions
 
-```python
-@dataclass
-class MarketState:
-    """Current market conditions for simulation."""
-    token_id: str
-    timestamp: datetime
-    bid: Decimal
-    ask: Decimal
-    spread_pct: Decimal
-    last_price: Optional[Decimal] = None
-    volume_24h: Optional[Decimal] = None
-    order_book_depth: Optional[List[OrderBookLevel]] = None
-```
+1. **Counterfactual PnL accuracy:** How to compute "what if we had followed?" when we don't have fill prices we would have gotten?
+   - **Answer:** Use leader's execution price as proxy. Conservative estimate.
 
-### PendingOrder
+2. **Failure mode taxonomy completeness:** Are 5 categories enough?
+   - **Answer:** Start with 5, expand if patterns emerge that don't fit.
 
-```python
-@dataclass
-class PendingOrder:
-    """Order awaiting fill."""
-    order_id: str
-    token_id: str
-    side: OrderSide
-    limit_price: Decimal
-    quantity: Decimal
-    filled: Decimal
-    submitted_at: datetime
-    expires_at: Optional[datetime]
-    metadata: Dict[str, Any]
-```
+3. **Comparison session selection:** Which sessions are representative for comparison?
+   - **Answer:** Validation pipeline's test set. Don't cherry-pick winning sessions.
 
-## Configuration Schema
+4. **Fix suggestion reliability:** Can we automatically suggest config changes?
+   - **Answer:** Start with simple heuristics (capital → budget, sizing → k_factor). Improve iteratively.
 
-```yaml
-simulation:
-  # Execution model selection
-  mode: "instant" | "spread" | "slippage" | "limit_order" | "depth"
+## Sources
 
-  # Spread modeling
-  fixed_spread_bps: 50  # 0.5% spread if not available from snapshot
+### Architecture Patterns
+- [Architectural Design Patterns for High-Frequency Algo Trading Bots | Medium](https://medium.com/@halljames9963/architectural-design-patterns-for-high-frequency-algo-trading-bots-c84f5083d704)
+- [Event Sourcing pattern - Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sourcing)
+- [Event Sourcing with Event Stores and Versioning in 2026](https://www.johal.in/event-sourcing-with-event-stores-and-versioning-in-2026/)
+- [Trading System Architecture 2026 | From Microservices to Agentic Mesh](https://www.tuvoc.com/blog/trading-system-architecture-microservices-agentic-mesh/)
 
-  # Slippage modeling (sqrt impact)
-  slippage:
-    enabled: true
-    impact_factor: 0.1  # Multiplier for sqrt(size/volume)
-    min_slippage_bps: 10  # Minimum 0.1%
-    max_slippage_bps: 500  # Cap at 5%
+### Comparison & Backtesting
+- [How to Compare Two Trading Strategies Using Backtest Results | FX Replay](https://www.fxreplay.com/learn/how-to-compare-two-trading-strategies-using-backtest-results)
+- [Top Backtesting Features Every Trader Should Look For in 2026 | FX Replay](https://www.fxreplay.com/learn/top-backtesting-features-every-trader-should-look-for-in-2026)
 
-  # Limit order settings
-  limit_orders:
-    default_ttl_seconds: 8.0  # Order expiration
-    use_limit_orders: true
-    offset_bps: 10  # Place limit order 0.1% better than current price
+### Trade Attribution
+- [P&L Attribution | La Cima Group](https://www.lacimagroup.com/pnl-attribution/)
+- [Running PnL Analytics: Risk and Drawdowns | TradesViz Blog](https://www.tradesviz.com/blog/running-pnl-risk-analysis/)
 
-  # Order book depth
-  order_book:
-    use_depth: false  # Requires depth data in session
-    min_liquidity_threshold: 100  # Reject if insufficient depth
-
-  # Fill timing
-  fill_delay_ms: 0  # Simulated network latency
-```
-
-## Open Questions & Future Research
-
-### 1. Fee Modeling
-**Question:** Should gas fees and Polymarket fees be in simulator or separate component?
-
-**Tradeoff:**
-- **In simulator:** Complete cost model, single source of truth
-- **Separate:** Easier to test, swap fee structures
-
-**Recommendation:** Separate fee calculator called by simulator. Fees are policy (configurable), slippage is market dynamics (simulated).
-
-### 2. Multi-Asset Correlation
-**Question:** Should simulator model cross-market impact (buying in one market affects another)?
-
-**Current:** Each market simulated independently.
-
-**Enhancement:** If buying token A moves token B (e.g., correlated markets), simulator could propagate impact.
-
-**Complexity:** High. Defer until single-market simulation is validated.
-
-### 3. Live Execution Adapter Reuse
-**Question:** Can same MarketSimulator interface work for live trading?
-
-**Possibility:** `LiveMarketSimulator` wraps actual API calls, returns pending orders that poll for fills.
-
-**Benefit:** Unified interface for backtest and live.
-
-**Risk:** Live trading has different failure modes (network errors, rate limits). May need separate abstraction.
-
-**Recommendation:** Keep separate for now. Revisit after simulation is stable.
-
-### 4. Simulation State Persistence
-**Question:** Should simulator checkpoint state for resume?
-
-**Use case:** Long optimization runs that crash.
-
-**Complexity:** Moderate (serialize pending orders, market state).
-
-**Priority:** Low. Only valuable for >1hr optimization runs.
-
-## Sources & Confidence
-
-**Source hierarchy:**
-
-| Claim | Source | Confidence |
-|-------|--------|------------|
-| Position sizing is scattered | Codebase grep (runner.py, strategies) | HIGH |
-| Limit order sim exists but not integrated | `src/simulation/limit_order_sim.py` line 358 TODO | HIGH |
-| Square root impact model is standard | Established quant finance pattern (Almgren-Chriss) | MEDIUM |
-| Order book depth modeling is complex | Codebase analysis, no depth data in sessions | HIGH |
-| Parallel optimization will help | ProcessPoolExecutor imported but unused | HIGH |
-
-**Gaps:**
-- No Polymarket-specific documentation for their order book API
-- Unknown if order book depth data is available historically
-- Slippage parameters may need empirical tuning
-
-**Validation needed:**
-- Phase-specific research before implementing order book depth (check API capabilities)
-- Empirical testing of slippage models against live trading results (if data exists)
-
----
-
-*Architecture research completed: 2026-01-30*
-*Confidence: MEDIUM (codebase-driven, standard backtesting patterns)*
-*Ready for roadmap creation: YES*
+### Failure Analysis
+- [What is FMEA? Failure Mode & Effects Analysis | ASQ](https://asq.org/quality-resources/fmea)
+- [Failure mode analysis - Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/resiliency/failure-mode-analysis)
