@@ -25,12 +25,12 @@ Reproduce the leader's profitable trades at a smaller scale with sizing that max
 
 ### Active
 
-- [ ] Comprehensive test suite validating strategies, risk caps, and portfolio math
-- [ ] Realistic end-to-end simulation that proves PnL numbers are trustworthy
-- [ ] Position sizing optimized for ~$100 budget (current caps designed for larger accounts)
-- [ ] Data-driven analysis of where profit leaks vs the leader
-- [ ] Strategy improvements based on simulation analysis
-- [ ] Better risk management (smarter exposure limits, drawdown protection)
+- [ ] Strategy comparison tooling to understand why conservative wins vs others
+- [ ] Per-trade attribution showing exactly which trades hurt/helped each strategy
+- [ ] Root cause analysis of strategy failure modes (sizing vs timing vs selection)
+- [ ] New strategy design based on conservative's winning patterns
+- [ ] Validation framework on fresh recorded sessions
+- [ ] Small-scale live testing if simulation results are promising
 
 ### Out of Scope
 
@@ -58,13 +58,25 @@ Reproduce the leader's profitable trades at a smaller scale with sizing that max
 - **Minimum orders**: Polymarket requires min $1 market orders, min 5 shares limit orders
 - **No live trading**: All work validated through simulation only
 
+## Current Milestone: v1.1 Beat Conservative
+
+**Goal:** Build a strategy that outperforms conservative on fresh recorded sessions
+
+**Target features:**
+- Strategy debugging to understand why conservative wins
+- Per-trade failure analysis for underperforming strategies
+- New strategy based on insights from conservative's patterns
+- Validation on fresh data + small live test
+
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Focus on simulation before live | Need confidence in numbers before risking real money | — Pending |
-| Single leader strategy | Identified whale is proven profitable | — Pending |
-| Small budget optimization | Under $100 means sizing is the critical variable | — Pending |
+| Focus on simulation before live | Need confidence in numbers before risking real money | ✓ Good (v1.0 complete) |
+| Single leader strategy | Identified whale is proven profitable | ✓ Good |
+| Small budget optimization | Under $100 means sizing is the critical variable | ✓ Good |
+| Conservative as baseline | Only profitable strategy in 12-session overnight test | — Pending |
+| Pattern discovery deferred | v1.2 research track, not blocking strategy work | — Pending |
 
 ---
-*Last updated: 2026-01-30 after initialization*
+*Last updated: 2026-02-03 after v1.1 milestone start*

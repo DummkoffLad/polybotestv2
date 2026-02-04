@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-30)
+See: .planning/PROJECT.md (updated 2026-02-03)
 
-**Core value:** Reproduce the leader's profitable trades at a smaller scale with sizing that maximizes returns while protecting capital
-**Current focus:** Phase 5 COMPLETE — All validation components delivered
+**Core value:** Build a strategy that beats conservative on fresh recorded sessions
+**Current focus:** Milestone v1.1 — Defining requirements
 
 ## Current Position
 
-Phase: 5 of 5 (Validation)
-Plan: 5 of 5 (COMPLETE)
-Status: Phase 5 complete
-Last activity: 2026-02-02 — Completed 05-05 (ValidationPipeline integration)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-03 — Milestone v1.1 started
 
-Progress: [█████████████████████████] 100% (20/20 plans complete across all phases)
+Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -164,31 +164,23 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-03 (Quick task 001)
-Stopped at: Completed quick-001 (WS reconnect fix)
+Last session: 2026-02-03 (Milestone v1.1 start)
+Stopped at: Defining requirements
 Resume file: None
-Next action: PROJECT COMPLETE — Ready for live validation workflow
+Next action: Research → Requirements → Roadmap
 
-**Phase 5 Progress (5/5 plans COMPLETE):**
-- Plan 05-01: DataSplitManager with data leakage prevention (4min, 14 tests)
-- Plan 05-02: SensitivitySweeper with parameter sweep analysis (4min, 14 tests)
-- Plan 05-03: LatencySimulator with stress scenario testing (4min, 21 tests)
-- Plan 05-04: ValidationReportGenerator with go/no-go decision (4min, 20 tests)
-- Plan 05-05: ValidationPipeline integration (7min, 8 integration tests)
-- All validation components complete and tested
-- Added 77 tests total in Phase 5
-- All 461 tests passing
+**v1.0 Summary (COMPLETE):**
+- 5 phases, 20 plans, 461 tests passing
+- Validation pipeline operational
+- Conservative strategy identified as only profitable in 12-session test
 
-**Live Deployment Workflow:**
-1. Gather 3-5 new out-of-sample sessions
-2. Run: `from src.validation import run_validation`
-3. Provide: `run_validation(out_of_sample_sessions=["session_xxx", ...])`
-4. Review: Console summary shows GO/NO-GO decision
-5. Analyze: Read markdown report for detailed metrics
-6. Decision: If GO, proceed with live trading; if NO-GO, address issues
-7. Monitor: Track live performance against OOS predictions
+**Milestone v1.1 Context:**
+- User ran bot 12 hours overnight (low volatility)
+- Conservative mirror was only profitable strategy
+- Conservative took MORE trades than basic mirror (not just selective)
+- Goal: Build strategy that beats conservative
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-02*
-*Project Status: COMPLETE*
+*Last updated: 2026-02-03*
+*Milestone: v1.1 Beat Conservative*
