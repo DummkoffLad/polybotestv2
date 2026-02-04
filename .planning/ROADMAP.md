@@ -131,12 +131,12 @@ Plans:
   3. Metrics table compares Sharpe ratio, win rate, profit factor, max drawdown for each strategy
   4. Decision matrix reveals which trades each strategy took vs skipped
   5. QuantStats HTML tear sheets provide deep performance analysis per strategy
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
-- [ ] 07-03: TBD
+- [ ] 07-01-PLAN.md -- StrategyComparator orchestrator + ComparisonResult dataclasses (TDD)
+- [ ] 07-02-PLAN.md -- Equity curve visualization (Plotly) + metrics table (empyrical-reloaded) (TDD)
+- [ ] 07-03-PLAN.md -- Decision matrix with divergence highlighting + QuantStats tear sheets (TDD)
 
 ### Phase 8: Failure Analysis
 **Goal**: Understand WHY strategies differ by categorizing each divergent trade decision
@@ -216,7 +216,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11
 | 4. Advanced Sizing | v1.0 | 5/5 | Complete | 2026-02-02 |
 | 5. Validation | v1.0 | 5/5 | Complete | 2026-02-02 |
 | 6. Statistical Validation | v1.1 | 3/3 | Complete | 2026-02-04 |
-| 7. Comparison Infrastructure | v1.1 | 0/TBD | Not started | - |
+| 7. Comparison Infrastructure | v1.1 | 0/3 | Not started | - |
 | 8. Failure Analysis | v1.1 | 0/TBD | Not started | - |
 | 9. Visual Reporting | v1.1 | 0/TBD | Not started | - |
 | 10. Validation Protocol | v1.1 | 0/TBD | Not started | - |
