@@ -1,12 +1,13 @@
 """Statistical validation module for trading bot.
 
 Provides confidence interval calculations, sample size adequacy checks,
-and hypothesis testing for strategy comparison.
+hypothesis testing for strategy comparison, and regime-based analysis.
 """
 
 from .confidence import ConfidenceIntervalCalculator
 from .sample_size import SampleSizeChecker, SampleSizeWarning
 from .hypothesis import StrategyComparator, ComparisonResult
+from .regime import RegimeAnalyzer, RegimeMetrics, RegimeComparisonResult
 
 __all__ = [
     "ConfidenceIntervalCalculator",
@@ -14,4 +15,7 @@ __all__ = [
     "SampleSizeWarning",
     "StrategyComparator",
     "ComparisonResult",
+    "RegimeAnalyzer",
+    "RegimeMetrics",
+    "RegimeComparisonResult",
 ]
