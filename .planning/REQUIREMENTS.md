@@ -111,38 +111,46 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STAT-01 | TBD | Pending |
-| STAT-02 | TBD | Pending |
-| STAT-03 | TBD | Pending |
-| COMP-01 | TBD | Pending |
-| COMP-02 | TBD | Pending |
-| COMP-03 | TBD | Pending |
-| COMP-04 | TBD | Pending |
-| COMP-05 | TBD | Pending |
-| COMP-06 | TBD | Pending |
-| FAIL-01 | TBD | Pending |
-| FAIL-02 | TBD | Pending |
-| FAIL-03 | TBD | Pending |
-| FAIL-04 | TBD | Pending |
-| FAIL-05 | TBD | Pending |
-| VISU-01 | TBD | Pending |
-| VISU-02 | TBD | Pending |
-| VISU-03 | TBD | Pending |
-| VALD-01 | TBD | Pending |
-| VALD-02 | TBD | Pending |
-| VALD-03 | TBD | Pending |
-| VALD-04 | TBD | Pending |
-| STRT-01 | TBD | Pending |
-| STRT-02 | TBD | Pending |
-| MNTR-01 | TBD | Pending |
-| MNTR-02 | TBD | Pending |
-| MNTR-03 | TBD | Pending |
+| STAT-01 | Phase 6 | Pending |
+| STAT-02 | Phase 6 | Pending |
+| STAT-03 | Phase 6 | Pending |
+| COMP-01 | Phase 7 | Pending |
+| COMP-02 | Phase 7 | Pending |
+| COMP-03 | Phase 7 | Pending |
+| COMP-04 | Phase 7 | Pending |
+| COMP-05 | Phase 7 | Pending |
+| COMP-06 | Phase 7 | Pending |
+| FAIL-01 | Phase 8 | Pending |
+| FAIL-02 | Phase 8 | Pending |
+| FAIL-03 | Phase 8 | Pending |
+| FAIL-04 | Phase 8 | Pending |
+| FAIL-05 | Phase 8 | Pending |
+| VISU-01 | Phase 9 | Pending |
+| VISU-02 | Phase 9 | Pending |
+| VISU-03 | Phase 9 | Pending |
+| VALD-01 | Phase 10 | Pending |
+| VALD-02 | Phase 10 | Pending |
+| VALD-03 | Phase 10 | Pending |
+| VALD-04 | Phase 10 | Pending |
+| STRT-01 | Phase 11 | Pending |
+| STRT-02 | Phase 11 | Pending |
+| MNTR-01 | Phase 11 | Pending |
+| MNTR-02 | Phase 11 | Pending |
+| MNTR-03 | Phase 11 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 26 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 26
+- Mapped to phases: 26 (100% coverage)
+- Unmapped: 0
+
+**Phase Distribution:**
+- Phase 6 (Statistical Validation): 3 requirements
+- Phase 7 (Comparison Infrastructure): 6 requirements
+- Phase 8 (Failure Analysis): 5 requirements
+- Phase 9 (Visual Reporting): 3 requirements
+- Phase 10 (Validation Protocol): 4 requirements
+- Phase 11 (Strategy + Monitoring): 5 requirements
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after milestone v1.1 definition*
+*Last updated: 2026-02-03 after v1.1 roadmap creation*

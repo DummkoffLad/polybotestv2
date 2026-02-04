@@ -1,24 +1,14 @@
 # Roadmap: Polymarket Copy Trading Bot Optimization
 
-## Overview
+## Milestones
 
-Transform the existing copy trading bot from a working prototype into a reliable small-budget profit machine. Starting with test coverage to validate existing behavior, we'll add performance analysis to identify profit leakage, optimize position sizing for $100 budget constraints, and validate robustness through systematic testing. The journey takes us from "it works" to "we trust the numbers and maximize every dollar."
+- ✅ **v1.0 Validation** - Phases 1-5 (shipped 2026-02-02)
+- 🚧 **v1.1 Beat Conservative** - Phases 6-11 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 1: Test Coverage** - Validate existing strategy and risk implementations
-- [x] **Phase 2: Performance Analysis** - Track attribution, drawdown, and profit leakage
-- [x] **Phase 3: Dynamic Sizing** - Adapt position sizing to current capital
-- [x] **Phase 4: Advanced Sizing** - Optimize capital efficiency and edge-based sizing
-- [x] **Phase 5: Validation** - Prove robustness through out-of-sample testing
-
-## Phase Details
+<details>
+<summary>✅ v1.0 Validation (Phases 1-5) - SHIPPED 2026-02-02</summary>
 
 ### Phase 1: Test Coverage
 **Goal**: Existing strategies, risk caps, and portfolio math are validated with automated tests
@@ -106,19 +96,129 @@ Plans:
 - [x] 05-04-PLAN.md -- ValidationReportGenerator (go/no-go decision logic + report formatting with TDD)
 - [x] 05-05-PLAN.md -- ValidationPipeline (wire components + integration tests)
 
+</details>
+
+## 🚧 v1.1 Beat Conservative (In Progress)
+
+**Milestone Goal:** Build a strategy that outperforms conservative on fresh recorded sessions
+
+Research insight: Conservative's win on 12 sessions may be luck (only 70-80% confidence with ~100-180 trades). Must validate statistical significance before analysis, understand causal mechanisms before building new strategy, and test on held-out data before deployment.
+
+### Phase 6: Statistical Validation
+**Goal**: Confirm conservative's edge is statistically significant, not random noise
+**Depends on**: Phase 5
+**Requirements**: STAT-01, STAT-02, STAT-03
+**Success Criteria** (what must be TRUE):
+  1. Confidence intervals show statistical bounds on PnL and win rate for each strategy
+  2. T-test results show whether conservative's advantage is significant (p < 0.05) or likely noise
+  3. Sample size warnings alert when trade count is insufficient for 95% confidence
+  4. Decision to proceed with analysis or gather more sessions is data-driven
+**Plans**: TBD
+
+Plans:
+- [ ] 06-01: TBD
+- [ ] 06-02: TBD
+
+### Phase 7: Comparison Infrastructure
+**Goal**: Run all strategies side-by-side with complete decision visibility
+**Depends on**: Phase 6
+**Requirements**: COMP-01, COMP-02, COMP-03, COMP-04, COMP-05, COMP-06
+**Success Criteria** (what must be TRUE):
+  1. StrategyComparator runs multiple strategies on same session with identical market data
+  2. Side-by-side equity curves show visual performance comparison across all strategies
+  3. Metrics table compares Sharpe ratio, win rate, profit factor, max drawdown for each strategy
+  4. Decision matrix reveals which trades each strategy took vs skipped
+  5. QuantStats HTML tear sheets provide deep performance analysis per strategy
+**Plans**: TBD
+
+Plans:
+- [ ] 07-01: TBD
+- [ ] 07-02: TBD
+- [ ] 07-03: TBD
+
+### Phase 8: Failure Analysis
+**Goal**: Understand WHY strategies differ by categorizing each divergent trade decision
+**Depends on**: Phase 7
+**Requirements**: FAIL-01, FAIL-02, FAIL-03, FAIL-04, FAIL-05
+**Success Criteria** (what must be TRUE):
+  1. Every trade has a failure categorization (timing, sizing, filter, capital, correct_skip)
+  2. Counterfactual PnL shows "what if strategy A followed strategy B on this trade"
+  3. FailureModeAnalyzer identifies recurring patterns and ranks by impact
+  4. Sizing impact analysis isolates whether sizing or selection drives performance gap
+  5. Causal hypotheses are documented before building new strategy
+**Plans**: TBD
+
+Plans:
+- [ ] 08-01: TBD
+- [ ] 08-02: TBD
+- [ ] 08-03: TBD
+
+### Phase 9: Visual Reporting
+**Goal**: Make comparison insights accessible through interactive visual reports
+**Depends on**: Phase 8
+**Requirements**: VISU-01, VISU-02, VISU-03
+**Success Criteria** (what must be TRUE):
+  1. Decision timeline shows buy/sell/skip markers across strategies over session time
+  2. PnL attribution waterfall visualizes cumulative divergence trade-by-trade
+  3. Interactive Plotly charts allow drill-down to individual trade details
+  4. Reports export to HTML for sharing and offline review
+**Plans**: TBD
+
+Plans:
+- [ ] 09-01: TBD
+- [ ] 09-02: TBD
+
+### Phase 10: Validation Protocol
+**Goal**: Rigorous out-of-sample testing prevents overfitting to 12-session analysis data
+**Depends on**: Phase 8
+**Requirements**: VALD-01, VALD-02, VALD-03, VALD-04
+**Success Criteria** (what must be TRUE):
+  1. Train/test split reserves 30% of sessions for validation (never used in analysis)
+  2. Out-of-sample requirement enforces that new strategy must beat conservative on held-out data
+  3. Execution cost modeling includes realistic spread and slippage estimates
+  4. Walk-forward validation tests strategy on rolling time windows
+**Plans**: TBD
+
+Plans:
+- [ ] 10-01: TBD
+- [ ] 10-02: TBD
+
+### Phase 11: Strategy Development & Monitoring
+**Goal**: Build improved strategy from validated insights and monitor for degradation
+**Depends on**: Phase 9 (reporting), Phase 10 (validation)
+**Requirements**: STRT-01, STRT-02, MNTR-01, MNTR-02, MNTR-03
+**Success Criteria** (what must be TRUE):
+  1. New strategy implements causal mechanism from failure analysis (not copied parameters)
+  2. Strategy beats conservative on out-of-sample validation sessions
+  3. Rolling performance windows track 6-session and 12-session recent metrics
+  4. Statistical alerts trigger on 2-sigma performance degradation
+  5. Regime detection identifies when market conditions shift significantly
+**Plans**: TBD
+
+Plans:
+- [ ] 11-01: TBD
+- [ ] 11-02: TBD
+- [ ] 11-03: TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Test Coverage | 4/4 | Complete | 2026-01-31 |
-| 2. Performance Analysis | 3/3 | Complete | 2026-01-31 |
-| 3. Dynamic Sizing | 4/4 | Complete | 2026-02-02 |
-| 4. Advanced Sizing | 5/5 | Complete | 2026-02-02 |
-| 5. Validation | 5/5 | Complete | 2026-02-02 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Test Coverage | v1.0 | 4/4 | Complete | 2026-01-31 |
+| 2. Performance Analysis | v1.0 | 3/3 | Complete | 2026-01-31 |
+| 3. Dynamic Sizing | v1.0 | 4/4 | Complete | 2026-02-02 |
+| 4. Advanced Sizing | v1.0 | 5/5 | Complete | 2026-02-02 |
+| 5. Validation | v1.0 | 5/5 | Complete | 2026-02-02 |
+| 6. Statistical Validation | v1.1 | 0/TBD | Not started | - |
+| 7. Comparison Infrastructure | v1.1 | 0/TBD | Not started | - |
+| 8. Failure Analysis | v1.1 | 0/TBD | Not started | - |
+| 9. Visual Reporting | v1.1 | 0/TBD | Not started | - |
+| 10. Validation Protocol | v1.1 | 0/TBD | Not started | - |
+| 11. Strategy Development & Monitoring | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-30*
-*Last updated: 2026-02-02 after Phase 5 execution complete*
+*Last updated: 2026-02-03 after v1.1 milestone planning*
