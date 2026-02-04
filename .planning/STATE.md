@@ -10,33 +10,34 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 6 of 11 (Statistical Validation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-02-03 — v1.1 roadmap created, Phase 6 ready
+Plan: 1 of TBD in current phase
+Status: In progress
+Last activity: 2026-02-04 — Completed 06-01-PLAN.md
 
-Progress: [█████░░░░░] 52% (21 of 40+ plans complete across milestones)
+Progress: [█████░░░░░] 53% (22 of 41+ plans complete across milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 21 (v1.0 complete)
-- Average duration: 4.5min (v1.0)
-- Total execution time: 1.51 hours (v1.0)
+- Total plans completed: 22 (v1.0 complete, v1.1 started)
+- Average duration: 4.5min (all time)
+- Total execution time: 1.56 hours (all time)
 
-**By Phase (v1.0 Complete):**
+**By Phase:**
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01-test-coverage | 4 | 19min | 5min |
-| 02-performance-analysis | 4 | 20min | 5min |
-| 03-dynamic-sizing | 4 | 15min | 4min |
-| 04-advanced-sizing | 5 | 24min | 5min |
-| 05-validation | 5 | 23min | 5min |
+| Phase | Plans | Total | Avg/Plan | Status |
+|-------|-------|-------|----------|--------|
+| 01-test-coverage | 4 | 19min | 5min | Complete |
+| 02-performance-analysis | 4 | 20min | 5min | Complete |
+| 03-dynamic-sizing | 4 | 15min | 4min | Complete |
+| 04-advanced-sizing | 5 | 24min | 5min | Complete |
+| 05-validation | 5 | 23min | 5min | Complete |
+| 06-statistical-validation | 1 | 4min | 4min | In progress |
 
 **Recent Trend:**
-- Last 5 plans: 05-01 (4min), 05-02 (4min), 05-03 (4min), 05-04 (4min), 05-05 (7min)
+- Last 5 plans: 05-02 (4min), 05-03 (4min), 05-04 (4min), 05-05 (7min), 06-01 (4min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
-- Milestone v1.1: Phase 6 ready to plan
+- Milestone v1.1: In progress (1 plan complete, Phase 6)
 
 *Updated after each plan completion*
 
@@ -50,6 +51,9 @@ Recent decisions affecting v1.1 milestone:
 - Conservative as baseline: Only profitable strategy in 12-session overnight test
 - Pattern discovery deferred: v1.2 research track, not blocking strategy work
 - Statistical validation first: Must confirm conservative's edge is real before analysis
+- **scipy.stats.bootstrap (06-01):** Use industry-standard library instead of hand-rolled bootstrap
+- **Fixed seed for reproducibility (06-01):** seed=42 for deterministic test results
+- **Research-backed thresholds (06-01):** 30/100/200 trades for minimum/basic/high confidence
 
 ### Pending Todos
 
@@ -94,10 +98,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-03
-Stopped at: v1.1 roadmap created, ROADMAP.md and STATE.md updated
+Last session: 2026-02-04
+Stopped at: Completed 06-01-PLAN.md (Statistics module foundation)
 Resume file: None
-Next action: `/gsd:plan-phase 6` to create Phase 6 plan
+Next action: Continue with next Phase 6 plan (06-02 or similar)
 Testing script: `full_optimizer.py` — runs all strategies against recorded sessions
 
 **v1.0 Summary (COMPLETE):**
@@ -113,5 +117,5 @@ Testing script: `full_optimizer.py` — runs all strategies against recorded ses
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-03 after v1.1 roadmap creation*
+*Last updated: 2026-02-04 after 06-01-PLAN.md completion*
 *Milestone: v1.1 Beat Conservative*
