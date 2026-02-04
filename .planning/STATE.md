@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 7 of 11 (Comparison Infrastructure)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-02-04 — Completed 07-01-PLAN.md
+Last activity: 2026-02-04 — Completed 07-02-PLAN.md
 
-Progress: [██████░░░░] 60% (25 of 42+ plans complete across milestones)
+Progress: [██████░░░░] 62% (26 of 42+ plans complete across milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 25 (v1.0 complete, v1.1 in progress)
+- Total plans completed: 26 (v1.0 complete, v1.1 in progress)
 - Average duration: 4.4min (all time)
-- Total execution time: 1.73 hours (all time)
+- Total execution time: 1.83 hours (all time)
 
 **By Phase:**
 
@@ -33,12 +33,12 @@ Progress: [██████░░░░] 60% (25 of 42+ plans complete across 
 | 04-advanced-sizing | 5 | 24min | 5min | Complete |
 | 05-validation | 5 | 23min | 5min | Complete |
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
-| 07-comparison-infrastructure | 1 | 5min | 5min | In progress |
+| 07-comparison-infrastructure | 2 | 11min | 5.5min | In progress |
 
 **Recent Trend:**
-- Last 5 plans: 05-05 (7min), 06-01 (4min), 06-02 (4min), 06-03 (3min), 07-01 (5min)
+- Last 5 plans: 06-01 (4min), 06-02 (4min), 06-03 (3min), 07-01 (5min), 07-02 (6min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
-- Milestone v1.1: In progress (4 plans complete, Phase 7 in progress)
+- Milestone v1.1: In progress (5 plans complete, Phase 7 in progress)
 
 *Updated after each plan completion*
 
@@ -61,6 +61,9 @@ Recent decisions affecting v1.1 milestone:
 - **Welch's t-test (06-03):** Use equal_var=False for independent regime comparison
 - **Sequential replay for comparison (07-01):** Not parallel - ensures data consistency and state isolation
 - **Fresh replayer per strategy (07-01):** Each strategy gets isolated SessionReplayer instance
+- **Scattergl for WebGL performance (07-02):** Use WebGL-accelerated Plotly traces for large datasets
+- **CDN for plotly.js (07-02):** Use include_plotlyjs='cdn' for ~3MB smaller HTML files
+- **empyrical-reloaded for metrics (07-02):** Don't hand-roll Sharpe/Sortino/Calmar ratios
 
 ### Pending Todos
 
@@ -106,9 +109,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-04
-Stopped at: Completed 07-01-PLAN.md (StrategyComparator core)
+Stopped at: Completed 07-02-PLAN.md (Equity visualization + metrics)
 Resume file: None
-Next action: 07-02-PLAN.md (Equity curve visualization)
+Next action: 07-03-PLAN.md (Decision matrix + tear sheets)
 Testing script: `full_optimizer.py` — runs all strategies against recorded sessions
 
 **v1.0 Summary (COMPLETE):**
@@ -124,5 +127,5 @@ Testing script: `full_optimizer.py` — runs all strategies against recorded ses
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-04 after 07-01-PLAN.md completion*
+*Last updated: 2026-02-04 after 07-02-PLAN.md completion*
 *Milestone: v1.1 Beat Conservative*
