@@ -140,13 +140,14 @@ Plans:
 ### Phase 8: Failure Analysis
 **Goal**: Understand WHY strategies differ by categorizing each divergent trade decision
 **Depends on**: Phase 7
-**Requirements**: FAIL-01, FAIL-02, FAIL-03, FAIL-04, FAIL-05
+**Requirements**: FAIL-01, FAIL-02, FAIL-03, FAIL-04, FAIL-05, FAIL-06
 **Success Criteria** (what must be TRUE):
   1. Every trade has a failure categorization (timing, sizing, filter, capital, correct_skip)
   2. Counterfactual PnL shows "what if strategy A followed strategy B on this trade"
   3. FailureModeAnalyzer identifies recurring patterns and ranks by impact
   4. Sizing impact analysis isolates whether sizing or selection drives performance gap
   5. Causal hypotheses are documented before building new strategy
+  6. Peak profit analysis shows max unrealized profit per trade — identifies if we held winners that became losers
 **Plans**: TBD
 
 Plans:

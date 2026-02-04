@@ -80,6 +80,12 @@ None yet.
 - Phase 10 enforces 30% holdout for validation
 - New strategy must beat conservative on out-of-sample data
 
+**Exit Timing Investigation (v1.1):**
+- Per-trade: Were positions profitable at some point before turning into losses?
+- Could we have sold earlier than leader and captured profit?
+- Phase 8 (FAIL-06) will track max unrealized profit per trade
+- Key question: Is the problem entry selection or exit timing?
+
 **Portfolio position keying bug (v1.0 documented):**
 - Portfolio._positions keyed only by token_id, not (token_id, market_id, side)
 - Same token_id in different markets incorrectly accumulates into single position

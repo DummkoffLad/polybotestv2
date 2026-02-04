@@ -30,6 +30,7 @@ Requirements for milestone v1.1: Beat Conservative. Each maps to roadmap phases.
 - [ ] **FAIL-03**: Counterfactual PnL calculation shows "what if we followed" for skipped trades
 - [ ] **FAIL-04**: FailureModeAnalyzer detects patterns and suggests fixes
 - [ ] **FAIL-05**: Sizing impact analysis compares "what if A used B's sizing" counterfactuals
+- [ ] **FAIL-06**: Peak profit analysis tracks max unrealized profit per trade to identify missed exit opportunities
 
 ### Visual Reporting
 
@@ -127,6 +128,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FAIL-03 | Phase 8 | Pending |
 | FAIL-04 | Phase 8 | Pending |
 | FAIL-05 | Phase 8 | Pending |
+| FAIL-06 | Phase 8 | Pending |
 | VISU-01 | Phase 9 | Pending |
 | VISU-02 | Phase 9 | Pending |
 | VISU-03 | Phase 9 | Pending |
@@ -141,14 +143,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MNTR-03 | Phase 11 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 27 total
-- Mapped to phases: 27 (100% coverage)
+- v1.1 requirements: 28 total
+- Mapped to phases: 28 (100% coverage)
 - Unmapped: 0
 
 **Phase Distribution:**
 - Phase 6 (Statistical Validation): 4 requirements
 - Phase 7 (Comparison Infrastructure): 6 requirements
-- Phase 8 (Failure Analysis): 5 requirements
+- Phase 8 (Failure Analysis): 6 requirements
 - Phase 9 (Visual Reporting): 3 requirements
 - Phase 10 (Validation Protocol): 4 requirements
 - Phase 11 (Strategy + Monitoring): 5 requirements
