@@ -134,9 +134,33 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md -- StrategyComparator orchestrator + ComparisonResult dataclasses (TDD)
-- [ ] 07-02-PLAN.md -- Equity curve visualization (Plotly) + metrics table (empyrical-reloaded) (TDD)
-- [ ] 07-03-PLAN.md -- Decision matrix with divergence highlighting + QuantStats tear sheets (TDD)
+- [x] 07-01-PLAN.md -- StrategyComparator orchestrator + ComparisonResult dataclasses (TDD)
+- [x] 07-02-PLAN.md -- Equity curve visualization (Plotly) + metrics table (empyrical-reloaded) (TDD)
+- [x] 07-03-PLAN.md -- Decision matrix with divergence highlighting + QuantStats tear sheets (TDD)
+
+### Phase 7.1: Codebase Cleanup (INSERTED)
+**Goal**: Eliminate code duplication and inconsistencies to reduce maintenance burden before feature work
+**Depends on**: Phase 7
+**Requirements**: None (technical debt reduction)
+**Success Criteria** (what must be TRUE):
+  1. Strategy utility functions extracted to `src/strategies/utils.py` (one `_to_side()`, not 29 copies)
+  2. Common strategy methods moved to StrategyBase mixin (`_skip()`, `_check_extreme_prices()`, hourly reset)
+  3. OrderType and Side enums consolidated in `src/core/types.py` only
+  4. Dead code removed (`optimizer_old.py` deleted or documented)
+  5. Single PnL calculation module in `src/analysis/pnl_calculator.py`
+  6. `src/framework/replay.py` split into focused modules (<300 lines each)
+  7. Unit tests added for price_level, velocity, momentum, spread_aware strategies (currently zero tests)
+  8. All existing tests still pass after refactoring
+**Plans**: 7 plans
+
+Plans:
+- [ ] 07.1-01-PLAN.md -- Extract _to_side() utility to src/strategies/utils.py (Wave 1)
+- [ ] 07.1-02-PLAN.md -- Consolidate OrderType enum in src/core/types.py only (Wave 1)
+- [ ] 07.1-03-PLAN.md -- Create strategy mixins (SkipHelperMixin, HourlyBudgetMixin) (Wave 2)
+- [ ] 07.1-04-PLAN.md -- Handle dead code optimizer_old.py (delete or document) (Wave 1)
+- [ ] 07.1-05-PLAN.md -- Split replay.py into package (<300 lines each) (Wave 2)
+- [ ] 07.1-06-PLAN.md -- Extract PnL calculation to src/analysis/pnl_calculator.py (Wave 2)
+- [ ] 07.1-07-PLAN.md -- Add tests for price_level, velocity, momentum, spread_aware (Wave 3)
 
 ### Phase 8: Failure Analysis
 **Goal**: Understand WHY strategies differ by categorizing each divergent trade decision
@@ -206,7 +230,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11
+Phases execute in numeric order: 6 → 7 → 7.1 → 8 → 9 → 10 → 11
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -217,6 +241,7 @@ Phases execute in numeric order: 6 → 7 → 8 → 9 → 10 → 11
 | 5. Validation | v1.0 | 5/5 | Complete | 2026-02-02 |
 | 6. Statistical Validation | v1.1 | 3/3 | Complete | 2026-02-04 |
 | 7. Comparison Infrastructure | v1.1 | 3/3 | Complete | 2026-02-04 |
+| 7.1 Codebase Cleanup | v1.1 | 0/7 | Planned | - |
 | 8. Failure Analysis | v1.1 | 0/TBD | Not started | - |
 | 9. Visual Reporting | v1.1 | 0/TBD | Not started | - |
 | 10. Validation Protocol | v1.1 | 0/TBD | Not started | - |
