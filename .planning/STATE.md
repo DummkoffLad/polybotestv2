@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 7.1 of 11 (Codebase Cleanup) - IN PROGRESS
-Plan: 1 of 7 in current phase
-Status: Wave 1 execution - 1 plan complete
-Last activity: 2026-02-05 — Completed 07.1-01-PLAN.md (extracted to_side() utility)
+Plan: 6 of 7 in current phase
+Status: Wave 2 execution - 2 plans complete
+Last activity: 2026-02-05 — Completed 07.1-06-PLAN.md (shared PnL calculator)
 
-Progress: [██████░░░░] 63% (28 of 46+ plans complete across milestones)
+Progress: [███████░░░] 65% (29 of 46+ plans complete across milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 28 (v1.0 complete, v1.1 in progress)
+- Total plans completed: 29 (v1.0 complete, v1.1 in progress)
 - Average duration: 4.6min (all time)
-- Total execution time: 2.14 hours (all time)
+- Total execution time: 2.21 hours (all time)
 
 **By Phase:**
 
@@ -34,10 +34,10 @@ Progress: [██████░░░░] 63% (28 of 46+ plans complete across 
 | 05-validation | 5 | 23min | 5min | Complete |
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
 | 07-comparison-infrastructure | 3 | 22min | 7min | Complete |
-| 07.1-codebase-cleanup | 1 | 8min | 8min | In Progress (1/7) |
+| 07.1-codebase-cleanup | 2 | 12min | 6min | In Progress (2/7) |
 
 **Recent Trend:**
-- Last 5 plans: 07-01 (5min), 07-02 (6min), 07-03 (11min), 07.1-01 (8min)
+- Last 5 plans: 07-02 (6min), 07-03 (11min), 07.1-01 (8min), 07.1-06 (4min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
 - Milestone v1.1: In progress (7 plans complete, Phase 7 complete, Phase 7.1 started)
 
@@ -75,6 +75,8 @@ Recent decisions affecting v1.1 milestone:
 - **Hourly charts default (quick-006):** Generate per-market hourly charts by default (--no-hourly to skip)
 - **Public function naming (07.1-01):** Changed _to_side to to_side for shared utils (public API)
 - **utils.py for strategy utilities (07.1-01):** Place strategy-specific shared utilities in src/strategies/utils.py
+- **PnL calculator location (07.1-06):** src/analysis/pnl_calculator.py for shared PnL logic (analysis concern, not strategy)
+- **Shared calculation pattern (07.1-06):** Extract duplicated calculations into modules with clean interfaces
 
 ### Roadmap Evolution
 
@@ -128,9 +130,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 07.1-01-PLAN.md (extracted to_side() utility function)
+Stopped at: Completed 07.1-06-PLAN.md (shared PnL calculator)
 Resume file: None
-Next action: Continue Phase 7.1 execution - Plan 02 onwards (6 cleanup plans remaining)
+Next action: Continue Phase 7.1 execution - Plans 02-05, 07 remaining (5 cleanup plans)
 Testing script: `python -m src.simulation.full_optimizer data/sessions/` — runs all strategies against all sessions
 
 **v1.0 Summary (COMPLETE):**
