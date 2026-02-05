@@ -24,7 +24,8 @@ from ...core.portfolio import Portfolio
 from ...core.types import Side
 from ..base import (
     Strategy, StrategyConfig, TradeDecision, DecisionAction, OrderType,
-    register_strategy, MIN_LIMIT_ORDER_SHARES, PRICE_EXTREME_HIGH, PRICE_EXTREME_LOW
+    register_strategy, MIN_LIMIT_ORDER_SHARES, PRICE_EXTREME_HIGH, PRICE_EXTREME_LOW,
+    calculate_actual_spread_pct
 )
 from ...data.models import MarketEvent, PriceSnapshot, TradeAction, TradeSide
 
@@ -132,10 +133,11 @@ class ConservativeMirrorStrategy(Strategy):
         if ask >= Decimal("1"):
             return self._skip("invalid_price")
 
-        # Stricter cost check
+        # Stricter cost check - use REAL spread from bid/ask prices
         if trade.price > 0:
             drift = ((ask - trade.price) / trade.price) * 100
-            if drift + cfg.spread_cost_pct + cfg.slippage_cost_pct > MAX_TOTAL_COST_PCT:
+            actual_spread_pct = calculate_actual_spread_pct(prices)
+            if drift + actual_spread_pct + cfg.slippage_cost_pct > MAX_TOTAL_COST_PCT:
                 return self._skip("cost_too_high")
 
         # Conservative capacity checks

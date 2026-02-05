@@ -12,7 +12,8 @@ from ...core import (
 )
 from ..base import (
     Strategy, StrategyConfig, TradeDecision, DecisionAction, OrderType,
-    register_strategy, MIN_LIMIT_ORDER_SHARES, PRICE_EXTREME_HIGH, PRICE_EXTREME_LOW
+    register_strategy, MIN_LIMIT_ORDER_SHARES, PRICE_EXTREME_HIGH, PRICE_EXTREME_LOW,
+    calculate_actual_spread_pct
 )
 from ...data.models import MarketEvent, PriceSnapshot, TradeAction, TradeSide
 
@@ -232,9 +233,11 @@ class MirrorStrategy(Strategy):
 
         # Cost check FIRST - original checked cost before budget
         # This means cost_too_high can happen even when budget is exhausted
+        # Use REAL spread from bid/ask prices instead of config constant
         if trade.price > 0:
             drift = ((ask - trade.price) / trade.price) * 100
-            if drift + cfg.spread_cost_pct + cfg.slippage_cost_pct > cfg.max_total_cost_pct:
+            actual_spread_pct = calculate_actual_spread_pct(prices)
+            if drift + actual_spread_pct + cfg.slippage_cost_pct > cfg.max_total_cost_pct:
                 return self._skip("cost_too_high")
 
         # Capacity checks - NOW USE CURRENT EQUITY

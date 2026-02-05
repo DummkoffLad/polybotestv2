@@ -7,11 +7,28 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
+if TYPE_CHECKING:
+    from ..data.models import PriceSnapshot as PriceSnapshotType
 
 from ..data.models import TradeAction, TradeSide, LeaderTrade, PriceSnapshot, MarketEvent
 
 logger = logging.getLogger(__name__)
+
+
+def calculate_actual_spread_pct(prices: "PriceSnapshotType") -> Decimal:
+    """Calculate actual spread percentage from bid/ask prices.
+
+    Returns spread as percentage: (ask - bid) / mid * 100
+    Falls back to 0 if prices unavailable (let other checks handle it).
+    """
+    if not prices.bid or not prices.ask or prices.bid <= 0 or prices.ask <= 0:
+        return Decimal("0")
+    mid = (prices.bid + prices.ask) / 2
+    if mid <= 0:
+        return Decimal("0")
+    return ((prices.ask - prices.bid) / mid) * 100
 
 # ============================================================================
 # POLYMARKET ORDER CONSTRAINTS
