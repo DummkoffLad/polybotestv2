@@ -30,6 +30,11 @@ class SessionReplayer:
         self.config_overrides = config_overrides or {}
         self.loader = SessionLoader(session_path)
 
+    @property
+    def session_id(self) -> str:
+        """Get the session ID from the loader."""
+        return self.loader.session_id
+
     def load(self) -> int:
         """Load session file. Returns event count."""
         return self.loader.load()
