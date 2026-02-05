@@ -76,6 +76,7 @@ None yet.
 | # | Description | Date | Directory |
 |---|-------------|------|-----------|
 | 001 | Fix WebSocket reconnection | 2026-02-03 | [001-fix-ws-reconnect](./quick/001-fix-ws-reconnect/) |
+| 003 | Refactor strategy cost to use real spread | 2026-02-04 | [003-refactor-strategy-config-real-spread](./quick/003-refactor-strategy-config-real-spread/) |
 
 ### Blockers/Concerns
 
@@ -111,7 +112,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-04
-Stopped at: Completed 07-03-PLAN.md (Decision matrix + tear sheets)
+Stopped at: Completed quick-003 (Real spread calculation)
 Resume file: None
 Next action: Phase 8 (Failure Mode Analysis)
 Testing script: `full_optimizer.py` — runs all strategies against recorded sessions
