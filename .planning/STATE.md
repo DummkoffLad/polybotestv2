@@ -84,6 +84,8 @@ Recent decisions affecting v1.1 milestone:
 - **Dedicated strategy test files (07.1-07):** Create test_<strategy>.py for each strategy's unique logic (parameterized tests miss specifics)
 - **Local test helpers (07.1-07):** Duplicate _make_config/_make_event in each test file for strategy-specific customization
 - **Regime-specific tests (07.1-07):** Test each strategy's unique regime/zone/conviction logic explicitly
+- **8% trailing stop (quick-008):** Trailing stop triggers 8% below high water mark, only after position goes into profit
+- **Trailing stop activation (quick-008):** High water mark must exceed entry price before trailing stop can trigger
 
 ### Roadmap Evolution
 
@@ -103,6 +105,7 @@ None yet.
 | 005 | Profit taker docs, hourly split, visualization | 2026-02-04 | [005-profit-taker-hourly-viz-docs](./quick/005-profit-taker-hourly-viz-docs/) |
 | 006 | Fix viz UP/DOWN P&L charts | 2026-02-04 | [006-fix-viz-up-down-pnl-charts](./quick/006-fix-viz-up-down-pnl-charts/) |
 | 007 | Optimize strategies for consistency | 2026-02-05 | [007-optimize-strategies-for-consistency](./quick/007-optimize-strategies-for-consistency/) |
+| 008 | Add trailing stop and metrics to profit_taker | 2026-02-05 | [008-improve-optimize-profit-taker](./quick/008-improve-optimize-profit-taker/) |
 
 ### Blockers/Concerns
 
