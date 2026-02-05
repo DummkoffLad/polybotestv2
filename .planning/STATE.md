@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 7.1 of 11 (Codebase Cleanup) - IN PROGRESS
-Plan: 2 of 7 in current phase
-Status: Wave 1 execution - 2 plans complete
-Last activity: 2026-02-05 — Completed 07.1-02-PLAN.md (consolidated OrderType enum)
+Plan: 1 of 7 in current phase
+Status: Wave 1 execution - 1 plan complete
+Last activity: 2026-02-05 — Completed 07.1-01-PLAN.md (extracted to_side() utility)
 
-Progress: [██████░░░░] 63% (29 of 46+ plans complete across milestones)
+Progress: [██████░░░░] 63% (28 of 46+ plans complete across milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 29 (v1.0 complete, v1.1 in progress)
-- Average duration: 4.5min (all time)
-- Total execution time: 2.17 hours (all time)
+- Total plans completed: 28 (v1.0 complete, v1.1 in progress)
+- Average duration: 4.6min (all time)
+- Total execution time: 2.14 hours (all time)
 
 **By Phase:**
 
@@ -34,12 +34,12 @@ Progress: [██████░░░░] 63% (29 of 46+ plans complete across 
 | 05-validation | 5 | 23min | 5min | Complete |
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
 | 07-comparison-infrastructure | 3 | 22min | 7min | Complete |
-| 07.1-codebase-cleanup | 2 | 9min | 4.5min | In Progress (2/7) |
+| 07.1-codebase-cleanup | 1 | 8min | 8min | In Progress (1/7) |
 
 **Recent Trend:**
-- Last 5 plans: 07-02 (6min), 07-03 (11min), 07.1-01 (5min), 07.1-02 (4.5min)
+- Last 5 plans: 07-01 (5min), 07-02 (6min), 07-03 (11min), 07.1-01 (8min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
-- Milestone v1.1: In progress (8 plans complete, Phase 7 complete, Phase 7.1 in progress)
+- Milestone v1.1: In progress (7 plans complete, Phase 7 complete, Phase 7.1 started)
 
 *Updated after each plan completion*
 
@@ -73,8 +73,8 @@ Recent decisions affecting v1.1 milestone:
 - **Net Cash as primary metric (quick-006):** Show received - spent as main line, spent/received as context
 - **Logical subplot order (quick-006):** Portfolio -> Cash -> Unrealized -> Realized for narrative flow
 - **Hourly charts default (quick-006):** Generate per-market hourly charts by default (--no-hourly to skip)
-- **Enum consolidation pattern (07.1-02):** All shared enums in core.types, import don't duplicate
-- **Delete optimizer_old.py (07.1-04):** Removed 877 lines of dead code with zero active references - superseded by SimpleOptimizer
+- **Public function naming (07.1-01):** Changed _to_side to to_side for shared utils (public API)
+- **utils.py for strategy utilities (07.1-01):** Place strategy-specific shared utilities in src/strategies/utils.py
 
 ### Roadmap Evolution
 
@@ -128,9 +128,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 07.1-02-PLAN.md (consolidated OrderType enum)
+Stopped at: Completed 07.1-01-PLAN.md (extracted to_side() utility function)
 Resume file: None
-Next action: Continue Phase 7.1 execution - Plan 03 (next cleanup task)
+Next action: Continue Phase 7.1 execution - Plan 02 onwards (6 cleanup plans remaining)
 Testing script: `python -m src.simulation.full_optimizer data/sessions/` — runs all strategies against all sessions
 
 **v1.0 Summary (COMPLETE):**
@@ -144,9 +144,9 @@ Testing script: `python -m src.simulation.full_optimizer data/sessions/` — run
 - Research: Validate significance → Compare → Analyze → Validate → Build → Monitor
 - NEW DATA (2026-02-04): Second run lost money on ALL strategies — must investigate regime difference
 - **Phase 7 COMPLETE:** Comparison infrastructure ready (97 tests, 10 module exports)
-- **Phase 7.1 IN PROGRESS:** Codebase cleanup (4/7 plans complete - 877 lines dead code removed, enums deduplicated, shared utils established)
+- **Phase 7.1 IN PROGRESS:** Codebase cleanup (1/7 plans complete - shared utils established)
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-05 after 07.1-04-PLAN.md completion*
+*Last updated: 2026-02-05 after 07.1-01-PLAN.md completion*
 *Milestone: v1.1 Beat Conservative*
