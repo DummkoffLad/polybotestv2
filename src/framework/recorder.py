@@ -52,10 +52,16 @@ class SessionRecorder:
     
     def start_session(self, config: Dict[str, Any], strategy_name: str = "") -> str:
         self.start_time = datetime.now(timezone.utc)
-        self.session_id = self.start_time.strftime("%Y%m%d_%H%M%S")
+        # New format: data/sessions/YYYY-MM-DD/HH-MM.jsonl
+        day_dir = self.start_time.strftime("%Y-%m-%d")
+        time_name = self.start_time.strftime("%H-%M")
+        self.session_id = f"{day_dir}/{time_name}"
         self.sequence = 0
-        
-        filepath = self.output_dir / f"session_{self.session_id}.jsonl"
+
+        # Create day directory if needed
+        day_path = self.output_dir / day_dir
+        day_path.mkdir(parents=True, exist_ok=True)
+        filepath = day_path / f"{time_name}.jsonl"
         self.file = open(filepath, "w", encoding="utf-8")
         
         self._write({"type": "session_start", "timestamp": self.start_time.isoformat(),

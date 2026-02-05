@@ -12,9 +12,17 @@ from src.validation import (
 )
 
 
-# Use existing session from Phase 1 for testing
-TEST_SESSION = "session_20260130_032713"
-SESSION_PATH = Path("data/sessions") / f"{TEST_SESSION}.jsonl"
+# Use existing session from Phase 1 for testing (new folder format)
+# Falls back to finding any available session if the original doesn't exist
+_sessions_dir = Path("data/sessions")
+_available_sessions = list(_sessions_dir.glob("**/*.jsonl"))
+if _available_sessions:
+    SESSION_PATH = _available_sessions[0]
+    # Extract session ID from new format (e.g., "2026-02-03/05-56" from path)
+    TEST_SESSION = f"{SESSION_PATH.parent.name}/{SESSION_PATH.stem}"
+else:
+    SESSION_PATH = _sessions_dir / "session_20260130_032713.jsonl"  # Will fail if no sessions
+    TEST_SESSION = "session_20260130_032713"
 
 
 @pytest.fixture

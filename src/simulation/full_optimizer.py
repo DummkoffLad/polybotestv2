@@ -8,15 +8,19 @@ For each strategy, tests with different execution mode assumptions:
 
 The "execution mode" affects the simulation by adjusting:
 - spread_cost_pct: How much spread cost to assume
-- slippage_cost_pct: Slippage assumption  
+- slippage_cost_pct: Slippage assumption
 - fill_rate_pct: What % of limit orders actually fill (passive only)
+
+Supports both single session files and day folders:
+- Single file: data/sessions/2026-02-03/05-56.jsonl
+- Day folder: data/sessions/2026-02-03/ (runs all sessions in folder)
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..framework.replay import SessionReplayer, ReplayResult
 from ..strategies.base import get_strategy, list_strategies
@@ -99,25 +103,58 @@ class StrategyModeResults:
         return min(self.results, key=lambda r: r.resolved_pnl)
 
 
+def find_sessions(path: Path) -> List[Path]:
+    """Find all session files in a path.
+
+    Args:
+        path: Either a single .jsonl file or a directory containing sessions.
+
+    Returns:
+        List of session file paths, sorted by name.
+    """
+    path = Path(path)
+    if path.is_file() and path.suffix == ".jsonl":
+        return [path]
+    elif path.is_dir():
+        # Find all .jsonl files in the directory (and subdirectories)
+        sessions = list(path.glob("**/*.jsonl"))
+        return sorted(sessions)
+    else:
+        return []
+
+
 class FullOptimizer:
     """
     Tests all strategies with all execution mode variations.
-    
+
+    Supports both single session files and day folders.
+
     Usage:
-        optimizer = FullOptimizer(session_path)
+        # Single session
+        optimizer = FullOptimizer("data/sessions/2026-02-03/05-56.jsonl")
+        results = optimizer.run_all()
+        optimizer.print_summary(results)
+
+        # Day folder (runs all sessions)
+        optimizer = FullOptimizer("data/sessions/2026-02-03/")
         results = optimizer.run_all()
         optimizer.print_summary(results)
     """
-    
-    def __init__(self, session_path: Path, leader_capital: Decimal = Decimal("900")):
+
+    def __init__(self, session_path: Union[Path, str], leader_capital: Decimal = Decimal("900")):
         self.session_path = Path(session_path)
+        self.session_files = find_sessions(self.session_path)
         self.leader_capital = leader_capital
+
+        if not self.session_files:
+            raise FileNotFoundError(f"No session files found at: {self.session_path}")
     
     def run_single(self, strategy_name: str, exec_mode: ExecutionMode,
-                   extra_overrides: Dict[str, str] = None) -> FullOptResult:
-        """Run a single strategy with a specific execution mode."""
+                   extra_overrides: Dict[str, str] = None,
+                   session_file: Optional[Path] = None) -> FullOptResult:
+        """Run a single strategy with a specific execution mode on one session."""
         mode_config = EXECUTION_MODES[exec_mode]
-        
+
         # Build config overrides
         overrides = {
             "scaling.leader_estimated_capital": str(self.leader_capital),
@@ -126,45 +163,100 @@ class FullOptimizer:
         }
         if extra_overrides:
             overrides.update(extra_overrides)
-        
+
+        # Use provided session or first available
+        session = session_file or self.session_files[0]
+
         # Run replay
         strategy = get_strategy(strategy_name)
-        replayer = SessionReplayer(self.session_path, strategy, overrides)
+        replayer = SessionReplayer(session, strategy, overrides)
         replayer.load()
         result = replayer.run(simulate_resolution=True, collect_trades=True)
-        
+
         return FullOptResult(
             strategy_name=strategy_name,
             execution_mode=exec_mode,
             result=result,
             config_overrides=overrides
         )
+
+    def run_single_aggregated(self, strategy_name: str, exec_mode: ExecutionMode,
+                              extra_overrides: Dict[str, str] = None) -> FullOptResult:
+        """Run a strategy across ALL sessions and aggregate results."""
+        mode_config = EXECUTION_MODES[exec_mode]
+
+        # Build config overrides
+        overrides = {
+            "scaling.leader_estimated_capital": str(self.leader_capital),
+            "simulation.spread_cost_pct": mode_config.spread_cost_pct,
+            "simulation.slippage_cost_pct": mode_config.slippage_cost_pct,
+        }
+        if extra_overrides:
+            overrides.update(extra_overrides)
+
+        # Aggregate results across all sessions
+        total_pnl = Decimal("0")
+        resolved_pnl = Decimal("0")
+        total_buys = 0
+        total_sells = 0
+        total_events = 0
+        last_result = None
+
+        for session_file in self.session_files:
+            strategy = get_strategy(strategy_name)
+            replayer = SessionReplayer(session_file, strategy, overrides)
+            replayer.load()
+            result = replayer.run(simulate_resolution=True, collect_trades=True)
+
+            total_pnl += result.total_pnl
+            resolved_pnl += result.resolved_pnl or Decimal("0")
+            total_buys += result.buys_executed
+            total_sells += result.sells_executed
+            total_events += result.events_processed
+            last_result = result
+
+        # Create aggregated result using last result as template
+        if last_result:
+            last_result.total_pnl = total_pnl
+            last_result.resolved_pnl = resolved_pnl
+            last_result.buys_executed = total_buys
+            last_result.sells_executed = total_sells
+            last_result.events_processed = total_events
+
+        return FullOptResult(
+            strategy_name=strategy_name,
+            execution_mode=exec_mode,
+            result=last_result,
+            config_overrides=overrides
+        )
     
     def run_strategy_all_modes(self, strategy_name: str) -> StrategyModeResults:
-        """Run a single strategy with all execution modes."""
+        """Run a single strategy with all execution modes across all sessions."""
         mode_results = StrategyModeResults(strategy_name=strategy_name)
-        
+
         for mode in ExecutionMode:
-            result = self.run_single(strategy_name, mode)
+            result = self.run_single_aggregated(strategy_name, mode)
             mode_results.results.append(result)
-        
+
         return mode_results
-    
+
     def run_all(self) -> Dict[str, StrategyModeResults]:
-        """Run all strategies with all execution modes."""
+        """Run all strategies with all execution modes across all sessions."""
         all_results: Dict[str, StrategyModeResults] = {}
         strategies = list_strategies()
-        
-        print(f"\nRunning {len(strategies)} strategies × {len(ExecutionMode)} execution modes = {len(strategies) * len(ExecutionMode)} combinations\n")
-        
+
+        total_combinations = len(strategies) * len(ExecutionMode)
+        print(f"\nRunning {len(strategies)} strategies × {len(ExecutionMode)} modes × {len(self.session_files)} sessions")
+        print(f"= {total_combinations} combinations × {len(self.session_files)} sessions = {total_combinations * len(self.session_files)} total replays\n")
+
         for i, strategy_name in enumerate(strategies, 1):
             print(f"[{i}/{len(strategies)}] Testing {strategy_name}...")
             for mode in ExecutionMode:
-                result = self.run_single(strategy_name, mode)
+                result = self.run_single_aggregated(strategy_name, mode)
                 if strategy_name not in all_results:
                     all_results[strategy_name] = StrategyModeResults(strategy_name=strategy_name)
                 all_results[strategy_name].results.append(result)
-        
+
         return all_results
     
     def print_summary(self, all_results: Dict[str, StrategyModeResults]) -> None:
@@ -223,7 +315,7 @@ class FullOptimizer:
             best_overall = all_flat[0]
             print()
             print("=" * 100)
-            print(f"🏆 OVERALL BEST: {best_overall.strategy_name} + {best_overall.execution_mode.value}")
+            print(f">>> OVERALL BEST: {best_overall.strategy_name} + {best_overall.execution_mode.value}")
             print(f"   Resolved PnL: ${best_overall.resolved_pnl:.2f}")
             print(f"   Total PnL: ${best_overall.total_pnl:.2f}")
             print(f"   Trades: {best_overall.result.buys_executed} buys, {best_overall.result.sells_executed} sells")
@@ -246,31 +338,42 @@ class FullOptimizer:
 
 
 def run_full_optimization(session_path: str, leader_capital: float = 900.0) -> Dict[str, StrategyModeResults]:
-    """Main entry point for full optimization."""
+    """Main entry point for full optimization.
+
+    Args:
+        session_path: Path to session file or day folder.
+                      Single file: data/sessions/2026-02-03/05-56.jsonl
+                      Day folder: data/sessions/2026-02-03/ (all sessions)
+        leader_capital: Estimated leader capital for scaling.
+    """
     optimizer = FullOptimizer(
         Path(session_path),
         leader_capital=Decimal(str(leader_capital))
     )
-    
+
     print(f"\n{'='*60}")
     print(f"  FULL STRATEGY OPTIMIZATION")
     print(f"{'='*60}")
-    print(f"Session: {session_path}")
+    print(f"Path: {session_path}")
+    print(f"Sessions found: {len(optimizer.session_files)}")
+    for sf in optimizer.session_files:
+        print(f"  - {sf.relative_to(Path(session_path).parent) if sf.is_relative_to(Path(session_path).parent) else sf.name}")
     print(f"Leader capital: ${leader_capital}")
     print(f"Strategies: {list_strategies()}")
     print(f"Execution modes: {[m.value for m in ExecutionMode]}")
-    
+
     all_results = optimizer.run_all()
     optimizer.print_summary(all_results)
-    
+
     return all_results
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Full Strategy Optimizer")
-    parser.add_argument("session_path", help="Path to session .jsonl file")
+    parser.add_argument("session_path",
+                        help="Path to session .jsonl file OR day folder (e.g., data/sessions/2026-02-03/)")
     parser.add_argument("--leader-capital", type=float, default=900.0)
-    
+
     args = parser.parse_args()
     run_full_optimization(args.session_path, args.leader_capital)
