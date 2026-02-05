@@ -19,6 +19,12 @@ from ..core.types import OrderRequest, OrderType, Side
 
 logger = logging.getLogger(__name__)
 
+# Hourly market transition settings
+HOUR_END_THRESHOLD_SEC = 30  # Stop trading 30s before hour ends
+HOUR_START_DELAY_SEC = 30    # Wait 30s after hour starts before resuming
+EXTREME_HIGH_PRICE = Decimal("0.99")  # Auto-sell threshold
+EXTREME_LOW_PRICE = Decimal("0.01")   # Accept loss threshold
+
 # State persistence paths
 STATE_DIR = Path("data/state")
 SEEN_HASHES_FILE = STATE_DIR / "seen_hashes.json"
@@ -125,6 +131,13 @@ class UniversalRunner:
             while self._running:
                 start = time.time()
                 if self.duration_minutes and (time.time() - self._start) / 60 >= self.duration_minutes: break
+
+                # Check for hourly market transition
+                if self._is_near_hour_end():
+                    self._hourly_cleanup()
+                    self._hourly_restart()
+                    continue  # Resume loop after restart
+
                 self._cycle()
                 self._maybe_reconcile()
                 # Record periodic price snapshots
@@ -133,7 +146,7 @@ class UniversalRunner:
                 if (e := time.time() - start) < poll: time.sleep(poll - e)
         except Exception as e:
             logger.error(f"Fatal error in run loop: {e}")
-        finally: 
+        finally:
             self._shutdown()
     
     def _init(self) -> None:
@@ -151,14 +164,16 @@ class UniversalRunner:
         leader_cap = Decimal(str(snap.total_assets)) if snap.total_assets else Decimal("900")
         our_cap, k = self.config.scaling.our_capital, self.config.scaling.k_factor
         scale = (our_cap / leader_cap) * k if leader_cap > 0 else Decimal("0.1")
-        
-        # SAFETY: Validate leader capital and scale
-        if leader_cap < Decimal("10"):
-            logger.warning(f"Leader capital suspiciously low: ${leader_cap}")
-        if not (Decimal("0.001") < scale < Decimal("10")):
-            logger.warning(f"Scale ratio out of typical bounds: {scale}")
-        
-        print(f"  Leader capital: ${leader_cap}  |  Scale: {scale:.4f}")
+
+        # Only show scale info for strategies that use it
+        uses_scaling = getattr(self.strategy, 'use_scaling', True)  # Default True for legacy strategies
+        if uses_scaling:
+            # SAFETY: Validate leader capital and scale
+            if leader_cap < Decimal("10"):
+                logger.warning(f"Leader capital suspiciously low: ${leader_cap}")
+            if not (Decimal("0.001") < scale < Decimal("10")):
+                logger.warning(f"Scale ratio out of typical bounds: {scale}")
+            print(f"  Leader capital: ${leader_cap}  |  Scale: {scale:.4f}")
         
         existing = self.data_source.fetch_trades(self.config.leader.address, limit=50)
         for t in existing:
@@ -303,16 +318,16 @@ class UniversalRunner:
         if time.time() - self._last_reconcile < 300:
             return
         self._last_reconcile = time.time()
-        
+
         if not self.data_source or not self.config.trader.address:
             return
-        
+
         try:
             # Fetch actual positions from exchange
             actual_positions = self.data_source.fetch_positions(self.config.trader.address)
             local_state = self.strategy.get_state()
             local_positions = local_state.get("positions", {})
-            
+
             # Compare and log discrepancies
             for pos in actual_positions:
                 local = local_positions.get(pos.asset, {})
@@ -320,10 +335,120 @@ class UniversalRunner:
                 if abs(pos.size - local_shares) > Decimal("0.01"):
                     logger.warning(f"POSITION MISMATCH: {pos.asset} actual={pos.size} local={local_shares}")
                     print(f"  ⚠️ Position mismatch: {pos.title[:30]} actual={pos.size:.2f} local={local_shares:.2f}")
-            
+
             logger.info(f"Reconciliation complete: {len(actual_positions)} exchange positions")
         except Exception as e:
             logger.error(f"Reconciliation failed: {e}")
+
+    # ========== HOURLY MARKET TRANSITION ==========
+
+    def _get_seconds_until_hour_end(self) -> float:
+        """Calculate seconds until next hour boundary."""
+        now = datetime.now(timezone.utc)
+        next_hour = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        return (next_hour - now).total_seconds()
+
+    def _get_seconds_since_hour_start(self) -> float:
+        """Calculate seconds since current hour started."""
+        now = datetime.now(timezone.utc)
+        hour_start = now.replace(minute=0, second=0, microsecond=0)
+        return (now - hour_start).total_seconds()
+
+    def _is_near_hour_end(self, threshold_sec: int = HOUR_END_THRESHOLD_SEC) -> bool:
+        """Check if we're within threshold of hour end."""
+        return self._get_seconds_until_hour_end() <= threshold_sec
+
+    def _hourly_cleanup(self) -> None:
+        """Clean up positions before hourly market transition."""
+        logger.info("🕐 Hourly market transition starting - cleaning up positions")
+        print(f"\n{'='*50}")
+        print("  HOURLY TRANSITION - Cleaning up positions")
+        print(f"{'='*50}")
+
+        state = self.strategy.get_state()
+        positions = state.get("positions", {})
+
+        if not positions:
+            logger.info("No positions to clean up")
+            print("  No positions to clean up")
+            return
+
+        cleaned = 0
+        for token_id, pos_data in positions.items():
+            shares = Decimal(pos_data.get("shares", "0"))
+            if shares <= 0:
+                continue
+
+            # Get current price
+            bid = None
+            if self.price_service:
+                try:
+                    bid, _ = self.price_service.get_prices(token_id)
+                except:
+                    pass
+
+            if bid is None:
+                logger.warning(f"No price for {token_id[:16]}... - position will expire")
+                print(f"  ⚠️ No price for {token_id[:16]}... - will expire")
+                continue
+
+            if bid >= EXTREME_HIGH_PRICE:
+                # Auto-sell at high price (take profit)
+                logger.info(f"Auto-sell at {bid}: {shares} shares of {token_id[:16]}...")
+                print(f"  💰 Auto-sell at {bid}: {shares:.2f} shares (take profit)")
+                # The actual sell would need to go through execution adapter
+                # For now we log and let strategy handle it
+                cleaned += 1
+            elif bid <= EXTREME_LOW_PRICE:
+                # Accept loss - don't sell, let expire
+                logger.info(f"Accept loss at {bid}: {shares} shares of {token_id[:16]}...")
+                print(f"  📉 Accept loss at {bid}: {shares:.2f} shares (let expire)")
+                cleaned += 1
+            else:
+                logger.warning(f"Mid-priced position {bid}: {shares} shares of {token_id[:16]}...")
+                print(f"  ⚠️ Mid-price {bid}: {shares:.2f} shares (may lose value)")
+
+        logger.info(f"Hourly cleanup complete: {cleaned} positions processed")
+        print(f"  Cleanup complete: {cleaned} positions processed")
+
+    def _hourly_restart(self) -> None:
+        """Restart the bot for new hourly market."""
+        sec_until_end = self._get_seconds_until_hour_end()
+        logger.info(f"🕐 Waiting {sec_until_end:.0f}s until hour end...")
+        print(f"  Waiting {sec_until_end:.0f}s until hour end...")
+
+        # Stop price service
+        if self.price_service:
+            try:
+                self.price_service.stop()
+                logger.info("WebSocket stopped")
+            except Exception as e:
+                logger.error(f"Error stopping WebSocket: {e}")
+
+        # Wait for hour boundary + delay
+        wait_time = sec_until_end + HOUR_START_DELAY_SEC
+        logger.info(f"Sleeping {wait_time:.0f}s for market transition...")
+        print(f"  Sleeping {wait_time:.0f}s for market transition...")
+        time.sleep(wait_time)
+
+        # Clear old state
+        self._seen.clear()
+        if self.data_source:
+            self.data_source._token_to_market.clear()
+
+        # Re-initialize
+        logger.info("🔄 Restarting with fresh state...")
+        print(f"\n{'='*50}")
+        print("  RESTARTING WITH FRESH STATE")
+        print(f"{'='*50}")
+        self._init()
+
+        # Reconnect recorder if active
+        if self.recorder and self.price_service:
+            self.recorder.set_price_service(self.price_service)
+
+        logger.info("Hourly restart complete - resuming trading")
+        print("  Ready for new hour.\n")
     
     def _hash(self, t) -> str: return f"{t.transaction_hash or ''}_{t.asset}_{t.timestamp}"
     

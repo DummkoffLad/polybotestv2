@@ -82,6 +82,11 @@ class DrawdownAnalyzer:
         # Calculate max drawdown dollar value
         peak_value = peak.loc[dd_idx]
         trough_value = equity_df.loc[dd_idx, 'equity']
+        # Handle case where loc returns Series (multiple values at same index)
+        if hasattr(peak_value, 'iloc'):
+            peak_value = peak_value.iloc[0]
+        if hasattr(trough_value, 'iloc'):
+            trough_value = trough_value.iloc[0]
         max_dd_value = float(trough_value - peak_value)
 
         # Calculate recovery time

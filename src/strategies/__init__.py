@@ -9,3 +9,5 @@ from .spread_aware import SpreadAwareStrategy
 from .velocity import VelocityStrategy
 from .price_level import PriceLevelStrategy
 from .hybrid_conservative import HybridConservativeStrategy
+from .simple_follow import SimpleFollowStrategy
+from .profit_taker import ProfitTakerStrategy

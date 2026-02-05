@@ -30,6 +30,7 @@ from ..base import (
 )
 from ...data.models import MarketEvent, PriceSnapshot, TradeAction, TradeSide
 from ...analysis.pnl_calculator import calculate_strategy_pnl
+from ..mixins import SkipHelperMixin
 from ..utils import to_side
 
 logger = logging.getLogger(__name__)
@@ -59,10 +60,11 @@ class WindowedTrade:
 
 
 @register_strategy
-class SimpleFollowStrategy(Strategy):
+class SimpleFollowStrategy(SkipHelperMixin, Strategy):
     """Simple copy trading with fixed sizing and rolling window filter."""
 
     def __init__(self):
+        SkipHelperMixin.__init__(self)
         self.config: Optional[StrategyConfig] = None
         self.portfolio = Portfolio()
 
@@ -84,8 +86,7 @@ class SimpleFollowStrategy(Strategy):
         self.leader_capital = DEFAULT_LEADER_CAPITAL
 
         # Stats
-        self.buys = self.sells = self.skips = 0
-        self.skip_reasons: Dict[str, int] = {}
+        self.buys = self.sells = 0
         self.partials_aggregated = 0
 
         # Compatibility: other strategies have scale_ratio for tests
@@ -96,13 +97,13 @@ class SimpleFollowStrategy(Strategy):
         return "simple_follow"
 
     def initialize(self, config: StrategyConfig) -> None:
+        SkipHelperMixin.__init__(self)
         self.config = config
         self.portfolio = Portfolio()
         self._window = defaultdict(lambda: deque(maxlen=20))
         self._tx_aggregator = {}
         self.leader_tracker = {}
-        self.buys = self.sells = self.skips = 0
-        self.skip_reasons = {}
+        self.buys = self.sells = 0
         self.partials_aggregated = 0
 
         # Load configurable params from config.params if present
@@ -350,11 +351,6 @@ class SimpleFollowStrategy(Strategy):
         logger.info(f"SELL ${dollars:.2f} ({shares:.2f} shares @ {bid:.4f}) "
                    f"[leader: ${windowed.dollars:.2f}, partials: {windowed.partial_count}]")
         return TradeDecision.sell(dollars, shares, bid)
-
-    def _skip(self, reason: str) -> TradeDecision:
-        self.skips += 1
-        self.skip_reasons[reason] = self.skip_reasons.get(reason, 0) + 1
-        return TradeDecision.skip(reason)
 
     def on_fill(self, event: MarketEvent, decision: TradeDecision) -> None:
         trade = event.trade

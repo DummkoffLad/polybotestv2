@@ -70,23 +70,17 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         return "profit_taker"
 
     def initialize(self, config: StrategyConfig) -> None:
+        SkipHelperMixin.__init__(self)
+        HourlyBudgetMixin.__init__(self)
+        self._current_hour = datetime.now(timezone.utc).hour
         self.config = config
         self.portfolio = Portfolio()
         self.leader_positions = {}
         self.our_entries = {}
-        self.hourly_budget_used = Decimal("0")
-        self._current_hour = datetime.now(timezone.utc).hour
-        self.buys = self.sells = self.skips = 0
-        self.skip_reasons = {}
+        self.buys = self.sells = 0
         self.profit_exits = 0
         self.scale_ratio = (config.starting_capital / config.leader_capital * config.k_factor
                            if config.leader_capital > 0 else Decimal("0.1"))
-
-    def _check_hourly_reset(self, event_time: datetime) -> None:
-        current_hour = event_time.hour
-        if self._current_hour is not None and current_hour != self._current_hour:
-            self.hourly_budget_used = Decimal("0")
-        self._current_hour = current_hour
 
     def _check_profit_target(self, token_id: str, current_bid: Decimal) -> bool:
         """Check if position has hit dynamic profit target based on entry price."""
@@ -170,6 +164,10 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         ask = prices.ask
         if not ask or ask <= 0 or ask >= Decimal("1"):
             return self._skip("invalid_price")
+
+        # Skip extreme low prices (0.01 or below - treated as zero value)
+        if ask <= PRICE_EXTREME_LOW:
+            return self._skip("price_extreme_low")
 
         # Cost check
         if trade.price > 0:
@@ -274,11 +272,6 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             shares = pos.shares  # Sell all even if below min
         self.sells += 1
         return TradeDecision.sell(shares * bid, shares, bid, exit_reason=reason, **kwargs)
-
-    def _skip(self, reason: str) -> TradeDecision:
-        self.skips += 1
-        self.skip_reasons[reason] = self.skip_reasons.get(reason, 0) + 1
-        return TradeDecision.skip(reason)
 
     def on_fill(self, event: MarketEvent, decision: TradeDecision) -> None:
         trade = event.trade

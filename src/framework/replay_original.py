@@ -441,6 +441,8 @@ class SessionReplayer:
 
         for i, event in enumerate(self.events):
             result.events_processed += 1
+            # Add all prices to event context for strategies that need them
+            event.context['all_prices'] = self.get_all_prices_at_time(event.trade.timestamp)
             decision = self.strategy.on_event(event)
             trade = event.trade
             prices = event.prices
