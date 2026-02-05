@@ -154,13 +154,13 @@ Plans:
 **Plans**: 7 plans
 
 Plans:
-- [ ] 07.1-01-PLAN.md -- Extract _to_side() utility to src/strategies/utils.py (Wave 1)
-- [ ] 07.1-02-PLAN.md -- Consolidate OrderType enum in src/core/types.py only (Wave 1)
-- [ ] 07.1-03-PLAN.md -- Create strategy mixins (SkipHelperMixin, HourlyBudgetMixin) (Wave 2)
-- [ ] 07.1-04-PLAN.md -- Handle dead code optimizer_old.py (delete or document) (Wave 1)
-- [ ] 07.1-05-PLAN.md -- Split replay.py into package (<300 lines each) (Wave 2)
-- [ ] 07.1-06-PLAN.md -- Extract PnL calculation to src/analysis/pnl_calculator.py (Wave 2)
-- [ ] 07.1-07-PLAN.md -- Add tests for price_level, velocity, momentum, spread_aware (Wave 3)
+- [x] 07.1-01-PLAN.md -- Extract _to_side() utility to src/strategies/utils.py (Wave 1)
+- [x] 07.1-02-PLAN.md -- Consolidate OrderType enum in src/core/types.py only (Wave 1)
+- [x] 07.1-03-PLAN.md -- Create strategy mixins (SkipHelperMixin, HourlyBudgetMixin) (Wave 2)
+- [x] 07.1-04-PLAN.md -- Handle dead code optimizer_old.py (deleted) (Wave 1)
+- [x] 07.1-05-PLAN.md -- Split replay.py into package (<300 lines each) (Wave 2)
+- [x] 07.1-06-PLAN.md -- Extract PnL calculation to src/analysis/pnl_calculator.py (Wave 2)
+- [x] 07.1-07-PLAN.md -- Add tests for price_level, velocity, momentum, spread_aware (Wave 3)
 
 ### Phase 8: Failure Analysis
 **Goal**: Understand WHY strategies differ by categorizing each divergent trade decision
@@ -241,7 +241,7 @@ Phases execute in numeric order: 6 → 7 → 7.1 → 8 → 9 → 10 → 11
 | 5. Validation | v1.0 | 5/5 | Complete | 2026-02-02 |
 | 6. Statistical Validation | v1.1 | 3/3 | Complete | 2026-02-04 |
 | 7. Comparison Infrastructure | v1.1 | 3/3 | Complete | 2026-02-04 |
-| 7.1 Codebase Cleanup | v1.1 | 0/7 | Planned | - |
+| 7.1 Codebase Cleanup | v1.1 | 7/7 | Complete | 2026-02-05 |
 | 8. Failure Analysis | v1.1 | 0/TBD | Not started | - |
 | 9. Visual Reporting | v1.1 | 0/TBD | Not started | - |
 | 10. Validation Protocol | v1.1 | 0/TBD | Not started | - |
@@ -249,4 +249,4 @@ Phases execute in numeric order: 6 → 7 → 7.1 → 8 → 9 → 10 → 11
 
 ---
 *Roadmap created: 2026-01-30*
-*Last updated: 2026-02-04 after Phase 7 execution*
+*Last updated: 2026-02-05 after Phase 7.1 execution*

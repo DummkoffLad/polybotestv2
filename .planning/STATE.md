@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Reproduce the leader's profitable trades at a smaller scale with sizing that maximizes returns while protecting capital — every dollar matters at this budget.
-**Current focus:** Phase 7.1 - Codebase Cleanup (milestone v1.1)
+**Current focus:** Phase 8 - Failure Analysis (milestone v1.1)
 
 ## Current Position
 
-Phase: 7.1 of 11 (Codebase Cleanup) - IN PROGRESS
-Plan: 4 of 7 in current phase
-Status: Wave 3 execution - 4 plans complete
-Last activity: 2026-02-05 — Completed 07.1-07-PLAN.md (added strategy-specific unit tests)
+Phase: 8 of 11 (Failure Analysis) - NOT STARTED
+Plan: 0 of TBD in current phase - NOT PLANNED
+Status: Phase 7.1 complete, ready for Phase 8 planning
+Last activity: 2026-02-05 — Completed Phase 7.1 (codebase cleanup verified)
 
-Progress: [███████░░░] 67% (31 of 46+ plans complete across milestones)
+Progress: [████████░░] 74% (34 of 46+ plans complete across milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 31 (v1.0 complete, v1.1 in progress)
-- Average duration: 4.9min (all time)
-- Total execution time: 2.50 hours (all time)
+- Total plans completed: 34 (v1.0 complete, v1.1 in progress)
+- Average duration: 5.0min (all time)
+- Total execution time: 2.85 hours (all time)
 
 **By Phase:**
 
@@ -34,12 +34,12 @@ Progress: [███████░░░] 67% (31 of 46+ plans complete across 
 | 05-validation | 5 | 23min | 5min | Complete |
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
 | 07-comparison-infrastructure | 3 | 22min | 7min | Complete |
-| 07.1-codebase-cleanup | 4 | 35min | 9min | In Progress (4/7) |
+| 07.1-codebase-cleanup | 7 | 50min | 7min | Complete |
 
 **Recent Trend:**
-- Last 5 plans: 07.1-06 (4min), 07.1-05 (5min), 07.1-03 (11min), 07.1-07 (7min)
+- Last 5 plans: 07.1-03 (11min), 07.1-05 (5min), 07.1-06 (4min), 07.1-07 (7min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
-- Milestone v1.1: In progress (9 plans complete, Phase 7 complete, Phase 7.1 in progress)
+- Milestone v1.1: In progress (13 plans complete, Phase 7.1 complete)
 
 *Updated after each plan completion*
 
@@ -137,9 +137,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 07.1-07-PLAN.md (added strategy-specific unit tests)
+Stopped at: Completed Phase 7.1 (codebase cleanup verified)
 Resume file: None
-Next action: Continue Phase 7.1 execution - Plans 02, 04 remaining (2 cleanup plans)
+Next action: Plan Phase 8 (/gsd:plan-phase 8)
 Testing script: `python -m src.simulation.full_optimizer data/sessions/` — runs all strategies against all sessions
 
 **v1.0 Summary (COMPLETE):**
@@ -153,9 +153,12 @@ Testing script: `python -m src.simulation.full_optimizer data/sessions/` — run
 - Research: Validate significance → Compare → Analyze → Validate → Build → Monitor
 - NEW DATA (2026-02-04): Second run lost money on ALL strategies — must investigate regime difference
 - **Phase 7 COMPLETE:** Comparison infrastructure ready (97 tests, 10 module exports)
-- **Phase 7.1 IN PROGRESS:** Codebase cleanup (3/7 plans complete - shared utils, PnL calculator, replay package refactored)
+- **Phase 7.1 COMPLETE:** Codebase cleanup (7/7 plans, 646 tests, 8/8 must-haves verified)
+  - Eliminated: 877 lines dead code, ~130 lines duplicated code
+  - Added: 1,138 lines test code (54 new tests)
+  - Refactored: replay.py → 4-module package, shared utils/mixins/PnL calculator
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-05 after 07.1-05-PLAN.md completion*
+*Last updated: 2026-02-05 after Phase 7.1 completion*
 *Milestone: v1.1 Beat Conservative*
