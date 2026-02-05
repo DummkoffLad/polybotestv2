@@ -1,113 +1,123 @@
 # Technology Stack
 
-**Analysis Date:** 2026-01-30
+**Analysis Date:** 2026-02-05
 
 ## Languages
 
 **Primary:**
-- Python 3.11+ - Full codebase, bot logic, strategies, simulations
+- Python 3.11+ - All bot logic, strategies, analysis, and testing
+
+**Secondary:**
+- YAML - Configuration files (`config/config.yaml`)
+- JSON - State persistence, session recording, logging
 
 ## Runtime
 
 **Environment:**
-- Python 3.13.5 (tested, 3.11+ required per requirements)
+- CPython 3.11+
+- Platform: Windows, macOS, Linux (cross-platform)
 
 **Package Manager:**
-- pip - Installs dependencies from requirements.txt
-- Lockfile: requirements.txt (no lock file, uses version specifiers)
+- pip
+- Lockfile: Not detected (uses `requirements.txt` with version pinning)
 
 ## Frameworks
 
 **Core:**
-- py-clob-client 0.34+ - Polymarket CLOB trading client for order placement
-- httpx 0.27+ - HTTP/2 async client for data API calls
-
-**Configuration:**
-- PyYAML 6.0+ - YAML config file parsing (`config/config.yaml`)
-- python-dotenv 1.0+ - Environment variable loading from `.env`
+- py-clob-client 0.34+ - Polymarket CLOB API integration for live trading (`src/execution/live.py`)
+- httpx 0.27+ - HTTP client for REST APIs (`src/data/live_source.py`)
 
 **Testing:**
-- pytest 8.0+ - Test runner
+- pytest 8.0+ - Unit and integration testing framework
 - pytest-asyncio 0.23+ - Async test support
 
-**Development/Quality:**
-- mypy 1.8+ - Type checking
-- ruff 0.2+ - Linting and code formatting
+**Analysis & Reporting:**
+- pandas 2.0+ - Data manipulation and analysis (`src/analysis/`, `src/comparison/`)
+- matplotlib 3.8+ - Chart generation (`src/analysis/reports.py`)
+- plotly 5.0+ - Interactive visualizations (`src/comparison/visualizer.py`)
+- numpy 1.24+ - Numerical computations (`src/analysis/`)
+- scipy 1.11+ - Scientific computing (`src/analysis/`)
+- quantstats 0.0.81+ - Portfolio performance metrics (`src/analysis/reports.py`)
+- empyrical-reloaded 0.5.11+ - Financial risk metrics
 
-**Async/Networking:**
-- websockets 12.0+ - WebSocket support (optional, for future enhancements)
+**Configuration:**
+- PyYAML 6.0+ - YAML parsing (`src/core/config.py`)
+- python-dotenv 1.0+ - Environment variable loading (`.env` file support)
+
+**WebSockets:**
+- websockets 12.0+ - Optional WebSocket support for price feeds (`src/data/ws_price.py`)
+
+**Development Tools:**
+- mypy 1.8+ - Static type checking
+- ruff 0.2+ - Linting (fast Python linter)
 
 ## Key Dependencies
 
 **Critical:**
-- py-clob-client 0.34+ - Why it matters: Core SDK for placing orders on Polymarket via CLOB API
-- httpx 0.27+ - Why it matters: All Polymarket API data reads (positions, trades, market metadata)
+- py-clob-client - Required for LIVE mode order placement; optional for DRY_RUN
+- httpx - Required for all API data fetching from Polymarket
+- pandas - Required for all analysis, comparison, and reporting modules
+- PyYAML - Required for config file loading
 
 **Infrastructure:**
-- PyYAML 6.0+ - Configuration management
-- python-dotenv 1.0+ - Secrets management (private keys, addresses from `.env`)
-- websockets 12.0+ - Future real-time price/trade streaming
-
-**Testing & Development:**
-- pytest 8.0+ - Test execution framework
-- pytest-asyncio 0.23+ - Async/await test support (async polling/data sources)
-- mypy 1.8+ - Type hints validation
-- ruff 0.2+ - Code linting and formatting
+- No external databases - Uses local JSON/JSONL for state and session persistence
+- No cloud dependencies - Fully self-contained deployable application
 
 ## Configuration
 
 **Environment:**
-- Loaded via `dotenv.load_dotenv()` in `src/core/config.py:71`
-- Critical env vars: `POLYMARKET_PRIVATE_KEY`, `POLYMARKET_FUNDER_ADDRESS`, `POLYMARKET_SIGNATURE_TYPE`
-- Optional: `HTTP_PROXY`, `HTTPS_PROXY`, `LOG_LEVEL`, `DATA_DIR`
+- `.env` file for secrets (not committed to git)
+- `config.yaml` in `config/` directory for bot parameters
+- Environment variable overrides for deployment flexibility:
+  - `POLYMARKET_PRIVATE_KEY` - Private key for order signing (LIVE mode)
+  - `POLYMARKET_FUNDER_ADDRESS` - Wallet address for trading (LIVE mode)
+  - `POLYMARKET_SIGNATURE_TYPE` - Signature type: 0 (EOA), 1 (POLY_PROXY), 2 (GNOSIS_SAFE)
+  - `DATA_DIR` - Override default data directory
+  - `LOG_LEVEL` - Override logging level
 
 **Build:**
-- No build step (pure Python)
-- Runtime config: `config/config.yaml` (YAML format, see `config/config.example.yaml`)
-- State persistence: `data/state/` (JSON files)
+- No build process - Pure Python, direct execution
+- Entry point: `main.py`
+- Module structure uses relative imports with project root on sys.path
 
 ## Platform Requirements
 
 **Development:**
 - Python 3.11+
-- Virtual environment recommended: `python -m venv venv`
-- Windows, Linux, or macOS (path handling works cross-platform)
+- pip package manager
+- Git (for version control)
 
-**Production:**
+**Production (LIVE mode):**
 - Python 3.11+
-- Polymarket proxy wallet with USDC balance (LIVE mode)
-- Private key for wallet signing (stored in `.env`, never in config)
-- Network access to:
-  - `https://data-api.polymarket.com` (positions, trades, metadata)
-  - `https://clob.polymarket.com` (order placement, market data)
+- Polymarket account with wallet funded in USDC
+- Private key and funder address for trading wallet
+- Network access to Polymarket CLOB API (`https://clob.polymarket.com`)
+- Network access to Polymarket data API (`https://data-api.polymarket.com`)
 
-## Port & Network
+**Production (DRY_RUN mode):**
+- Python 3.11+
+- Network access to read-only Polymarket APIs
+- No wallet/funding required
 
-**No explicit ports required** - All API calls are outbound HTTPS to Polymarket APIs:
-- `https://data-api.polymarket.com` - REST API for reading positions/trades
-- `https://clob.polymarket.com` - CLOB API for order placement and market data
+## API Endpoints (Polymarket)
 
-**Timeout & Rate Limiting:**
-- Default httpx timeout: 10.0 seconds (configurable in `config.yaml`)
-- Polymarket API rate limits: 5 requests/second (configurable)
-- Built-in rate limiting: positions 0.1s, trades 0.05s minimum interval
+**CLOB API:**
+- Host: `https://clob.polymarket.com`
+- Chain ID: 137 (Polygon)
+- Used for order placement (LIVE) and market data
 
-## Data Persistence
+**Data API:**
+- Host: `https://data-api.polymarket.com`
+- Endpoints:
+  - `/positions` - Fetch wallet positions (used in `src/data/live_source.py`)
+  - `/trades` - Fetch recent trades (used in `src/data/live_source.py`)
+  - `/markets` - Market metadata (optional)
 
-**Local Storage:**
-- SQLite: Not used (built-in sqlite3 mentioned in requirements but no ORM)
-- JSON files: State, seen hashes, portfolio, session recordings
-  - `data/state/seen_hashes.json` - Tracks processed transaction hashes
-  - `data/state/portfolio_state.json` - Strategy state persistence
-  - `data/sessions/` - Recorded session data for replay
-  - `data/logs/` - JSONL format structured logs
-  - `data/traces/` - Decision trace files (JSONL)
-
-**File Format:**
-- JSONL (JSON Lines) for logs and traces
-- JSON for state files
-- YAML for configuration
+**WebSocket:**
+- URL: `wss://ws-subscriptions-clob.polymarket.com/ws/market`
+- Purpose: Real-time price feeds (optional optimization; polling is default)
+- Used in: `src/data/ws_price.py`
 
 ---
 
-*Stack analysis: 2026-01-30*
+*Stack analysis: 2026-02-05*

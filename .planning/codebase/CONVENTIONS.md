@@ -1,258 +1,255 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-01-30
+**Analysis Date:** 2026-02-05
 
 ## Naming Patterns
 
 **Files:**
-- Snake case: `mirror_strategy.py`, `blockchain_detector.py`
-- Package modules use single descriptors: `models.py`, `base.py`, `runner.py`
-- Test files: `test_dry_run_smoke.py` (test prefix + underscore-separated description)
-- Tools: `verify_trades.py` (action verb + noun)
+- `snake_case.py` for modules: `capital_manager.py`, `kelly_engine.py`, `conviction.py`
+- Co-located tests use `test_<module_name>.py`: `test_capital_manager.py`, `test_conviction.py`
+- Polymarket-specific modules grouped by domain: `src/core/`, `src/strategies/`, `src/framework/`, `src/comparison/`, `src/analysis/`, `src/execution/`, `src/data/`
 
-**Functions:**
-- Snake case throughout
-- Private functions prefixed with single underscore: `_check_hourly_reset()`, `_buy()`, `_skip()`
-- Public methods: no prefix (`initialize()`, `on_event()`, `place_order()`)
-- Helper utilities: descriptive verb-noun pattern: `fetch_api_trades()`, `scan_blockchain()`, `correlate()`
+**Functions & Methods:**
+- `snake_case` for all functions and methods
+- Test functions use descriptive names: `test_normal_mode_above_soft_floor()`, `test_can_enter_soft_floor_exceptional_quality()`
+- Helper functions in tests prefixed with `make_` or similar: `make_capital_manager()`, `make_trade()`, `make_prices()`, `make_event()`
+- Private methods/attributes use leading underscore: `_high_water_mark`, `_load_seen_hashes()`, `_mode`
 
 **Variables:**
-- Snake case for all variables: `hourly_budget_used`, `scale_ratio`, `order_log`, `match_found`
-- Type aliases in UPPER_CASE: `MarketId = str`
-- Constants in UPPER_CASE with description: `MIN_MARKET_ORDER_DOLLARS = Decimal("1.00")`, `PRICE_EXTREME_HIGH = Decimal("0.99")`
+- `snake_case` for all variables
+- Decimal-based values explicitly named to indicate units: `soft_floor_pct`, `equity`, `current_equity`, `starting_capital`
+- Collection names pluralized: `positions`, `trades`, `events`, `equities`, `strategies`
+- Boolean flags use `is_` or `has_` prefix: `is_scale_in`, `has_position`, `negative_risk`
+- Enum members use `UPPER_CASE`: `TradingMode.NORMAL`, `TradingMode.SOFT_FLOOR`, `DecisionAction.BUY`
 
-**Types:**
-- Enum names PascalCase: `ExecutionMode`, `OrderStatus`, `TradeAction`, `TradeSide`, `DecisionAction`
-- Dataclass names PascalCase: `BotConfig`, `StrategyConfig`, `TradeDecision`, `OrderRequest`, `OrderResponse`
-- Type annotations use full qualified names from `typing`: `Optional`, `Dict`, `List`, `Tuple`, `Any`
+**Types & Classes:**
+- `PascalCase` for all classes: `CapitalManager`, `Portfolio`, `KellyCalculator`, `ConvictionScorer`
+- Enums use `PascalCase`: `TradingMode`, `DecisionAction`, `TradeAction`, `TradeSide`, `OrderType`
+- Exception classes end with `Error` or `Exception`: `PortfolioInvariantError`
+- Dataclasses use `PascalCase`: `LeaderTrade`, `PriceSnapshot`, `MarketEvent`, `PortfolioPosition`
 
 ## Code Style
 
 **Formatting:**
-- No explicit formatter configured (no `.black`, `.flake8`, `.pylintrc`)
-- Implicit conventions from codebase:
-  - 4-space indentation (standard Python)
-  - Line length: varies, examples show 80-100 character preference for readability
-  - Dataclass fields on single lines when brief, multi-line for complex types
-  - Long import statements organized on separate lines
+- No explicit linter configuration found in repo, but code follows PEP 8
+- Line length appears flexible (no strict 80/100 char limit observed in practice)
+- 4-space indentation consistently used
+- Use `from __future__ import annotations` at top of modules for type hints
 
 **Linting:**
-- No linter configuration found (linting not enforced)
-- Code follows standard PEP 8 conventions implicitly
+- `ruff>=0.2` in requirements.txt indicates linting capability
+- Type hints used throughout: `Optional[Decimal]`, `Dict[str, Any]`, `Tuple[bool, Optional[str]]`
+- Type checking with `mypy>=1.8` available but not strictly enforced
 
 ## Import Organization
 
 **Order:**
-1. `__future__` imports (for Python 3.7+ compatibility): `from __future__ import annotations`
-2. Standard library: `import sys`, `from pathlib import Path`, `import logging`
-3. Third-party: `import yaml`, `from dotenv import load_dotenv`, `import pytest`
-4. Local project imports: `from ..core.config import load_config`, `from .base import Strategy`
+1. `__future__` imports: `from __future__ import annotations`
+2. Standard library: `import json`, `from datetime import datetime`, `from decimal import Decimal`
+3. Third-party: `import pandas as pd`, `import pytest`
+4. Relative imports: `from ..core.portfolio import Portfolio`, `from .base import Strategy`
+5. Conditional imports with `TYPE_CHECKING` for avoiding circular imports
 
 **Path Aliases:**
-- Relative imports use `..` for parent package traversal: `from ..core.config import BotConfig`
-- No `@` path aliases (Django/TypeScript style)
-- Type checking imports guarded: `from typing import TYPE_CHECKING` followed by conditional `if TYPE_CHECKING: from ..core.config import BotConfig`
+- Imports relative to project root via sys.path manipulation in conftest: `from src.core.portfolio import Portfolio`
+- Relative module imports using dots: `from ..data.models import LeaderTrade`
+- TYPE_CHECKING block for circular dependency prevention: `if TYPE_CHECKING: from ..data.models import PriceSnapshot as PriceSnapshotType`
 
-**Pattern Example from `src/framework/runner.py`:**
+**Examples:**
 ```python
+# From src/strategies/base.py
 from __future__ import annotations
-import json
-import os
-import signal
-import time, logging
-import uuid
-from datetime import datetime, timezone, timedelta
+import logging
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from decimal import Decimal
-from pathlib import Path
-from typing import Optional, Set, Dict, Any, TYPE_CHECKING
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+
 if TYPE_CHECKING:
-    from ..core.config import BotConfig
-    from .recorder import SessionRecorder
-from ..strategies.base import Strategy, StrategyConfig, DecisionAction
+    from ..data.models import PriceSnapshot as PriceSnapshotType
+
+from ..data.models import TradeAction, TradeSide, LeaderTrade, PriceSnapshot, MarketEvent
+
+logger = logging.getLogger(__name__)
+```
+
+```python
+# From tests/unit/conftest.py
+import pytest
+from datetime import datetime, timezone
+from decimal import Decimal
+
+from src.data.models import MarketEvent, LeaderTrade, PriceSnapshot, TradeAction, TradeSide
+from src.strategies.base import StrategyConfig, DecisionAction, TradeDecision
 ```
 
 ## Error Handling
 
 **Patterns:**
-- Explicit exception catching with specific exception types (not bare `except:`)
-- Try-except-finally blocks for resource cleanup (`self.price_service.stop()` in finally)
-- Logging errors with `logger.error()`, `logger.warning()`, `logger.info()` contextually
-- Validation with early returns: check preconditions and return error decisions early
-- Exception propagation for critical failures, recovery logging for non-critical
+- Custom exceptions inherit from `Exception`: `class PortfolioInvariantError(Exception): pass`
+- Raise exceptions with descriptive messages: `raise PortfolioInvariantError(f"BUY shares must be positive: {shares}")`
+- Invariant violations checked with comments: `# SAFETY: Validate inputs` or `# SAFETY: Never sell more than we own`
+- Use `logger.warning()` for clamping/defensive behavior instead of raising: `logger.warning(f"SELL clamped: requested {shares}, have {pos.shares}")`
+- Use `logger.error()` for actual failures
+- No broad `except Exception` patterns; catch specific exceptions when needed
 
-**Example from `src/strategies/mirror/strategy.py`:**
+**Example from `src/core/portfolio.py`:**
 ```python
-def _buy(self, event: MarketEvent, scaled: Decimal) -> TradeDecision:
-    trade, prices, cfg = event.trade, event.prices, self.config
-    ask = prices.ask
-    if not ask or ask <= 0:
-        return self._skip("no_price")
-
-    if ask >= Decimal("1"):
-        logger.warning(f"Invalid ask price >= 1: {ask}")
-        return self._skip("invalid_price")
-```
-
-**Example from `src/framework/runner.py` (resource cleanup):**
-```python
-try:
-    while self._running:
-        # main loop
-        self._cycle()
-except Exception as e:
-    logger.error(f"Fatal error in run loop: {e}")
-finally:
-    self._shutdown()
+def apply_buy(self, token_id: str, market_id: str, side: Side, shares: Decimal,
+              price: Decimal, timestamp: Optional[datetime] = None) -> PortfolioPosition:
+    # SAFETY: Validate inputs
+    if shares <= 0:
+        raise PortfolioInvariantError(f"BUY shares must be positive: {shares}")
+    if price <= 0 or price >= 1:
+        raise PortfolioInvariantError(f"BUY price must be in (0,1): {price}")
+    # ... rest of implementation
 ```
 
 ## Logging
 
-**Framework:** Python's `logging` module (built-in)
+**Framework:** Python's built-in `logging` module with `logger = logging.getLogger(__name__)`
 
 **Patterns:**
-- Logger initialized per module: `logger = logging.getLogger(__name__)`
-- Log levels used:
-  - `logger.debug()`: Detailed state tracking (`"Loaded {len(self._seen)} seen hashes from disk"`)
-  - `logger.info()`: Important events (`"Hourly budget reset"`, `"Startup catchup"`)
-  - `logger.warning()`: Unusual but recoverable conditions (`"Scale ratio out of typical bounds"`)
-  - `logger.error()`: Errors that prevent operation (`"Fatal error in run loop"`, `"Blockchain init failed"`)
+- Each module initializes: `logger = logging.getLogger(__name__)` at module level after imports
+- `logger.info()` for normal operations: `logger.info(f"CapitalManager initialized: HWM=${starting_capital}, mode={self._mode.value}")`
+- `logger.debug()` for detailed tracing (rarely used): `logger.debug(f"BUY applied: {token_id} +{shares} @{price} -> total {pos.shares}")`
+- `logger.warning()` for defensive/fallback behavior: `logger.warning(f"SELL clamped: requested {shares}, have {pos.shares}")`
+- `logger.error()` for actual failures
+- Use f-strings in log messages with context
+- Log function parameters and results for debugging
 
-**Example from `src/strategies/mirror/strategy.py`:**
+**Example:**
 ```python
+from src.core.kelly_engine.py:
 logger = logging.getLogger(__name__)
 
-def _check_hourly_reset(self, event_time: datetime) -> None:
-    if self._current_hour is not None and current_hour != self._current_hour:
-        logger.info(f"Hourly budget reset: ${self.hourly_budget_used:.2f} used last hour")
+logger.info(
+    f"KellyCalculator initialized: kelly_fraction={kelly_fraction}, "
+    f"max_position_pct={self.MAX_POSITION_PCT}"
+)
 ```
 
 ## Comments
 
 **When to Comment:**
-- Complex decision logic or non-obvious constraints (e.g., "SAFETY:" comments for security-critical code)
-- Historical context explaining WHY something is done (not WHAT it does)
-- Algorithm explanations (e.g., "Fuzzy match by token + amount + timestamp")
-- Warnings about gotchas or fragile assumptions
+- Comment algorithmic complexity or non-obvious logic
+- Use section headers with `# ============================================================================` for readability
+- SAFETY comments on invariant checks or critical validations
+- Constraint comments for Polymarket-specific limits: `# Market orders: minimum $1`, `# Price extremes: 0.99 = auto-sell`
+- Comments on test helper functions explaining defaults and usage patterns
 
-**Pattern Examples:**
+**Examples:**
 ```python
-# SAFETY: Check for hourly budget reset
-self._check_hourly_reset(event.trade.timestamp)
+# Section header pattern
+# ============================================================================
+# INITIALIZATION TESTS
+# ============================================================================
 
-# Use content-based dedup key to avoid duplicate OrderFilled events
-# Same trade can emit 2 logs (leader as maker AND taker) with different log_index
-h = f"{bt.tx_hash}_{bt.token_id}_{bt.action}_{bt.dollar_value}"
+# Inline constraint comment
+# Polymarket order constraints
+MIN_MARKET_ORDER_DOLLARS = Decimal("1.00")
+MIN_LIMIT_ORDER_SHARES = Decimal("5.0")
 
-# SAFETY: Validate order meets Polymarket minimum constraints.
-# Market orders: min $1
-# Limit orders: min 5 shares
+# Safety comment
+# SAFETY: Validate inputs
+if shares <= 0:
+    raise PortfolioInvariantError(f"BUY shares must be positive: {shares}")
 ```
 
-**Module-level Docstrings:**
-- Present on all modules with triple-quoted description
-- Example from `src/data/models.py`:
+**Docstrings:**
+- Module docstrings at top of file explaining purpose: `"""Capital protection system with two-tier floor mechanism."""`
+- Class docstrings with Examples section showing usage
+- Function docstrings with Args, Returns, and Raises sections
+- Attribute docstrings in dataclasses rare; context usually clear from names
+- Test docstring style: One-liner describing the test scenario in imperative: `"""Initialize with $100 should set HWM=$100 and mode=NORMAL."""`
+
+**Example from `src/core/capital_manager.py`:**
 ```python
-"""Data models for Polymarket events."""
+class CapitalManager:
+    """Manages capital protection via two-tier floor system.
+
+    Tracks high water mark (HWM) and determines trading mode based on
+    current equity as percentage of HWM:
+    - Above soft_floor_pct: NORMAL mode (unrestricted)
+    - Between soft_floor_pct and hard_floor_pct: SOFT_FLOOR (exceptional trades only)
+    - Below hard_floor_pct: HARD_FLOOR (all trading stopped)
+
+    Examples:
+        >>> cm = CapitalManager()
+        >>> cm.initialize(Decimal("100.00"))
+        >>> cm.check_floor_status(Decimal("95.00"))  # 5% DD -> NORMAL
+        TradingMode.NORMAL
+    """
+
+    def __init__(
+        self,
+        soft_floor_pct: Decimal = Decimal("90.0"),
+        hard_floor_pct: Decimal = Decimal("70.0"),
+        exceptional_quality_threshold: Decimal = Decimal("0.85")
+    ):
+        """Initialize capital manager with floor thresholds.
+
+        Args:
+            soft_floor_pct: Equity % of HWM below which soft floor activates (default 90% = 10% DD)
+            hard_floor_pct: Equity % of HWM below which hard floor activates (default 70% = 30% DD)
+            exceptional_quality_threshold: Minimum quality score for trades at soft floor (default 0.85)
+        """
 ```
 
 ## Function Design
 
-**Size:** Functions typically 20-60 lines; larger ones broken into private helpers
-- `on_event()`: ~15 lines (delegates to `_buy()`, `_sell()`, `_check_extreme_prices()`)
-- `_buy()`: ~60 lines (complex with multiple validation checks)
-- `place_order()`: ~5 lines (simple delegation)
+**Size:** Generally 20-50 lines, with helper methods breaking complex logic
 
 **Parameters:**
-- Positional arguments for required inputs
-- Type annotations required on all parameters: `def on_event(self, event: MarketEvent) -> TradeDecision:`
-- Default values for optional parameters: `def create_clock(mode: str, start: Optional[datetime] = None) -> Clock:`
-- No `**kwargs` for configuration (use dataclasses instead)
+- Use type hints on all parameters
+- Keyword arguments for optional/configuration parameters
+- Use dataclass instances for complex parameter groups: `strategy_config: StrategyConfig`
+- Decimal type preferred for all financial calculations (never float)
 
 **Return Values:**
-- Always annotated: `-> TradeDecision`, `-> bool`, `-> Dict[str, Any]`
-- Early returns for guard clauses (fail fast)
-- Consistent return types (no conditional None vs list)
+- Explicit return type hints: `-> Decimal`, `-> TradingMode`, `-> Tuple[bool, Optional[str]]`
+- Return tuples for multiple related values: `return (True, None)` for (can_trade, error_reason)
+- Return None for no result rather than empty values
+- Single responsibility: functions return one logical value/structure
+
+**Example from `src/core/capital_manager.py`:**
+```python
+def can_enter_new_trade(self, quality_score: Decimal) -> Tuple[bool, Optional[str]]:
+    """Check if current mode allows new trade entry.
+
+    Args:
+        quality_score: Trade quality score (0 to 1)
+
+    Returns:
+        Tuple of (can_enter: bool, reason: Optional[str])
+        - (True, None) if trade allowed
+        - (False, reason) if blocked by mode
+    """
+```
 
 ## Module Design
 
 **Exports:**
-- `__all__` not used; rely on `from X import Y` clarity
-- Public classes and functions placed at module level
-- Private implementation classes prefixed with underscore: `class _STRATEGIES` (private registry)
+- Classes and main functions defined in module are public by default
+- Private implementation details use leading underscore: `_high_water_mark`, `_load_seen_hashes`
+- Dataclass fields are always public
+- No explicit `__all__` lists observed
 
 **Barrel Files:**
-- Central re-export pattern in `__init__.py` files
-- Example from `src/execution/__init__.py`:
+- `src/strategies/__init__.py` provides convenience exports: `list_strategies()`, `get_strategy(name)`
+- Minimalist approach to re-exports; mostly for strategy registration
+- No deep nesting of imports; relative imports preferred
+
+**Example from `src/strategies/__init__.py`:**
 ```python
-from .base import ExecutionAdapter
-from .dry_run import NullExecutionAdapter
-DryRunAdapter = NullExecutionAdapter  # Alias for backward compat
-```
-
-**Pattern from `src/strategies/__init__.py`:**
-```python
-from .base import Strategy, StrategyConfig, TradeDecision, DecisionAction, register_strategy, get_strategy, list_strategies
-from .mirror import MirrorStrategy
-from .momentum import MomentumMirrorStrategy
-# ... all strategies imported for registration
-```
-
-## Dataclass Usage
-
-**Pattern:**
-- Use `@dataclass` for immutable data models: `@dataclass(frozen=True)` for event-like structures
-- Use `field(default_factory=...)` for mutable defaults: `pending_orders: List[str] = field(default_factory=list)`
-- Implement `@classmethod` factory methods for API parsing: `LeaderTrade.from_api(data: Dict) -> LeaderTrade`
-
-**Example from `src/core/types.py`:**
-```python
-@dataclass
-class Exposure:
-    """Exposure in a market (both sides)."""
-    market_id: MarketId
-    up_shares: Decimal = Decimal("0")
-    up_dollars: Decimal = Decimal("0")
-
-    @property
-    def total_dollars(self) -> Decimal:
-        return self.up_dollars + self.down_dollars
-```
-
-## Strategy Pattern (Register/Lookup)
-
-**Registry Pattern:**
-Used for dynamic strategy loading without hardcoded imports.
-
-**Implementation in `src/strategies/base.py`:**
-```python
-_STRATEGIES: Dict[str, type] = {}
-
-def register_strategy(cls: type) -> type:
-    instance = cls()
-    _STRATEGIES[instance.name] = cls
-    return cls
+def list_strategies():
+    """Return list of available strategy names."""
 
 def get_strategy(name: str) -> Strategy:
-    if name not in _STRATEGIES:
-        raise ValueError(f"Unknown strategy: {name}")
-    return _STRATEGIES[name]()
-
-def list_strategies() -> List[str]:
-    return list(_STRATEGIES.keys())
-
-@register_strategy
-class MirrorStrategy(Strategy):
-    @property
-    def name(self) -> str:
-        return "mirror"
-```
-
-**Usage:**
-```python
-from src.strategies import get_strategy, list_strategies
-strategy = get_strategy("mirror")  # Returns fresh instance
+    """Get strategy instance by name."""
 ```
 
 ---
 
-*Convention analysis: 2026-01-30*
+*Convention analysis: 2026-02-05*

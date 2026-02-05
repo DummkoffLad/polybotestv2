@@ -1,235 +1,275 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-01-30
+**Analysis Date:** 2026-02-05
 
 ## Directory Layout
 
 ```
 polybotestv2/
-├── main.py                 # Entry point: CLI argument parsing, mode dispatch
-├── compare_trades.py       # Utility: compare leader vs follower trades
-├── requirements.txt        # Python dependencies
-├── README.md              # Project documentation
-├── .env.example           # Environment variable template
-├── config/                # Configuration files
-│   └── config.example.yaml  # Example config (copy to config.yaml)
-├── data/                  # Runtime data and state
-│   ├── sessions/          # Recorded session JSONL files (created by --record)
-│   ├── state/             # Persisted state (seen_hashes.json, portfolio_state.json)
-│   ├── logs/              # Log files
-│   ├── collected/         # Deprecated: old data collection output
-│   └── traces/            # Execution traces
-├── logs/                  # Separate logs directory
-├── .planning/             # GSD planning documents
-│   └── codebase/          # Architecture and structure analysis
-├── tests/                 # Test suite
-│   ├── integration/       # Integration tests (smoke tests, end-to-end)
-│   ├── unit/              # Unit tests (removed during refactor)
-│   └── tools/             # Test utilities
-└── src/                   # Main source code
-    ├── __init__.py
-    ├── core/              # Core abstractions and types
-    ├── data/              # Data fetching and models
-    ├── execution/         # Order execution adapters
-    ├── framework/         # Main run loop and replay
-    ├── simulation/        # Optimization and backtesting
-    └── strategies/        # Trading strategy implementations
+├── main.py                  # Primary CLI entry point
+├── requirements.txt         # Python dependencies
+├── README.md               # Project documentation
+├── .env.example            # Environment variable template
+├── config/                 # Configuration directory
+│   ├── config.yaml         # Main bot configuration (user-edited)
+│   └── config.example.yaml # Configuration template
+├── data/                   # Runtime data directory
+│   ├── state/              # Persistent state files
+│   │   ├── seen_hashes.json
+│   │   └── portfolio_state.json
+│   └── sessions/           # Recorded session data (JSON)
+├── logs/                   # Log files (generated at runtime)
+├── src/                    # Main source code
+│   ├── framework/          # Core orchestration (runner, replay, recording)
+│   ├── strategies/         # Strategy implementations
+│   ├── execution/          # Execution adapters (live vs dry-run)
+│   ├── data/               # Data sources (APIs, blockchain, websocket)
+│   ├── core/               # Core services (portfolio, config, types)
+│   ├── analysis/           # Post-session analysis
+│   ├── comparison/         # Strategy comparison tools
+│   ├── simulation/         # Optimization and testing
+│   ├── statistics/         # Statistical utilities
+│   ├── tools/              # Utility scripts
+│   ├── validation/         # Data validation
+│   └── __init__.py
+├── tests/                  # Unit tests
+│   └── unit/               # Unit test files
+├── docs/                   # Generated documentation
+└── .planning/              # GSD planning documents
 ```
 
 ## Directory Purposes
 
-**src/core/:**
-- Purpose: Shared types, configuration, and utilities used by all layers
-- Contains:
-  - `types.py` - Enums (ExecutionMode, Side, OrderType, OrderStatus) and dataclasses (OrderRequest, OrderResponse, Exposure)
-  - `config.py` - Configuration loading from YAML (LeaderConfig, TraderConfig, ScalingConfig, MirrorStrategyConfig, BotConfig)
-  - `portfolio.py` - Portfolio tracking with position and PnL management (Portfolio, PortfolioPosition)
-  - `clock.py` - Time abstraction (SystemClock for live, SimulatedClock for deterministic replay)
-- Key files: `types.py` (shared enum/dataclass definitions), `config.py` (loads config/config.yaml)
+**Root level scripts:**
+- `main.py`: Primary entry point, handles CLI routing to live/dry-run/replay/optimize modes
+- `run_test.py`, `run_comparison.py`, `check_profit_taker.py`, `optimize_profit_taker.py`: Utility scripts for testing specific strategies
 
-**src/data/:**
-- Purpose: Fetch leader activity and market data from external APIs
-- Contains:
-  - `live_source.py` - Polymarket API client (positions, trades, market discovery)
-  - `blockchain_detector.py` - Polygon blockchain event listener (detects leader transactions)
-  - `ws_price.py` - WebSocket price feed subscriber (bid/ask quotes)
-  - `models.py` - Data models (LeaderTrade, PriceSnapshot, MarketEvent, PolymarketPosition, PolymarketTrade)
-- Key files: `models.py` (immutable data classes), `live_source.py` (API calls)
+**config/**
+- Purpose: Store user configuration and examples
+- Contains: YAML configuration files
+- Key files: `config/config.yaml` (user creates from example), `config/config.example.yaml`
+- Note: config.yaml is gitignored, each user/environment maintains their own
 
-**src/execution/:**
-- Purpose: Abstract order placement to support different execution modes
-- Contains:
-  - `base.py` - ExecutionAdapter abstract interface
-  - `dry_run.py` - NullExecutionAdapter (logs trades without placing, DRY_RUN mode)
-  - `live.py` - LiveExecutionAdapter (places real orders via py-clob-client, LIVE mode)
-  - `hybrid.py` - Alternative adapter (not currently used)
-- Key files: `base.py` (interface contract), `dry_run.py` (safe stub), `live.py` (API integration)
+**data/**
+- Purpose: Runtime-generated data storage
+- Contains: State persistence, session recordings, logs
+- `data/state/`: Persistent data across runs (seen trade hashes, portfolio snapshots)
+- `data/sessions/`: Recorded session files (JSON) for replay and analysis
+- Note: Directory auto-created at startup if missing
 
-**src/framework/:**
-- Purpose: Main application logic (run loop, recording, replay)
-- Contains:
-  - `runner.py` - UniversalRunner (polls blockchain, emits events to strategy, executes orders)
-  - `recorder.py` - SessionRecorder (writes events + price snapshots to JSONL)
-  - `replay.py` - SessionReplayer (reads JSONL, replays through any strategy)
-- Key files: `runner.py` (main loop), `recorder.py` (persistence layer)
+**src/framework/**
+- Purpose: Core orchestration and lifecycle management
+- Contains: UniversalRunner (main event loop), SessionReplayer (replay engine), SessionRecorder (session persistence)
+- Key files:
+  - `src/framework/runner.py`: Main loop, handles data polling, strategy calls, execution
+  - `src/framework/replay.py`: Replays sessions deterministically
+  - `src/framework/recorder.py`: Records events and prices for later analysis
 
-**src/simulation/:**
-- Purpose: Offline backtesting and strategy optimization
-- Contains:
-  - `optimizer.py` - Grid search over strategy parameters
-  - `full_optimizer.py` - Tests all strategies × all execution modes
-  - `limit_order_sim.py` - Simulates limit order fill logic
-  - `follow_metrics.py` - Calculates strategy quality metrics
-- Key files: `optimizer.py` (parameter tuning), `full_optimizer.py` (comprehensive testing)
+**src/strategies/**
+- Purpose: Pluggable strategy implementations
+- Contains: Base class and 9+ concrete strategies
+- Directory structure: Each strategy in its own directory with `strategy.py` and optional `config.py`
+  - `src/strategies/mirror/`: Copy leader exactly
+  - `src/strategies/conservative/`: Size down conservative positions
+  - `src/strategies/aggressive/`: Scale up with confidence
+  - `src/strategies/profit_taker/`: Take profits at thresholds
+  - `src/strategies/momentum/`: Follow trend momentum
+  - `src/strategies/velocity/`: Based on position velocity
+  - `src/strategies/spread_aware/`: Adjust for market spread
+  - `src/strategies/price_level/`: Entry/exit based on price levels
+  - `src/strategies/hybrid_conservative/`: Mixed approach
+  - `src/strategies/simple_follow/`: Basic following with stops
+- Key files:
+  - `src/strategies/base.py`: Strategy interface and TradeDecision class
+  - `src/strategies/__init__.py`: Strategy registry and get_strategy() factory
 
-**src/strategies/:**
-- Purpose: Trading strategy implementations
-- Contains: Strategy implementations organized by type
-  - `base.py` - Strategy abstract interface and StrategyConfig
-  - `mirror/` - Mirror strategy (copies leader with scaling)
-  - `momentum/` - Momentum strategy
-  - `conservative/` - Conservative variant
-  - `aggressive/` - Aggressive variant
-  - `spread_aware/` - Spread-aware pricing
-  - `velocity/` - Velocity-based sizing
-  - `price_level/` - Price level targeting
-  - `hybrid_conservative/` - Hybrid approach
-- Key files: `base.py` (Strategy abstract class, register_strategy decorator), strategy subdirs (implementations)
+**src/execution/**
+- Purpose: Pluggable execution backends
+- Contains: ExecutionAdapter interface, dry-run and live implementations
+- Key files:
+  - `src/execution/base.py`: Abstract ExecutionAdapter interface
+  - `src/execution/dry_run.py`: NullExecutionAdapter (returns SIMULATED status, no real orders)
+  - `src/execution/live.py`: LiveExecutionAdapter (hits Polymarket API, requires private key)
+  - `src/execution/hybrid.py`: Hybrid execution mode
+  - `src/execution/__init__.py`: Exports adapter classes
 
-**config/:**
-- Purpose: Configuration files
-- Contains: `config.example.yaml` (template with all settings)
-- Usage: Copy to `config/config.yaml` and customize before running
+**src/data/**
+- Purpose: External data sources
+- Contains: Polymarket API client, blockchain detector, WebSocket price service
+- Key files:
+  - `src/data/live_source.py`: HTTP client for Polymarket REST API (positions, trades)
+  - `src/data/blockchain_detector.py`: Polls Polygon blockchain for leader transactions
+  - `src/data/ws_price.py`: WebSocket connection to Polymarket for real-time bid/ask
+  - `src/data/models.py`: Data model definitions (MarketEvent, LeaderTrade, etc)
+  - `src/data/__init__.py`: Re-exports models
 
-**data/:**
-- Purpose: Runtime data storage
-- Subdirectories:
-  - `sessions/` - Recorded sessions (JSONL files, one per `--record` run)
-  - `state/` - Persisted state (seen_hashes.json for dedup, portfolio_state.json on shutdown)
-  - `logs/` - Log files from runs
-- Not committed to git (in .gitignore)
+**src/core/**
+- Purpose: Core trading logic and configuration
+- Contains: Portfolio tracking, capital management, configuration, type definitions
+- Key files:
+  - `src/core/portfolio.py`: Portfolio class (tracks positions, computes PnL)
+  - `src/core/capital_manager.py`: Capital allocation logic
+  - `src/core/kelly_engine.py`: Kelly criterion position sizing
+  - `src/core/config.py`: Config loading from YAML
+  - `src/core/types.py`: OrderRequest, OrderResponse, Side, ExecutionMode
+  - `src/core/sizing.py`: Position sizing utilities
+  - `src/core/adaptive_sizer.py`: Adaptive sizing based on edge
+  - `src/core/edge_tracker.py`: Track realized edges
+  - `src/core/conviction.py`: Conviction scoring
+  - `src/core/trade_filter.py`: Trade filtering logic
+  - `src/core/trade_ranker.py`: Rank trades by quality
+  - `src/core/clock.py`: Simulated clock for testing
 
-**tests/:**
-- Purpose: Test suite
-- Directories:
-  - `integration/` - Integration tests (smoke tests for dry-run mode)
-  - `unit/` - Unit tests (mostly removed during refactor)
-  - `tools/` - Test utilities (trade verification scripts)
-- Not committed by default (in .gitignore)
+**src/analysis/**
+- Purpose: Post-trade analysis and metrics
+- Contains: Equity curve tracking, P&L attribution, risk metrics
+- Key files:
+  - `src/analysis/equity_tracker.py`: Track portfolio equity over time
+  - `src/analysis/drawdown.py`: Compute max drawdown, recovery analysis
+  - `src/analysis/slippage.py`: Measure execution slippage vs decision price
+  - `src/analysis/attribution.py`: P&L attribution to strategy decisions
+  - `src/analysis/reports.py`: Generate summary reports from session data
+
+**src/comparison/**
+- Purpose: Compare multiple strategy runs
+- Contains: Metrics computation, tear sheets, decision matrices
+- Key files:
+  - `src/comparison/metrics.py`: Compute returns, Sharpe, etc
+  - `src/comparison/tear_sheets.py`: Generate HTML tear sheets
+  - `src/comparison/visualizer.py`: Plot strategy comparisons
+  - `src/comparison/comparator.py`: Compare multiple runs
+
+**src/simulation/**
+- Purpose: Strategy optimization and testing
+- Contains: Parameter optimization, full testing harness
+- Key files:
+  - `src/simulation/optimizer.py`: Grid search over strategy parameters
+  - `src/simulation/full_optimizer.py`: Exhaustive Cartesian product testing
+
+**src/statistics/**
+- Purpose: Statistical utilities
+- Contains: Distribution fitting, correlation analysis, etc
+
+**src/tools/**
+- Purpose: Standalone utility tools
+- Contains: Portfolio visualization, trade analysis tools
+
+**src/validation/**
+- Purpose: Data validation and sanity checks
+- Contains: Event validation, trade validation
+
+**tests/unit/**
+- Purpose: Unit tests
+- Contains: Tests for individual components
+- Key files:
+  - `tests/unit/test_strategies.py`: Strategy behavior tests
+  - `tests/unit/test_simple_follow.py`: Simple follow strategy tests
 
 ## Key File Locations
 
 **Entry Points:**
-- `main.py` - CLI entry point (parse args, load config, dispatch to execution path)
+- `main.py`: Main CLI orchestrator, route to all modes
+- `src/framework/runner.py`: UniversalRunner.run() - main event loop
 
 **Configuration:**
-- `config/config.example.yaml` - Example configuration with all settings
-- `.env.example` - Environment variable template (copy to .env for secrets)
+- `src/core/config.py`: BotConfig, load_config() function
+- `config/config.yaml`: User configuration (not in git)
 
 **Core Logic:**
-- `src/framework/runner.py` - Main event loop and orchestration
-- `src/strategies/mirror/strategy.py` - Default mirror strategy implementation
-- `src/execution/base.py` - Execution adapter interface
+- `src/strategies/base.py`: Strategy base class, TradeDecision
+- `src/core/portfolio.py`: Portfolio state tracking
+- `src/execution/base.py`: ExecutionAdapter interface
 
-**Data Handling:**
-- `src/data/live_source.py` - Polymarket API client
-- `src/data/models.py` - Data model definitions
-- `src/core/portfolio.py` - Position and PnL tracking
+**Data Models:**
+- `src/data/models.py`: MarketEvent, LeaderTrade, PriceSnapshot
+- `src/core/types.py`: OrderRequest, OrderResponse, Side, ExecutionMode
 
-**Testing & Replay:**
-- `src/framework/replay.py` - Replay recorded sessions
-- `src/framework/recorder.py` - Record sessions to disk
-- `src/simulation/optimizer.py` - Strategy optimization
+**Testing & Optimization:**
+- `src/framework/replay.py`: SessionReplayer for deterministic replay
+- `src/simulation/optimizer.py`: Grid search optimization
+- `src/analysis/equity_tracker.py`: P&L computation for results
 
 ## Naming Conventions
 
 **Files:**
-- Module names: snake_case (e.g., `live_source.py`, `blockchain_detector.py`)
-- Strategy implementations: `strategy.py` in strategy subdirectory (e.g., `src/strategies/mirror/strategy.py`)
-- Test files: `test_*.py` (e.g., `test_dry_run_smoke.py`)
+- Module names: lowercase with underscores (`config.py`, `live_source.py`, `kelly_engine.py`)
+- Strategy implementations: One strategy per directory, main file is `strategy.py`
+- Test files: Match source module name with `test_` prefix (`test_strategies.py`)
 
 **Directories:**
-- Package names: lowercase (e.g., `src/data`, `src/strategies`)
-- Strategy subdirectories: lowercase strategy name (e.g., `mirror/`, `aggressive/`, `conservative/`)
-- Data directories: descriptive lowercase (e.g., `sessions/`, `state/`)
+- Functional grouping: `src/strategies/`, `src/execution/`, `src/data/`, `src/core/`
+- One strategy per subdirectory: `src/strategies/mirror/`, `src/strategies/conservative/`
 
 **Classes:**
-- Abstract base classes: Strategy, ExecutionAdapter (defined in `base.py`)
-- Concrete classes: PascalCase with descriptive names (MirrorStrategy, LiveExecutionAdapter, BlockchainDetector)
-- Data classes: PascalCase (LeaderTrade, PriceSnapshot, OrderRequest, PortfolioPosition)
+- Pascal case for classes: `UniversalRunner`, `LiveDataSource`, `SessionRecorder`
+- Exception classes end with Error: `PortfolioInvariantError`
+- Dataclass models: `MarketEvent`, `LeaderTrade`, `OrderRequest`, `PortfolioPosition`
 
-**Functions:**
-- Public functions: snake_case (e.g., `get_strategy()`, `load_config()`)
-- Private methods: leading underscore (e.g., `_init()`, `_cycle()`, `_make_event()`)
+**Functions/Methods:**
+- Snake case: `on_event()`, `place_order()`, `fetch_positions()`
+- Private methods start with underscore: `_init()`, `_cycle()`, `_save_state()`
+- Magic methods double underscore: `__post_init__()` (dataclass hook)
 
 **Constants:**
-- All caps with underscores (e.g., `MIN_MARKET_ORDER_DOLLARS`, `PRICE_EXTREME_HIGH`)
-- Defined in module where used or in `base.py` for strategy constants
+- All caps: `MIN_MARKET_ORDER_DOLLARS`, `HOUR_END_THRESHOLD_SEC`, `EXTREME_HIGH_PRICE`
+- Grouped at module top after imports
 
 ## Where to Add New Code
 
 **New Strategy:**
-- Create directory: `src/strategies/{strategy_name}/`
-- Create files:
-  - `src/strategies/{strategy_name}/__init__.py` (import and register strategy)
-  - `src/strategies/{strategy_name}/strategy.py` (implement Strategy interface)
-- Add to `src/strategies/__init__.py` imports
-- Use `@register_strategy` decorator on class
-- Reference: `src/strategies/mirror/strategy.py`
+1. Create directory: `src/strategies/[strategy_name]/`
+2. Create file: `src/strategies/[strategy_name]/strategy.py` extending Strategy base
+3. Register in: `src/strategies/__init__.py` with import and optional register_strategy() call
+4. Add tests: `tests/unit/test_[strategy_name].py`
 
-**New Execution Adapter:**
-- Create file: `src/execution/{adapter_name}.py`
-- Implement ExecutionAdapter interface from `src/execution/base.py`
-- Add instantiation logic to `main.py` mode dispatch
-- Reference: `src/execution/live.py`
+**New Execution Mode:**
+1. Create file: `src/execution/[mode].py`
+2. Implement ExecutionAdapter interface from `src/execution/base.py`
+3. Export from: `src/execution/__init__.py`
+4. Route from: `main.py` when user selects mode
+
+**New Analysis Metric:**
+1. Add to: `src/analysis/[metric_name].py` (or add function to existing file)
+2. Import in: `src/analysis/__init__.py`
+3. Call from: SessionReplayer or ReplayResult processing in `src/framework/replay.py`
 
 **New Data Source:**
-- Create file: `src/data/{source_name}.py`
-- Implement interface expected by `UniversalRunner._init()` (see `live_source.py`)
-- Update runner to initialize new source if needed
-- Reference: `src/data/live_source.py`
+1. Create file: `src/data/[source_name].py`
+2. Follow LiveDataSource pattern (rate limiting, error handling, caching)
+3. Wire into: UniversalRunner._init() in `src/framework/runner.py`
 
-**Utilities/Helpers:**
-- Shared helpers: `src/core/` (if used by multiple layers)
-- Strategy-specific: `src/strategies/{strategy_name}/` (keep with strategy)
-- Data processing: `src/data/` (if used by multiple strategies)
+**New Core Service:**
+1. Create file: `src/core/[service].py`
+2. Dependency inject into: UniversalRunner or strategies
+3. Add configuration if needed: Add to BotConfig in `src/core/config.py`
 
-**Tests:**
-- Integration tests: `tests/integration/test_{feature}.py`
-- Unit tests: `tests/unit/test_{module}.py`
-- Test utilities: `tests/tools/{utility}.py`
+**Utility Scripts:**
+1. Root level Python files: `src_[feature].py`
+2. Import from src/ modules normally
+3. Entry point: if __name__ == "__main__": main()
 
 ## Special Directories
 
-**data/sessions/:**
-- Purpose: Store recorded trading sessions (JSONL files)
-- Generated: Yes (by `SessionRecorder` when `--record` flag used)
-- Committed: No (in .gitignore)
-- Format: JSONL (one JSON object per line)
-- Lifecycle: Created during `--mode dry-run --record`, replayed with `--replay-session`
-
 **data/state/:**
-- Purpose: Persist state between runs
-- Generated: Yes (by `UniversalRunner._shutdown()`)
+- Purpose: Persistent runtime state across restarts
+- Generated: Yes (auto-created at startup)
 - Committed: No (in .gitignore)
-- Files:
-  - `seen_hashes.json` - Transaction hashes seen (prevents duplicate trades)
-  - `portfolio_state.json` - Portfolio positions and stats
-- Lifecycle: Loaded on startup, updated on shutdown
+- Contents: JSON files with trade hashes and portfolio snapshots
 
-**.planning/codebase/:**
-- Purpose: GSD architecture documentation
-- Generated: Yes (by `/gsd:map-codebase`)
-- Committed: Yes (in git)
-- Files: ARCHITECTURE.md, STRUCTURE.md, CONVENTIONS.md, TESTING.md, STACK.md, INTEGRATIONS.md, CONCERNS.md
-- Lifecycle: Updated by GSD when codebase changes significantly
-
-**tests/:**
-- Purpose: Test suite
-- Generated: No (hand-written)
+**data/sessions/:**
+- Purpose: Recorded session data for replay and analysis
+- Generated: Yes (when --record flag used)
 - Committed: No (in .gitignore)
-- Note: Most tests were removed during refactor; only smoke test remains
+- Contents: JSON files with event sequences, prices, decisions for each session
 
----
+**config/**
+- Purpose: Configuration files
+- Generated: No (user-created from examples)
+- Committed: Only .example.yaml files; actual config.yaml is gitignored
+- Note: Users must copy config.example.yaml to config.yaml and customize
 
-*Structure analysis: 2026-01-30*
+**logs/**
+- Purpose: Application logs
+- Generated: Yes (if logging configured to write files)
+- Committed: No (in .gitignore)
+- Rotation: Not currently implemented, files grow indefinitely

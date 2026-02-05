@@ -1,159 +1,186 @@
 # External Integrations
 
-**Analysis Date:** 2026-01-30
+**Analysis Date:** 2026-02-05
 
 ## APIs & External Services
 
-**Polymarket Trading:**
-- Polymarket CLOB API - Order placement, cancellation, execution
-  - SDK/Client: `py-clob-client>=0.34`
-  - Implementation: `src/execution/live.py:LiveExecutionAdapter`
+**Polymarket CLOB (Copy-Trading):**
+- Service: Polymarket Decentralized CLOB (Central Limit Order Book)
+- What it's used for: Live order placement, market data fetching, position tracking
+  - SDK/Client: `py-clob-client` 0.34+
+  - Implementation: `src/execution/live.py` (LiveExecutionAdapter)
   - Host: `https://clob.polymarket.com`
-  - Chain ID: 137 (Polygon)
-  - Auth: Wallet private key signing (configurable signature type)
+  - Chain: Polygon (chain_id=137)
+  - Auth: ECDSA signature (private key signing)
+  - Signature types supported: EOA, POLY_PROXY, GNOSIS_SAFE
 
-**Polymarket Data:**
-- Polymarket Data API - Read positions, trades, market metadata
-  - SDK/Client: `httpx>=0.27` (raw HTTP)
-  - Implementation: `src/data/live_source.py:LiveDataSource`
-  - Base URL: `https://data-api.polymarket.com`
+**Polymarket Data API:**
+- Service: REST API for historical and position data
+- What it's used for: Fetching leader positions, trade history, market metadata
+  - SDK/Client: `httpx` (HTTP client)
+  - Implementation: `src/data/live_source.py` (LiveDataSource)
+  - Host: `https://data-api.polymarket.com`
   - Endpoints:
-    - `GET /positions?user={address}&limit=500` - Fetch wallet positions
-    - `GET /trades?user={address}&limit={limit}` - Fetch trade history
-  - Rate limiting: 0.1s per positions call, 0.05s per trades call
+    - `GET /positions?user={address}&limit=500` - Fetch positions
+    - `GET /trades?user={address}&limit=100` - Fetch trades
+  - Rate limiting: Built-in with `_rate_limit()` method to prevent throttling
+
+**Polymarket WebSocket Feed (Price Subscriptions):**
+- Service: Real-time market price updates
+- What it's used for: Live bid/ask prices for trading (optional optimization)
+  - SDK/Client: `websockets` 12.0+
+  - Implementation: `src/data/ws_price.py` (WebSocketPriceService)
+  - URL: `wss://ws-subscriptions-clob.polymarket.com/ws/market`
+  - Purpose: Real-time price subscription (default is polling API)
+  - Stale threshold: 30 seconds
 
 ## Data Storage
 
 **Databases:**
-- Not applicable - No external database used
-- Local persistence only (JSON/JSONL files)
+- None - No external database
+- Local: JSONL files in `data/` directory
+- Format: JSON Lines (newline-delimited JSON)
 
 **File Storage:**
 - Local filesystem only
-  - Session recordings: `data/sessions/*.jsonl`
-  - State files: `data/state/*.json`
-  - Logs: `data/logs/*.jsonl`
-  - Traces: `data/traces/*.jsonl`
+- Directories:
+  - `data/sessions/` - Recorded trading sessions (JSONL)
+  - `data/state/` - Bot state persistence (JSON)
+  - `data/reports/` - Generated reports and charts
+  - `data/collected/` - Collected market data during operation
+  - `config/` - Configuration files (YAML)
+  - `logs/` - Bot execution logs (JSONL)
+
+**State Persistence:**
+- `data/state/seen_hashes.json` - Transaction hash deduplication (24-hour cache)
+- `data/state/portfolio_state.json` - Portfolio state on shutdown/recovery
+- Implemented in: `src/framework/runner.py` (UniversalRunner._load_seen_hashes, _save_state)
 
 **Caching:**
-- In-memory caching of discovered markets (`src/data/live_source.py:_discovered_markets`)
-- Persisted seen transaction hashes: `data/state/seen_hashes.json`
-- No external cache services (Redis, Memcached)
+- None - No external caching service
+- In-memory market info cache in LiveDataSource._market_info
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Self-managed wallet signing (no third-party auth)
+- Polymarket Web3 wallets (self-custodial)
+- Types supported:
+  - EOA (Externally Owned Account) - Direct wallet
+  - POLY_PROXY - Magic link email login
+  - GNOSIS_SAFE - Browser wallets (MetaMask, etc.) - most common
 
 **Implementation:**
-- Wallet private key signing via `py-clob-client`
-- Three signature types supported:
-  - `0` = EOA (standard externally owned account, requires POL for gas)
-  - `1` = POLY_PROXY (Magic Link email wallet)
-  - `2` = GNOSIS_SAFE (most common, browser wallet like MetaMask)
-- Signature type set in config: `trader.signature_type` (default 2)
-
-**Secret Management:**
-- Private key stored in `.env` file (never in `config.yaml`)
-- Loaded via `python-dotenv` before startup
-- Environment variable: `POLYMARKET_PRIVATE_KEY` (configurable as `trader.private_key_env`)
-- Funder address: `POLYMARKET_FUNDER_ADDRESS` environment variable or config
+- Private key signing: ECDSA signature in `src/execution/live.py`
+- Environment variable: `POLYMARKET_PRIVATE_KEY` (from .env file)
+- Funder address: `POLYMARKET_FUNDER_ADDRESS` (wallet holding USDC)
+- Signature type: `POLYMARKET_SIGNATURE_TYPE` (0, 1, or 2)
+- No OAuth/centralized auth - Direct blockchain signing
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- Not integrated with external service
-- Errors logged to local JSONL files
-- Structured logging in `src/logging/` (if present)
+- None - No external error tracking service (Sentry, etc.)
+- All errors logged locally to `data/logs/bot.jsonl`
 
 **Logs:**
-- Local file-based logging (JSONL format)
-- Log path: `data/logs/bot.jsonl` (configurable)
-- Log level: DEBUG, INFO, WARNING, ERROR (configurable)
-- Log rotation: Max 50MB per file, 5 backups (configurable)
-- Types of logs:
-  - Bot operations (trades, errors, state changes)
-  - Decision traces (per-decision JSON records)
-  - API interactions (httpx requests/responses via logging)
+- Local JSONL logging (JSON lines format for machine readability)
+- Paths:
+  - `data/logs/bot.jsonl` - Main bot execution log
+  - `data/traces/decisions.jsonl` - Decision trace for strategy analysis
+- Logging implementation: Python `logging` module with custom handlers
+- Controlled in config: `logging.level`, `logging.output`, `logging.file_path`
+- Log rotation: Configurable with `log_max_mb` and `log_backup_count`
+- Trace rotation: Configurable with `trace_max_mb` and `trace_backup_count`
 
-**Structured Logging:**
-- Format: JSON Lines (one JSON object per line)
-- Includes timestamp, level, message, metadata
-- Decision traces logged separately to `data/traces/decisions.jsonl`
+**Metrics & Analysis:**
+- QuantStats: Portfolio performance analytics (`src/analysis/reports.py`)
+- Empyrical: Risk metrics (Sharpe, Sortino, max drawdown)
+- Custom analysis: `src/analysis/` modules for slippage, attribution, drawdown
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Self-hosted (no cloud platform lock-in)
-- Runs locally or on user's server
-- Supports Windows, Linux, macOS
+- None configured - Self-hosted execution
+- Target: Local machine or VPS with Python 3.11+
+- Deployment: Manual or via script (no CI/CD pipeline detected)
 
 **CI Pipeline:**
-- Not configured (pytest available but no GitHub Actions/GitLab CI)
-- Manual testing: `pytest tests/ -v`
-
-**Deployment:**
-- Direct execution: `python main.py --mode live`
-- No containerization (Docker/Kubernetes) currently
-- No deployment automation
+- None detected
+- Local testing: `pytest` (run manually or via hook)
+- Test discovery: `tests/unit/` directory
 
 ## Environment Configuration
 
-**Required env vars:**
-- `POLYMARKET_PRIVATE_KEY` - Wallet signing key (LIVE only)
-- `POLYMARKET_FUNDER_ADDRESS` - Wallet address for order placement (LIVE only)
-- `POLYMARKET_SIGNATURE_TYPE` - Signature type: 0, 1, or 2 (default 2)
+**Required env vars (LIVE mode):**
+- `POLYMARKET_PRIVATE_KEY` - Private key for signing orders (SECRET)
+- `POLYMARKET_FUNDER_ADDRESS` - Wallet address for trading capital
+- `POLYMARKET_SIGNATURE_TYPE` - Signature type (0, 1, or 2) - default: 2
 
 **Optional env vars:**
-- `HTTP_PROXY`, `HTTPS_PROXY` - Proxy configuration
-- `LOG_LEVEL` - Override config file log level
-- `DATA_DIR` - Override default `data/` directory
+- `DATA_DIR` - Override default data directory (default: `./data`)
+- `LOG_LEVEL` - Override config log level (DEBUG, INFO, WARNING, ERROR)
+- `HTTP_PROXY` / `HTTPS_PROXY` - HTTP proxy configuration
+- `POLYMARKET_PRIVATE_KEY_ENV` - Alternative env var name for private key (config: `trader.private_key_env`)
 
 **Secrets location:**
-- `.env` file (gitignored, never committed)
-- Template: `.env.example` (shows required vars)
-- Loaded once at startup via `python-dotenv`
+- `.env` file (NOT committed to git, added to `.gitignore`)
+- Template: `.env.example` in root directory
+- All secrets must be in `.env` file - NEVER in config.yaml or committed files
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None - Bot reads data via polling
+- None - No webhooks consumed
 
 **Outgoing:**
-- None currently implemented
-- Bot operates on poll-based state reconciliation, not webhooks
-- Future enhancement: WebSocket subscriptions for real-time market data
+- None - No webhooks sent
+- Application operates in polling mode for data fetching
 
-## Order Execution Flow
+## Rate Limiting & API Quotas
 
-**Place Order (LIVE only):**
-1. Strategy calls `execution.place_order(OrderRequest)`
-2. `LiveExecutionAdapter.place_order()` validates request
-3. Fetches current midpoint: `GET https://clob.polymarket.com/midpoint?token_id=...`
-4. Calculates order price (market order with 5¢ adjustment)
-5. Creates order via `py-clob-client.ClobClient.create_order(OrderArgs)`
-6. Signs order with private key (signature type configurable)
-7. POSTs signed order: `POST https://clob.polymarket.com/order` (FOK - Fill or Kill)
-8. Returns `OrderResponse` with status (FILLED, REJECTED, PENDING)
+**Polymarket APIs:**
+- Data API: Rate limiting with `_rate_limit()` method in `LiveDataSource`
+  - Default implementation: Time-based throttling (requests/second)
+  - Configured in `src/data/live_source.py` with hardcoded intervals
+- CLOB API: Implicitly rate-limited by order placement frequency
+- WebSocket: Subscription-based (no additional rate limiting)
 
-**Order Types:**
-- Market orders only (BUY at ask, SELL at bid)
-- No limit orders implemented
-- Order execution type: FOK (Fill or Kill - all or nothing)
+**Circuit Breakers (Config-based):**
+- Max consecutive API errors: 5 (pause if exceeded)
+- Max pending orders: 3
+- Max orders per minute: 10
+- Max new exposure per minute: $10
+- Max unknown fill duration: 30 seconds
+- Configured in `config.yaml` under `circuit_breakers:`
 
-## Data Discovery & Market Detection
+## Market Data Sources
 
-**Market Discovery (Live Mode):**
-- Reads leader positions from Polymarket API
-- Extracts market metadata (condition_id, outcome, title)
-- Filters to "hourly up/down" crypto markets only
-- Implementation: `src/data/live_source.py:is_hourly_updown_market()`
+**Leader Discovery:**
+- Polymarket API fetches leader positions and trades
+- Market discovery via position snapshots
+- Automatic token_id to market mapping in `src/data/live_source.py`
 
-**Position & Trade Fetching:**
-- `fetch_positions(address)` - Get all open positions for an address
-- `fetch_trades(address, limit)` - Get recent trade history
-- Rate-limited to prevent API throttling
+**Price Data:**
+- REST API: Polymarket Data API (polling)
+- WebSocket: Polymarket WebSocket feed (optional real-time)
+- Default: Polling-first design; WebSocket is optimization
+- Implementation: `src/data/live_source.py` and `src/data/ws_price.py`
+
+## Session Recording & Replay
+
+**Session Recording:**
+- Format: JSONL (JSON Lines)
+- Contents: Market events (trades, price snapshots, decisions)
+- Storage: `data/sessions/{date}/{time}.jsonl`
+- Purpose: Post-trade analysis, strategy backtesting, optimization
+- Implementation: `src/framework/recorder.py` (SessionRecorder)
+
+**Replay Engine:**
+- Reads recorded sessions and replays strategy decisions
+- Simulates executions without real orders
+- Used for: Backtesting, parameter optimization, performance comparison
+- Implementation: `src/framework/replay.py` (SessionReplayer)
 
 ---
 
-*Integration audit: 2026-01-30*
+*Integration audit: 2026-02-05*

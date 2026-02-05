@@ -1,249 +1,185 @@
 # Architecture
 
-**Analysis Date:** 2026-01-30
+**Analysis Date:** 2026-02-05
 
 ## Pattern Overview
 
-**Overall:** Layered event-driven architecture with pluggable execution adapters and strategies.
-
-The system follows a classic **separation of concerns** model:
-- **Data Layer**: Fetches leader trades from Polymarket APIs and blockchain
-- **Strategy Layer**: Consumes events and makes trading decisions
-- **Execution Layer**: Abstract adapters for order placement (dry-run vs live)
-- **Recording/Replay**: Framework for session persistence and backtesting
+**Overall:** Event-driven copy-trading bot following a data flow pipeline architecture where leader trades trigger strategy decisions that flow through an execution layer.
 
 **Key Characteristics:**
-- Event-driven: Core loop polls for leader trades, emits `MarketEvent` to strategy
-- Adapter pattern: Execution abstraction allows DRY_RUN and LIVE modes without code change
-- Deterministic replay: All trades and prices recorded for offline testing
-- Safety-first: Validation at multiple layers, invariant checks in portfolio tracking
+- Decoupled strategy layer from execution (pluggable execution adapters)
+- Blockchain event detection feeding into price-aware decision making
+- Pluggable strategy framework with multiple concrete implementations
+- Session recording and replay for optimization and testing
+- State persistence across restarts
 
 ## Layers
 
-**Data Layer:**
-- Purpose: Fetch leader activity and market data from Polymarket
-- Location: `src/data/`
-- Contains:
-  - `live_source.py` - Polymarket API client (positions, trades, market discovery)
-  - `blockchain_detector.py` - Polygon blockchain event listener for leader transactions
-  - `ws_price.py` - WebSocket price feed for bid/ask quotes
-  - `models.py` - Data classes (MarketEvent, LeaderTrade, PriceSnapshot, PolymarketPosition)
-- Depends on: httpx (HTTP), websocket (price feeds)
-- Used by: Framework runner, recorder, replay system
+**Data Source Layer:**
+- Purpose: Fetch leader trades and position data from Polymarket APIs
+- Location: `src/data/live_source.py`, `src/data/blockchain_detector.py`, `src/data/ws_price.py`
+- Contains: LiveDataSource (HTTP API client), BlockchainDetector (blockchain event polling), WebSocketPriceService (real-time prices)
+- Depends on: HTTP client, blockchain RPC, WebSocket connection
+- Used by: UniversalRunner (orchestrator)
 
 **Strategy Layer:**
-- Purpose: Decide whether to buy/sell when leader trades
-- Location: `src/strategies/`
-- Contains:
-  - `base.py` - Abstract Strategy interface with StrategyConfig
-  - Implementations: `mirror/`, `momentum/`, `conservative/`, `aggressive/`, `spread_aware/`, `velocity/`, `price_level/`, `hybrid_conservative/`
-  - Each strategy implements `on_event(MarketEvent) -> TradeDecision`
-  - Strategies maintain local portfolio state via `Portfolio` class
-- Depends on: `src/core/portfolio.py` (position tracking)
-- Used by: UniversalRunner, replay system
-
-**Core Layer:**
-- Purpose: Shared types, configuration, utilities
-- Location: `src/core/`
-- Contains:
-  - `types.py` - Enums (ExecutionMode, Side, OrderStatus) and dataclasses (OrderRequest, OrderResponse, Exposure)
-  - `config.py` - BotConfig loaded from YAML (leader/trader addresses, scaling, budget)
-  - `portfolio.py` - Portfolio tracking with realized/unrealized PnL calculations
-  - `clock.py` - Abstraction for time (SystemClock for live, SimulatedClock for replay)
-- Depends on: pyyaml, python-dotenv
-- Used by: All layers
+- Purpose: Consume MarketEvents and generate trading decisions
+- Location: `src/strategies/base.py` (base interface), `src/strategies/mirror/`, `src/strategies/conservative/`, `src/strategies/aggressive/`, etc.
+- Contains: Strategy base class, 9+ concrete strategy implementations
+- Depends on: MarketEvent models, StrategyConfig
+- Used by: UniversalRunner for decision making
 
 **Execution Layer:**
-- Purpose: Place orders via appropriate adapter
-- Location: `src/execution/`
-- Contains:
-  - `base.py` - ExecutionAdapter abstract interface
-  - `dry_run.py` - NullExecutionAdapter (logs what would execute, DRY_RUN mode)
-  - `live.py` - LiveExecutionAdapter (actual order placement via py-clob-client)
-  - `hybrid.py` - Alternative multi-mode adapter (not currently used)
-- Depends on: py-clob-client SDK (live only)
-- Used by: UniversalRunner
+- Purpose: Convert strategy decisions into actual orders on Polymarket
+- Location: `src/execution/base.py`, `src/execution/dry_run.py`, `src/execution/live.py`, `src/execution/hybrid.py`
+- Contains: ExecutionAdapter interface, NullExecutionAdapter (dry-run), LiveExecutionAdapter (real API)
+- Depends on: OrderRequest/OrderResponse models, Polymarket API
+- Used by: UniversalRunner to place orders
 
 **Framework Layer:**
-- Purpose: Main run loop and replay infrastructure
-- Location: `src/framework/`
-- Contains:
-  - `runner.py` - UniversalRunner: polls blockchain, emits events to strategy, executes orders
-  - `recorder.py` - SessionRecorder: writes events and price snapshots to JSONL for replay
-  - `replay.py` - SessionReplayer: reads recorded session, replays through any strategy
-- Depends on: All layers below
-- Used by: main.py
+- Purpose: Orchestrate the event loop and manage runner lifecycle
+- Location: `src/framework/runner.py`, `src/framework/replay.py`, `src/framework/recorder.py`
+- Contains: UniversalRunner (main loop), SessionReplayer (replays recorded sessions), SessionRecorder (records events)
+- Depends on: Data source, strategy, execution layers
+- Used by: main.py entry point
 
-**Simulation Layer:**
-- Purpose: Strategy optimization and backtesting
-- Location: `src/simulation/`
-- Contains:
-  - `optimizer.py` - Grid search over strategy parameters
-  - `full_optimizer.py` - Tests all strategies × all execution modes
-  - `limit_order_sim.py` - Limit order fill simulation
-  - `follow_metrics.py` - Metrics for comparing strategy vs leader
+**Core Services:**
+- Purpose: Cross-cutting trading logic (portfolio tracking, capital management, risk sizing)
+- Location: `src/core/portfolio.py`, `src/core/capital_manager.py`, `src/core/kelly_engine.py`, `src/core/config.py`
+- Contains: Portfolio tracking, position management, capital allocation, Kelly criterion sizing
+- Depends on: Type definitions, Decimal math
+- Used by: Strategies and execution layer
+
+**Analysis & Reporting:**
+- Purpose: Post-session analysis and metrics computation
+- Location: `src/analysis/drawdown.py`, `src/analysis/reports.py`, `src/analysis/equity_tracker.py`, `src/analysis/slippage.py`
+- Contains: Equity curve tracking, drawdown computation, P&L attribution, slippage analysis
+- Depends on: Session data, position history
+- Used by: Replay system for optimization results
+
+**Simulation & Optimization:**
+- Purpose: Test and optimize strategies against recorded sessions
+- Location: `src/simulation/optimizer.py`, `src/simulation/full_optimizer.py`
+- Contains: Grid search optimization, strategy variant testing, full Cartesian product testing
+- Depends on: SessionReplayer, all strategies, analysis modules
+- Used by: main.py --optimize flags
 
 ## Data Flow
 
-**Live Execution Flow (--mode live):**
+**Live Trading Flow (--mode live):**
 
-1. **Initialization** (`UniversalRunner._init()`)
-   - Load BotConfig from YAML
-   - Initialize LiveDataSource → fetch leader positions/trades
-   - Initialize BlockchainDetector → poll Polygon for leader txs
-   - Initialize WebSocketPriceService → subscribe to token prices
-   - Initialize LiveExecutionAdapter with private key
-   - Initialize Strategy with StrategyConfig
+1. UniversalRunner initializes in `_init()`: fetches leader snapshot, discovers markets, starts data services
+2. BlockchainDetector polls for leader transaction logs on Polygon
+3. For each trade found, BlockchainDetector enriches with market data and creates LeaderTrade
+4. LeaderTrade wrapped in MarketEvent with price snapshot from WebSocketPriceService
+5. Strategy.on_event(event) processes event, returns TradeDecision
+6. UniversalRunner validates decision against Polymarket constraints (minimum dollar amounts, etc)
+7. ExecutionAdapter.place_order(OrderRequest) sends to Polymarket API
+8. Strategy.on_fill() updates internal state with fill confirmation
+9. Portfolio tracks position changes, calculates PnL
+10. State persisted to disk on shutdown or hourly transitions
 
-2. **Main Loop** (`UniversalRunner.run()`)
-   - Poll blockchain for new leader trades every N seconds
-   - For each trade:
-     - Extract trade details → create LeaderTrade
-     - Fetch current bid/ask prices → create PriceSnapshot
-     - Emit MarketEvent to strategy
-     - Strategy decides BUY/SELL/SKIP → TradeDecision
-     - If BUY/SELL: create OrderRequest → pass to execution adapter
-     - Adapter places order → returns OrderResponse
-     - Strategy updates local portfolio on fill
-     - Record event if SessionRecorder enabled
+**Dry-Run Flow (--mode dry-run):**
 
-3. **Shutdown** (`UniversalRunner._shutdown()`)
-   - Strategy.on_session_end() → summary stats
-   - Persist seen transaction hashes and portfolio state
-   - SessionRecorder.end_session() → closes JSONL file
+Same as live except ExecutionAdapter.place_order() returns SIMULATED status instead of hitting real API.
 
-**Dry-Run Execution Flow (--mode dry-run):**
+**Replay Flow (--replay-session PATH):**
 
-Same as live, except:
-- NullExecutionAdapter used instead of LiveExecutionAdapter
-- Orders are logged but not placed
-- Portfolio simulation happens client-side
+1. SessionReplayer loads recorded session JSON (events, prices, trades)
+2. For each recorded MarketEvent, feeds to strategy in same sequence
+3. Replayer computes execution without hitting network
+4. Strategy decisions evaluated against recorded prices (deterministic)
+5. Final portfolio and P&L metrics computed
+6. Results used for optimization or analysis
 
-**Session Replay Flow (--replay-session PATH):**
+**Hourly Market Transition:**
 
-1. **Load Session** (`SessionReplayer.load()`)
-   - Read JSONL file written by SessionRecorder
-   - Parse events (leader_trade, price_snapshot)
-   - Reconstruct session config and trade timeline
-
-2. **Replay** (`SessionReplayer.replay(strategy)`)
-   - For each recorded trade event:
-     - Look up prices from nearest price_snapshot
-     - Create MarketEvent and feed to strategy
-     - Strategy decides action
-     - Simulate fill and update portfolio
-     - Calculate realized/unrealized PnL
-   - Output ReplayResult with metrics
+1. UniversalRunner detects when within 30 seconds of hour boundary
+2. Calls _hourly_cleanup(): attempts to sell high positions, accepts losses on low prices
+3. Stops WebSocket and BlockchainDetector
+4. Waits for hour boundary + 30 second delay
+5. Clears internal state (seen trades, discovered markets)
+6. Calls _init() to reinitialize with fresh state for new hourly market
 
 **State Management:**
 
-- **Leader State**: Current positions tracked from Polymarket API snapshot
-- **Our State**: Portfolio maintained in-memory by Strategy
-- **Seen Trades**: Transaction hash deduplication set, persisted to `data/state/seen_hashes.json`
-- **Portfolio State**: Realized PnL, open positions, persisted to `data/state/portfolio_state.json` on shutdown
+- Session state: In-memory in UniversalRunner and Strategy instances
+- Persistence: `data/state/seen_hashes.json` (deduplication), `data/state/portfolio_state.json` (positions/summary)
+- Recording: SessionRecorder writes events to `data/sessions/[timestamp]_[strategy]_session.json`
+- Positions: Tracked in strategy internal state, fetched from exchange every 5 minutes for reconciliation
 
 ## Key Abstractions
 
-**Strategy (abstract base):**
-- Purpose: Encapsulates trading logic
-- Examples: `src/strategies/mirror/strategy.py`, `src/strategies/momentum/strategy.py`
-- Pattern:
-  - Initialize with config → set budget, scale ratio, caps
-  - on_event(MarketEvent) → analyze trade and prices → return TradeDecision
-  - on_fill(event, decision) → update local portfolio
-  - get_state() → return dict for persistence
-- All strategies share same interface; runner doesn't care which strategy is loaded
+**Strategy Interface:**
+- Purpose: Pluggable decision-making logic
+- Examples: `src/strategies/mirror/strategy.py`, `src/strategies/conservative/strategy.py`, `src/strategies/profit_taker/strategy.py`
+- Pattern: All extend Strategy base class, implement on_event(MarketEvent) -> TradeDecision
 
-**ExecutionAdapter (abstract base):**
-- Purpose: Decouple order placement from strategy logic
+**ExecutionAdapter Interface:**
+- Purpose: Pluggable order execution backend
 - Examples: `src/execution/dry_run.py` (NullExecutionAdapter), `src/execution/live.py` (LiveExecutionAdapter)
-- Pattern:
-  - place_order(OrderRequest) → OrderResponse
-  - Implementations vary: null logs only, live calls py-clob-client SDK
-  - Both implement same interface
-- Allows switching modes without code change
-
-**Portfolio:**
-- Purpose: Track positions and calculate PnL
-- Location: `src/core/portfolio.py`
-- Pattern:
-  - apply_buy/apply_sell: update position and cost basis
-  - Invariant checks: shares never negative, prices in (0,1)
-  - Tracks realized_pnl separately from unrealized
-  - Used by both live and replay systems
+- Pattern: All implement abstract methods (place_order, cancel_order, arm/disarm)
 
 **MarketEvent:**
-- Purpose: Immutable snapshot of trade + prices at moment of decision
+- Purpose: Immutable event packet containing trade + prices
 - Location: `src/data/models.py`
-- Contains: LeaderTrade (who, what, when) + PriceSnapshot (bid/ask at that moment)
-- Frozen dataclass ensures event semantics are preserved
+- Pattern: Passed through entire pipeline, strategies are stateless with respect to event history
+
+**Configuration Objects:**
+- Purpose: Centralized config without globals
+- Examples: `BotConfig`, `StrategyConfig`, `LeaderConfig`, `TraderConfig`
+- Pattern: Loaded from YAML, passed through dependency injection
 
 ## Entry Points
 
-**main.py:**
+**main.py (CLI) - primary:**
 - Location: `main.py`
-- Triggers: Python script invocation with CLI args
-- Responsibilities:
-  - Parse arguments (--mode, --replay-session, --optimize, etc.)
-  - Load config from YAML
-  - Branch to appropriate execution path:
-    - `--mode dry-run` → UniversalRunner with NullExecutionAdapter
-    - `--mode live` → UniversalRunner with LiveExecutionAdapter (after arm/preflight)
-    - `--replay-session PATH` → SessionReplayer.replay()
-    - `--optimize SESSION` → Optimizer.optimize()
+- Triggers: User runs `python main.py [flags]`
+- Responsibilities: Parse CLI args, load config, route to appropriate mode (live/dry-run/replay/optimize)
 
 **UniversalRunner.run():**
 - Location: `src/framework/runner.py`
-- Triggers: Called from main.py for live or dry-run modes
-- Responsibilities:
-  - Initialize data sources and adapters
-  - Poll blockchain in loop
-  - Route trades to strategy
-  - Execute orders
-  - Handle graceful shutdown (Ctrl+C)
+- Triggers: Called from main.py after setup
+- Responsibilities: Main event loop, polling blockchain, feeding events to strategy, coordinating execution
 
 **SessionReplayer.replay():**
 - Location: `src/framework/replay.py`
-- Triggers: Called from main.py for --replay-session
-- Responsibilities:
-  - Load recorded session from disk
-  - Play events sequentially through strategy
-  - Simulate order fills and PnL
-  - Output metrics
+- Triggers: Called from main.py with --replay-session flag
+- Responsibilities: Load JSON session file, replay events deterministically, compute final metrics
+
+**Optimizer.run_optimization():**
+- Location: `src/simulation/optimizer.py`
+- Triggers: Called from main.py with --optimize flag
+- Responsibilities: Grid search over strategy configs, run replayer for each variant, rank results
 
 ## Error Handling
 
-**Strategy:**
-- Errors logged, trade skipped, runner continues
-- Invalid TradeDecision (e.g., negative shares) rejected before execution
+**Strategy:** Strategies can return TradeDecision.skip() with reason if market conditions don't warrant a trade
 
-**Execution:**
-- OrderRequest validated before sending to adapter
-- Adapter returns OrderResponse with status and error message
-- Failed orders not applied to portfolio
+**Execution:** Orders validated before submission; if rejected by API, logged and stats incremented, portfolio NOT updated
 
-**Data Source:**
-- API timeouts/errors caught, empty results returned
-- Blockchain polling failures logged, runner continues polling
-- Price feed disconnects handled gracefully
+**Blockchain Detection:** Failures logged but don't crash runner; next poll attempt retries
+
+**API Rate Limiting:** LiveDataSource includes rate limiting with exponential backoff
+
+**Portfolio Invariants:** Portfolio raises PortfolioInvariantError if shares go negative or other violations detected
 
 ## Cross-Cutting Concerns
 
-**Logging:**
-- stdlib logging configured at module level (`logger = logging.getLogger(__name__)`)
-- Each layer logs at appropriate level (DEBUG: state updates, INFO: trades, WARNING: failures)
-- No console output without logger
+**Logging:** All modules use standard logging (handlers configured in runner initialization)
 
 **Validation:**
-- Portfolio: invariant checks (shares >= 0, prices in bounds)
-- Order: minimum order size checks (Polymarket constraints)
-- Strategy: capital budget and exposure caps
+- TradeDecision validates against Polymarket minimums (market order >= $1, limit order >= 5 shares)
+- Portfolio validates shares never go negative, prices in valid range (0, 1)
 
 **Authentication:**
-- Live mode: private key from environment (POLYMARKET_PRIVATE_KEY)
-- Adapter checks armed status before order placement
-- Explicit preflight check in main.py before live trading
+- Live mode requires private key from environment variable
+- Signature type (default 2) configured in TraderConfig
 
----
+**Deduplication:**
+- Content-based keys prevent replay of same trade twice: `{tx_hash}_{token_id}_{action}_{dollar_value}`
+- Seen hashes persisted across restarts (24-hour window)
 
-*Architecture analysis: 2026-01-30*
+**Rate Limiting:**
+- LiveDataSource implements token bucket rate limiting on API calls
+- WebSocket auto-reconnects with exponential backoff on disconnect
