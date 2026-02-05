@@ -519,8 +519,8 @@ def main():
     parser.add_argument('--strategy', '-s', default='profit_taker',
                         help='Strategy name (default: profit_taker)')
     parser.add_argument('--output', '-o', help='Output directory')
-    parser.add_argument('--hourly', action='store_true',
-                        help='Generate per-hour charts')
+    parser.add_argument('--no-hourly', action='store_true',
+                        help='Skip per-hour charts (default: generate hourly charts)')
 
     args = parser.parse_args()
     session_path = Path(args.session_path)
@@ -560,8 +560,8 @@ def main():
     fig.write_html(summary_path, include_plotlyjs='cdn')
     print(f"  Saved: {summary_path}")
 
-    # Create hourly charts if requested
-    if args.hourly:
+    # Create hourly charts by default (unless --no-hourly)
+    if not args.no_hourly:
         print("Creating per-market hourly charts...")
         hourly_dir = output_dir / f'{session_path.stem}_hourly'
         hourly_dir.mkdir(exist_ok=True)
