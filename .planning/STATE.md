@@ -102,6 +102,7 @@ None yet.
 | 004 | Reorganize sessions into day folders | 2026-02-04 | [004-reorganize-sessions-day-folders](./quick/004-reorganize-sessions-day-folders/) |
 | 005 | Profit taker docs, hourly split, visualization | 2026-02-04 | [005-profit-taker-hourly-viz-docs](./quick/005-profit-taker-hourly-viz-docs/) |
 | 006 | Fix viz UP/DOWN P&L charts | 2026-02-04 | [006-fix-viz-up-down-pnl-charts](./quick/006-fix-viz-up-down-pnl-charts/) |
+| 007 | Optimize strategies for consistency | 2026-02-05 | [007-optimize-strategies-for-consistency](./quick/007-optimize-strategies-for-consistency/) |
 
 ### Blockers/Concerns
 
