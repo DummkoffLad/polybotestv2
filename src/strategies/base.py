@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 if TYPE_CHECKING:
     from ..data.models import PriceSnapshot as PriceSnapshotType
 
+from ..core.types import OrderType
 from ..data.models import TradeAction, TradeSide, LeaderTrade, PriceSnapshot, MarketEvent
 
 logger = logging.getLogger(__name__)
@@ -46,12 +47,6 @@ class DecisionAction(Enum):
     BUY = "BUY"
     SELL = "SELL"
     SKIP = "SKIP"
-
-
-class OrderType(Enum):
-    """Order type for Polymarket execution."""
-    MARKET = "MARKET"
-    LIMIT = "LIMIT"
 
 
 @dataclass
