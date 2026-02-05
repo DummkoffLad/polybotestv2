@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 7.1 of 11 (Codebase Cleanup) - IN PROGRESS
-Plan: 3 of 7 in current phase
-Status: Wave 2 execution - 3 plans complete
-Last activity: 2026-02-05 — Completed 07.1-03-PLAN.md (extracted strategy mixins)
+Plan: 4 of 7 in current phase
+Status: Wave 3 execution - 4 plans complete
+Last activity: 2026-02-05 — Completed 07.1-07-PLAN.md (added strategy-specific unit tests)
 
-Progress: [███████░░░] 65% (30 of 46+ plans complete across milestones)
+Progress: [███████░░░] 67% (31 of 46+ plans complete across milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 30 (v1.0 complete, v1.1 in progress)
-- Average duration: 4.7min (all time)
-- Total execution time: 2.38 hours (all time)
+- Total plans completed: 31 (v1.0 complete, v1.1 in progress)
+- Average duration: 4.9min (all time)
+- Total execution time: 2.50 hours (all time)
 
 **By Phase:**
 
@@ -34,12 +34,12 @@ Progress: [███████░░░] 65% (30 of 46+ plans complete across 
 | 05-validation | 5 | 23min | 5min | Complete |
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
 | 07-comparison-infrastructure | 3 | 22min | 7min | Complete |
-| 07.1-codebase-cleanup | 3 | 28min | 9min | In Progress (3/7) |
+| 07.1-codebase-cleanup | 4 | 35min | 9min | In Progress (4/7) |
 
 **Recent Trend:**
-- Last 5 plans: 07.1-01 (8min), 07.1-06 (4min), 07.1-05 (5min), 07.1-03 (11min)
+- Last 5 plans: 07.1-06 (4min), 07.1-05 (5min), 07.1-03 (11min), 07.1-07 (7min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
-- Milestone v1.1: In progress (8 plans complete, Phase 7 complete, Phase 7.1 in progress)
+- Milestone v1.1: In progress (9 plans complete, Phase 7 complete, Phase 7.1 in progress)
 
 *Updated after each plan completion*
 
@@ -81,6 +81,9 @@ Recent decisions affecting v1.1 milestone:
 - **Shared calculation pattern (07.1-06):** Extract duplicated calculations into modules with clean interfaces
 - **Package structure for large modules (07.1-05):** Split 800+ line files into focused packages with loader/processor/orchestrator pattern
 - **Property delegation (07.1-05):** Expose nested state via @property for backward compatibility
+- **Dedicated strategy test files (07.1-07):** Create test_<strategy>.py for each strategy's unique logic (parameterized tests miss specifics)
+- **Local test helpers (07.1-07):** Duplicate _make_config/_make_event in each test file for strategy-specific customization
+- **Regime-specific tests (07.1-07):** Test each strategy's unique regime/zone/conviction logic explicitly
 
 ### Roadmap Evolution
 
@@ -134,9 +137,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 07.1-03-PLAN.md (extracted strategy mixins for shared behaviors)
+Stopped at: Completed 07.1-07-PLAN.md (added strategy-specific unit tests)
 Resume file: None
-Next action: Continue Phase 7.1 execution - Plans 02, 04, 07 remaining (3 cleanup plans)
+Next action: Continue Phase 7.1 execution - Plans 02, 04 remaining (2 cleanup plans)
 Testing script: `python -m src.simulation.full_optimizer data/sessions/` — runs all strategies against all sessions
 
 **v1.0 Summary (COMPLETE):**
