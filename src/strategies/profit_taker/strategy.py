@@ -38,9 +38,10 @@ logger = logging.getLogger(__name__)
 
 # Strategy parameters - Dynamic profit targets based on entry price
 # Lower prices have more room to run, higher prices closer to ceiling
-PROFIT_TARGET_LOW = Decimal("35")   # Prices < 0.30: let winners run
-PROFIT_TARGET_MID = Decimal("20")   # Prices 0.30-0.60
-PROFIT_TARGET_HIGH = Decimal("12")  # Prices > 0.60: take profits earlier
+PROFIT_TARGET_LOW = Decimal("25")   # Prices < 0.30: let winners run
+PROFIT_TARGET_MID = Decimal("15")   # Prices 0.30-0.60
+PROFIT_TARGET_HIGH = Decimal("8")  # Prices > 0.60: take profits earlier
+TRAILING_STOP_PCT = Decimal("8")  # 8% trailing stop from high water mark
 IGNORE_LEADER_MINISELLS_PCT = Decimal("10")  # Ignore sells < 10% of leader position
 MIN_LEADER_TRADE_PCT = Decimal("1")  # Skip trades < 1% of leader capital (noise filter)
 MAX_TOTAL_COST_PCT = Decimal("6")  # Stricter cost threshold (was 8%)
@@ -61,9 +62,11 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self.portfolio = Portfolio()
         self.leader_positions: Dict[str, Dict] = {}  # Track leader's positions
         self.our_entries: Dict[str, Decimal] = {}  # Our entry prices by token_id
+        self.high_water_marks: Dict[str, Decimal] = {}  # Track highest bid seen for trailing stop
         self.scale_ratio = Decimal("0")
         self.buys = self.sells = 0
         self.profit_exits = 0  # Track how many exits were profit-based
+        self.trailing_stops = 0  # Track trailing stop exits
 
     @property
     def name(self) -> str:
@@ -77,8 +80,10 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self.portfolio = Portfolio()
         self.leader_positions = {}
         self.our_entries = {}
+        self.high_water_marks = {}
         self.buys = self.sells = 0
         self.profit_exits = 0
+        self.trailing_stops = 0
         self.scale_ratio = (config.starting_capital / config.leader_capital * config.k_factor
                            if config.leader_capital > 0 else Decimal("0.1"))
 
@@ -131,26 +136,71 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             token_prices = all_prices.get(token_id)
             if not token_prices or not token_prices.bid or token_prices.bid <= 0:
                 continue
+
+            current_bid = token_prices.bid
+            entry_price = self.our_entries.get(token_id, Decimal("0"))
+
+            # Update high water mark
+            if entry_price > 0:
+                self.high_water_marks[token_id] = max(
+                    current_bid,
+                    self.high_water_marks.get(token_id, entry_price)
+                )
+
             # Check profit target
-            if self._check_profit_target(token_id, token_prices.bid):
-                logger.info(f"Taking profit on {token_id}: entry={self.our_entries.get(token_id)}, bid={token_prices.bid}")
+            if self._check_profit_target(token_id, current_bid):
+                logger.info(f"Taking profit on {token_id}: entry={entry_price}, bid={current_bid}")
                 self.profit_exits += 1
-                return self._exit_position(pos, token_prices.bid, "profit_target",
+                return self._exit_position(pos, current_bid, "profit_target",
                                           token_id=token_id, market_id=pos.market_id, side=pos.side)
+
+            # Check trailing stop (only if we've been in profit)
+            high_water = self.high_water_marks.get(token_id, entry_price)
+            if high_water > entry_price and entry_price > 0:
+                # We've been in profit - check if price dropped enough from high
+                drawdown_from_high = (high_water - current_bid) / high_water * 100
+                if drawdown_from_high >= TRAILING_STOP_PCT:
+                    logger.info(f"Trailing stop on {token_id}: high={high_water}, bid={current_bid}, drawdown={drawdown_from_high:.2f}%")
+                    self.trailing_stops += 1
+                    return self._exit_position(pos, current_bid, "trailing_stop",
+                                              token_id=token_id, market_id=pos.market_id, side=pos.side)
+
             # Check extreme prices
-            if token_prices.bid >= PRICE_EXTREME_HIGH:
-                return self._exit_position(pos, token_prices.bid, "extreme_price",
+            if current_bid >= PRICE_EXTREME_HIGH:
+                return self._exit_position(pos, current_bid, "extreme_price",
                                           token_id=token_id, market_id=pos.market_id, side=pos.side)
 
         # Fallback: check current token (for compatibility)
         pos = self.portfolio.get(trade.token_id, trade.market_id, to_side(trade.side))
         if pos.shares > 0 and prices.bid and prices.bid > 0:
-            if self._check_profit_target(trade.token_id, prices.bid):
-                logger.info(f"Taking profit on {trade.token_id}: entry={self.our_entries.get(trade.token_id)}, bid={prices.bid}")
+            current_bid = prices.bid
+            entry_price = self.our_entries.get(trade.token_id, Decimal("0"))
+
+            # Update high water mark
+            if entry_price > 0:
+                self.high_water_marks[trade.token_id] = max(
+                    current_bid,
+                    self.high_water_marks.get(trade.token_id, entry_price)
+                )
+
+            # Check profit target
+            if self._check_profit_target(trade.token_id, current_bid):
+                logger.info(f"Taking profit on {trade.token_id}: entry={entry_price}, bid={current_bid}")
                 self.profit_exits += 1
-                return self._exit_position(pos, prices.bid, "profit_target")
-            if prices.bid >= PRICE_EXTREME_HIGH:
-                return self._exit_position(pos, prices.bid, "extreme_price")
+                return self._exit_position(pos, current_bid, "profit_target")
+
+            # Check trailing stop (only if we've been in profit)
+            high_water = self.high_water_marks.get(trade.token_id, entry_price)
+            if high_water > entry_price and entry_price > 0:
+                drawdown_from_high = (high_water - current_bid) / high_water * 100
+                if drawdown_from_high >= TRAILING_STOP_PCT:
+                    logger.info(f"Trailing stop on {trade.token_id}: high={high_water}, bid={current_bid}, drawdown={drawdown_from_high:.2f}%")
+                    self.trailing_stops += 1
+                    return self._exit_position(pos, current_bid, "trailing_stop")
+
+            # Check extreme prices
+            if current_bid >= PRICE_EXTREME_HIGH:
+                return self._exit_position(pos, current_bid, "extreme_price")
 
         # Now handle leader's action
         if trade.action == TradeAction.BUY:
@@ -296,10 +346,13 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             self.our_entries[token_id] = price
         elif decision.action == DecisionAction.SELL:
             self.portfolio.apply_sell(token_id, market_id, side, shares, price)
-            # Clear entry if fully exited
+            # Clear entry and high water mark if fully exited
             pos = self.portfolio.get(token_id, market_id, side)
-            if pos.shares <= 0 and token_id in self.our_entries:
-                del self.our_entries[token_id]
+            if pos.shares <= 0:
+                if token_id in self.our_entries:
+                    del self.our_entries[token_id]
+                if token_id in self.high_water_marks:
+                    del self.high_water_marks[token_id]
 
         # Track leader positions
         if trade.action == TradeAction.BUY:
@@ -323,11 +376,14 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             "positions": positions,
             "total_deployed": str(self.portfolio.get_total_deployed()),
             "realized_pnl": str(self.portfolio.realized_pnl),
+            "total_bought": str(self.portfolio.total_bought),
+            "total_sold": str(self.portfolio.total_sold),
             "hourly_budget_used": str(self.hourly_budget_used),
             "buys": self.buys,
             "sells": self.sells,
             "skips": self.skips,
             "profit_exits": self.profit_exits,
+            "trailing_stops": self.trailing_stops,
             "skip_reasons": self.skip_reasons
         }
 
@@ -337,9 +393,12 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             "sells_executed": self.sells,
             "skips": self.skips,
             "profit_exits": self.profit_exits,
+            "trailing_stops": self.trailing_stops,
             "skip_reasons": self.skip_reasons,
             "total_deployed": str(self.portfolio.get_total_deployed()),
-            "realized_pnl": str(self.portfolio.realized_pnl)
+            "realized_pnl": str(self.portfolio.realized_pnl),
+            "total_bought": str(self.portfolio.total_bought),
+            "total_sold": str(self.portfolio.total_sold)
         }
 
     def calculate_pnl(self, final_prices: Dict[str, PriceSnapshot]) -> Tuple[Decimal, Decimal]:
