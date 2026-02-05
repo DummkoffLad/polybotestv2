@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Reproduce the leader's profitable trades at a smaller scale with sizing that maximizes returns while protecting capital — every dollar matters at this budget.
-**Current focus:** Phase 8 - Failure Mode Analysis (milestone v1.1)
+**Current focus:** Phase 7.1 - Codebase Cleanup (milestone v1.1)
 
 ## Current Position
 
-Phase: 7 of 11 (Comparison Infrastructure) - COMPLETE
-Plan: 3 of 3 in current phase - COMPLETE
-Status: Phase 7 complete, ready for Phase 8
-Last activity: 2026-02-04 — Completed quick-005 (profit_taker docs & tools)
+Phase: 7.1 of 11 (Codebase Cleanup) - IN PROGRESS
+Plan: 4 of 7 in current phase
+Status: Wave 1 execution - 4 plans complete
+Last activity: 2026-02-05 — Completed 07.1-04-PLAN.md (removed optimizer_old.py)
 
-Progress: [██████░░░░] 64% (27 of 42+ plans complete across milestones)
+Progress: [██████░░░░] 67% (31 of 46+ plans complete across milestones)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 27 (v1.0 complete, v1.1 in progress)
+- Total plans completed: 31 (v1.0 complete, v1.1 in progress)
 - Average duration: 4.5min (all time)
-- Total execution time: 1.96 hours (all time)
+- Total execution time: 2.16 hours (all time)
 
 **By Phase:**
 
@@ -34,11 +34,12 @@ Progress: [██████░░░░] 64% (27 of 42+ plans complete across 
 | 05-validation | 5 | 23min | 5min | Complete |
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
 | 07-comparison-infrastructure | 3 | 22min | 7min | Complete |
+| 07.1-codebase-cleanup | 4 | 20min | 5min | In Progress (4/7) |
 
 **Recent Trend:**
-- Last 5 plans: 06-03 (3min), 07-01 (5min), 07-02 (6min), 07-03 (11min)
+- Last 5 plans: 07-03 (11min), 07.1-01 (5min), 07.1-02 (5min), 07.1-03 (5min), 07.1-04 (5min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
-- Milestone v1.1: In progress (6 plans complete, Phase 7 complete)
+- Milestone v1.1: In progress (10 plans complete, Phase 7 complete, Phase 7.1 in progress)
 
 *Updated after each plan completion*
 
@@ -72,6 +73,11 @@ Recent decisions affecting v1.1 milestone:
 - **Net Cash as primary metric (quick-006):** Show received - spent as main line, spent/received as context
 - **Logical subplot order (quick-006):** Portfolio -> Cash -> Unrealized -> Realized for narrative flow
 - **Hourly charts default (quick-006):** Generate per-market hourly charts by default (--no-hourly to skip)
+- **Delete optimizer_old.py (07.1-04):** Removed 877 lines of dead code with zero active references - superseded by SimpleOptimizer
+
+### Roadmap Evolution
+
+- Phase 7.1 inserted after Phase 7: Codebase Cleanup (URGENT) — addresses 29 duplicated utility functions, inconsistent enums, 877 lines dead code, 4 untested strategies
 
 ### Pending Todos
 
@@ -120,10 +126,10 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-04
-Stopped at: Completed quick-006 (visualization improvements)
+Last session: 2026-02-05
+Stopped at: Completed 07.1-04-PLAN.md (removed optimizer_old.py dead code)
 Resume file: None
-Next action: Phase 8 (Failure Mode Analysis)
+Next action: Continue Phase 7.1 execution - Plan 05 (handle untested strategies)
 Testing script: `python -m src.simulation.full_optimizer data/sessions/` — runs all strategies against all sessions
 
 **v1.0 Summary (COMPLETE):**
@@ -137,8 +143,9 @@ Testing script: `python -m src.simulation.full_optimizer data/sessions/` — run
 - Research: Validate significance → Compare → Analyze → Validate → Build → Monitor
 - NEW DATA (2026-02-04): Second run lost money on ALL strategies — must investigate regime difference
 - **Phase 7 COMPLETE:** Comparison infrastructure ready (97 tests, 10 module exports)
+- **Phase 7.1 IN PROGRESS:** Codebase cleanup (4/7 plans complete - 877 lines dead code removed, enums deduplicated, shared utils established)
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-04 after 07-03-PLAN.md completion*
+*Last updated: 2026-02-05 after 07.1-04-PLAN.md completion*
 *Milestone: v1.1 Beat Conservative*
