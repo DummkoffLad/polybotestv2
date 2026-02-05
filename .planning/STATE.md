@@ -69,6 +69,9 @@ Recent decisions affecting v1.1 milestone:
 - **Keep profit_taker params (quick-005):** Current 35/20/12% optimal given 2 sessions - avoid overfitting
 - **ET timezone for hourly analysis (quick-005):** Polymarket operates on US Eastern Time
 - **Max 10 tokens per viz (quick-005):** Prevent overwhelming charts with too many subplots
+- **Net Cash as primary metric (quick-006):** Show received - spent as main line, spent/received as context
+- **Logical subplot order (quick-006):** Portfolio -> Cash -> Unrealized -> Realized for narrative flow
+- **Hourly charts default (quick-006):** Generate per-market hourly charts by default (--no-hourly to skip)
 
 ### Pending Todos
 
@@ -82,6 +85,7 @@ None yet.
 | 003 | Refactor strategy cost to use real spread | 2026-02-04 | [003-refactor-strategy-config-real-spread](./quick/003-refactor-strategy-config-real-spread/) |
 | 004 | Reorganize sessions into day folders | 2026-02-04 | [004-reorganize-sessions-day-folders](./quick/004-reorganize-sessions-day-folders/) |
 | 005 | Profit taker docs, hourly split, visualization | 2026-02-04 | [005-profit-taker-hourly-viz-docs](./quick/005-profit-taker-hourly-viz-docs/) |
+| 006 | Fix viz UP/DOWN P&L charts | 2026-02-04 | [006-fix-viz-up-down-pnl-charts](./quick/006-fix-viz-up-down-pnl-charts/) |
 
 ### Blockers/Concerns
 
@@ -117,7 +121,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-04
-Stopped at: Completed quick-005 (profit_taker docs, hourly splitting, visualization)
+Stopped at: Completed quick-006 (visualization improvements)
 Resume file: None
 Next action: Phase 8 (Failure Mode Analysis)
 Testing script: `python -m src.simulation.full_optimizer data/sessions/` — runs all strategies against all sessions
