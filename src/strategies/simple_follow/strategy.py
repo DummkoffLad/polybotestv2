@@ -29,6 +29,7 @@ from ..base import (
     register_strategy, MIN_LIMIT_ORDER_SHARES, PRICE_EXTREME_HIGH, PRICE_EXTREME_LOW
 )
 from ...data.models import MarketEvent, PriceSnapshot, TradeAction, TradeSide
+from ...analysis.pnl_calculator import calculate_strategy_pnl
 from ..utils import to_side
 
 logger = logging.getLogger(__name__)
@@ -428,8 +429,4 @@ class SimpleFollowStrategy(Strategy):
         }
 
     def calculate_pnl(self, final_prices: Dict[str, PriceSnapshot]) -> Tuple[Decimal, Decimal]:
-        unrealized = Decimal("0")
-        for tid, p in self.portfolio.get_positions().items():
-            if tid in final_prices and final_prices[tid].bid:
-                unrealized += p.shares * final_prices[tid].bid - p.cost_basis
-        return self.portfolio.realized_pnl, unrealized
+        return calculate_strategy_pnl(self.portfolio, final_prices)

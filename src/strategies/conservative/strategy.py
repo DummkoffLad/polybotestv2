@@ -28,6 +28,8 @@ from ..base import (
     calculate_actual_spread_pct
 )
 from ...data.models import MarketEvent, PriceSnapshot, TradeAction, TradeSide
+from ...analysis.pnl_calculator import calculate_strategy_pnl
+from ..mixins import SkipHelperMixin, HourlyBudgetMixin
 from ..utils import to_side
 
 logger = logging.getLogger(__name__)
@@ -43,41 +45,33 @@ MIN_LEADER_TRADE_PCT = Decimal("1")  # Skip trades < 1% of leader capital
 
 
 @register_strategy
-class ConservativeMirrorStrategy(Strategy):
+class ConservativeMirrorStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
 
     def __init__(self):
+        SkipHelperMixin.__init__(self)
+        HourlyBudgetMixin.__init__(self)
         self.config: Optional[StrategyConfig] = None
         self.portfolio = Portfolio()
         self.leader_tracker: Dict[str, Dict] = {}
         self.scale_ratio = Decimal("0")
-        self.hourly_budget_used = Decimal("0")
-        self._current_hour: Optional[int] = None
-        self.buys = self.sells = self.skips = 0
-        self.skip_reasons: Dict[str, int] = {}
+        self.buys = self.sells = 0
 
     @property
     def name(self) -> str:
         return "conservative_mirror"
 
     def initialize(self, config: StrategyConfig) -> None:
+        SkipHelperMixin.__init__(self)
+        HourlyBudgetMixin.__init__(self)
+        self._current_hour = datetime.now(timezone.utc).hour
         self.config = config
         self.portfolio = Portfolio()
         self.leader_tracker = {}
-        self.hourly_budget_used = Decimal("0")
-        self._current_hour = datetime.now(timezone.utc).hour
-        self.buys = self.sells = self.skips = 0
-        self.skip_reasons = {}
+        self.buys = self.sells = 0
         # Use lower effective k_factor for conservative sizing
         effective_k = config.k_factor * K_FACTOR_MULT
         self.scale_ratio = (config.starting_capital / config.leader_capital * effective_k
                             if config.leader_capital > 0 else Decimal("0.05"))
-
-    def _check_hourly_reset(self, event_time: datetime) -> None:
-        current_hour = event_time.hour
-        if self._current_hour is not None and current_hour != self._current_hour:
-            logger.info(f"Hourly budget reset: ${self.hourly_budget_used:.2f} used last hour")
-            self.hourly_budget_used = Decimal("0")
-        self._current_hour = current_hour
 
     def _check_extreme_prices(self, event: MarketEvent) -> Optional[TradeDecision]:
         """Check for price extremes - auto-sell at 0.99, treat 0.01 as 0."""
@@ -221,11 +215,6 @@ class ConservativeMirrorStrategy(Strategy):
         self.sells += 1
         return TradeDecision.sell(shares * bid, shares, bid)
 
-    def _skip(self, reason: str) -> TradeDecision:
-        self.skips += 1
-        self.skip_reasons[reason] = self.skip_reasons.get(reason, 0) + 1
-        return TradeDecision.skip(reason)
-
     def on_fill(self, event: MarketEvent, decision: TradeDecision) -> None:
         trade = event.trade
         side = to_side(trade.side)
@@ -274,7 +263,4 @@ class ConservativeMirrorStrategy(Strategy):
                 "total_sold": str(self.portfolio.total_sold)}
 
     def calculate_pnl(self, final_prices: Dict[str, PriceSnapshot]) -> Tuple[Decimal, Decimal]:
-        unrealized = sum((p.shares * final_prices[tid].bid - p.cost_basis
-                          for tid, p in self.portfolio.get_positions().items()
-                          if tid in final_prices and final_prices[tid].bid), Decimal("0"))
-        return self.portfolio.realized_pnl, unrealized
+        return calculate_strategy_pnl(self.portfolio, final_prices)

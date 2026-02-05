@@ -30,6 +30,8 @@ from ..base import (
     calculate_actual_spread_pct
 )
 from ...data.models import MarketEvent, PriceSnapshot, TradeAction, TradeSide
+from ...analysis.pnl_calculator import calculate_strategy_pnl
+from ..mixins import SkipHelperMixin, HourlyBudgetMixin
 from ..utils import to_side
 
 logger = logging.getLogger(__name__)
@@ -49,19 +51,18 @@ GLOBAL_EXPOSURE_PCT = Decimal("85")
 
 
 @register_strategy
-class ProfitTakerStrategy(Strategy):
+class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
     """Copy buys, exit on profit target or leader exit."""
 
     def __init__(self):
+        SkipHelperMixin.__init__(self)
+        HourlyBudgetMixin.__init__(self)
         self.config: Optional[StrategyConfig] = None
         self.portfolio = Portfolio()
         self.leader_positions: Dict[str, Dict] = {}  # Track leader's positions
         self.our_entries: Dict[str, Decimal] = {}  # Our entry prices by token_id
         self.scale_ratio = Decimal("0")
-        self.hourly_budget_used = Decimal("0")
-        self._current_hour: Optional[int] = None
-        self.buys = self.sells = self.skips = 0
-        self.skip_reasons: Dict[str, int] = {}
+        self.buys = self.sells = 0
         self.profit_exits = 0  # Track how many exits were profit-based
 
     @property
@@ -345,7 +346,4 @@ class ProfitTakerStrategy(Strategy):
         }
 
     def calculate_pnl(self, final_prices: Dict[str, PriceSnapshot]) -> Tuple[Decimal, Decimal]:
-        unrealized = sum((p.shares * final_prices[tid].bid - p.cost_basis
-                         for tid, p in self.portfolio.get_positions().items()
-                         if tid in final_prices and final_prices[tid].bid), Decimal("0"))
-        return self.portfolio.realized_pnl, unrealized
+        return calculate_strategy_pnl(self.portfolio, final_prices)
