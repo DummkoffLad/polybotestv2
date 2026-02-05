@@ -109,7 +109,7 @@ class FullOptimizer:
         optimizer.print_summary(results)
     """
     
-    def __init__(self, session_path: Path, leader_capital: Decimal = Decimal("800")):
+    def __init__(self, session_path: Path, leader_capital: Decimal = Decimal("900")):
         self.session_path = Path(session_path)
         self.leader_capital = leader_capital
     
@@ -245,7 +245,7 @@ class FullOptimizer:
         return all_flat
 
 
-def run_full_optimization(session_path: str, leader_capital: float = 800.0) -> Dict[str, StrategyModeResults]:
+def run_full_optimization(session_path: str, leader_capital: float = 900.0) -> Dict[str, StrategyModeResults]:
     """Main entry point for full optimization."""
     optimizer = FullOptimizer(
         Path(session_path),
@@ -270,7 +270,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Full Strategy Optimizer")
     parser.add_argument("session_path", help="Path to session .jsonl file")
-    parser.add_argument("--leader-capital", type=float, default=800.0)
+    parser.add_argument("--leader-capital", type=float, default=900.0)
     
     args = parser.parse_args()
     run_full_optimization(args.session_path, args.leader_capital)
