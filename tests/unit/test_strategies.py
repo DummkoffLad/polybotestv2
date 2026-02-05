@@ -98,9 +98,9 @@ def _make_config(**overrides) -> StrategyConfig:
 ALL_STRATEGIES = list_strategies()
 
 
-def test_strategy_count_is_eight():
-    """Verify exactly 8 strategies are registered."""
-    assert len(ALL_STRATEGIES) == 8, f"Expected 8 strategies, got {len(ALL_STRATEGIES)}: {ALL_STRATEGIES}"
+def test_strategy_count_is_nine():
+    """Verify exactly 10 strategies are registered."""
+    assert len(ALL_STRATEGIES) == 10, f"Expected 10 strategies, got {len(ALL_STRATEGIES)}: {ALL_STRATEGIES}"
 
 
 # ============================================================================
