@@ -43,6 +43,8 @@ class Trade:
     """A buy or sell trade."""
     timestamp: datetime
     token_id: str
+    market_id: str
+    side: str  # 'UP' or 'DOWN'
     action: str  # 'BUY' or 'SELL'
     shares: float
     price: float
@@ -66,10 +68,19 @@ def load_session_events(session_path: Path) -> Tuple[List[dict], List[dict]]:
     return snapshots, trades
 
 
+@dataclass
+class TokenInfo:
+    """Token metadata from leader trades."""
+    token_id: str
+    market_id: str
+    side: str  # 'UP' or 'DOWN'
+
+
 def run_tracking(session_path: Path, strategy_name: str) -> Tuple[
     List[PortfolioState],  # State at each snapshot
     List[Trade],           # Our executed trades
     Dict[str, List[Tuple[datetime, float]]],  # Price history per token
+    Dict[str, TokenInfo],  # Token metadata (market_id, side)
 ]:
     """Run strategy and track portfolio state at each price snapshot."""
 
@@ -91,12 +102,22 @@ def run_tracking(session_path: Path, strategy_name: str) -> Tuple[
     states: List[PortfolioState] = []
     our_trades: List[Trade] = []
     price_history: Dict[str, List[Tuple[datetime, float]]] = defaultdict(list)
+    token_info: Dict[str, TokenInfo] = {}
 
     cash_spent = Decimal("0")
     cash_received = Decimal("0")
 
     # Current prices from latest snapshot
     current_prices: Dict[str, Decimal] = {}
+
+    # Pre-populate token_info from all leader trades in the file
+    for trade_data in trades_raw:
+        lt = trade_data.get('leader_trade', {})
+        tid = lt.get('token_id')
+        mid = lt.get('market_id')
+        side = lt.get('side')
+        if tid and mid and side:
+            token_info[tid] = TokenInfo(token_id=tid, market_id=mid, side=side)
 
     # Process events in order
     trade_idx = 0
@@ -137,10 +158,14 @@ def run_tracking(session_path: Path, strategy_name: str) -> Tuple[
                     # Record our trade
                     meta = decision.metadata
                     token_id = meta.get('token_id', event.trade.token_id)
+                    market_id = meta.get('market_id', event.trade.market_id)
+                    side = meta.get('side', event.trade.side.value if hasattr(event.trade.side, 'value') else str(event.trade.side))
 
                     our_trades.append(Trade(
                         timestamp=trade_time,
                         token_id=token_id,
+                        market_id=market_id,
+                        side=side,
                         action='BUY' if decision.action == DecisionAction.BUY else 'SELL',
                         shares=float(decision.shares or 0),
                         price=float(decision.price or 0),
@@ -181,26 +206,37 @@ def run_tracking(session_path: Path, strategy_name: str) -> Tuple[
             position_count=position_count
         ))
 
-    return states, our_trades, dict(price_history)
+    return states, our_trades, dict(price_history), token_info
 
 
 def create_hourly_charts(
     price_history: Dict[str, List[Tuple[datetime, float]]],
     trades: List[Trade],
+    token_info: Dict[str, TokenInfo],
     session_name: str,
     output_dir: Path
 ) -> List[Path]:
-    """Create per-hour price charts with trade markers."""
+    """Create per-hour, per-market price charts with trade markers.
+
+    Each market shows both UP and DOWN token prices on the same subplot.
+    """
     et = ZoneInfo('America/New_York')
 
-    # Group by hour
-    hours: Dict[int, Dict[str, List[Tuple[datetime, float]]]] = defaultdict(lambda: defaultdict(list))
+    # Group price history by hour and market
+    # Structure: hours[hour][market_id] = {side: [(ts, price), ...]}
+    hours: Dict[int, Dict[str, Dict[str, List[Tuple[datetime, float]]]]] = defaultdict(
+        lambda: defaultdict(lambda: {'UP': [], 'DOWN': []})
+    )
     trades_by_hour: Dict[int, List[Trade]] = defaultdict(list)
 
     for token_id, history in price_history.items():
+        info = token_info.get(token_id)
+        if not info:
+            continue  # Skip tokens we don't have market info for
+
         for ts, price in history:
             hour = ts.astimezone(et).hour
-            hours[hour][token_id].append((ts, price))
+            hours[hour][info.market_id][info.side].append((ts, price))
 
     for trade in trades:
         hour = trade.timestamp.astimezone(et).hour
@@ -209,80 +245,112 @@ def create_hourly_charts(
     created_files = []
 
     for hour in sorted(hours.keys()):
-        tokens_data = hours[hour]
+        markets_data = hours[hour]
         hour_trades = trades_by_hour[hour]
 
-        # Get top 6 most active tokens
-        sorted_tokens = sorted(tokens_data.items(), key=lambda x: len(x[1]), reverse=True)[:6]
+        # Sort markets by activity (total price points)
+        sorted_markets = sorted(
+            markets_data.items(),
+            key=lambda x: len(x[1]['UP']) + len(x[1]['DOWN']),
+            reverse=True
+        )[:4]  # Top 4 markets per hour (as expected)
 
-        if not sorted_tokens:
+        if not sorted_markets:
             continue
 
-        # Create subplot for each token
-        n_tokens = len(sorted_tokens)
+        # Create subplot for each market
+        n_markets = len(sorted_markets)
         fig = make_subplots(
-            rows=n_tokens, cols=1,
+            rows=n_markets, cols=1,
             shared_xaxes=True,
-            vertical_spacing=0.05,
-            subplot_titles=[f"Token {tid[:12]}..." for tid, _ in sorted_tokens]
+            vertical_spacing=0.08,
+            subplot_titles=[f"Market {mid[:16]}..." for mid, _ in sorted_markets]
         )
 
-        for row, (token_id, history) in enumerate(sorted_tokens, 1):
-            times = [ts.astimezone(et) for ts, _ in history]
-            prices = [p for _, p in history]
+        colors = {'UP': 'blue', 'DOWN': 'red'}
 
-            # Price line
-            fig.add_trace(
-                go.Scattergl(
-                    x=times,
-                    y=prices,
-                    mode='lines',
-                    name=f'Price',
-                    line=dict(width=1),
-                    showlegend=(row == 1)
-                ),
-                row=row, col=1
-            )
+        for row, (market_id, sides_data) in enumerate(sorted_markets, 1):
+            # Plot both UP and DOWN price lines
+            for side in ['UP', 'DOWN']:
+                history = sides_data[side]
+                if not history:
+                    continue
 
-            # Add trades for this token
-            token_trades = [t for t in hour_trades if t.token_id == token_id]
+                # Sort by time
+                history_sorted = sorted(history, key=lambda x: x[0])
+                times = [ts.astimezone(et) for ts, _ in history_sorted]
+                prices = [p for _, p in history_sorted]
 
-            buys = [t for t in token_trades if t.action == 'BUY']
-            sells = [t for t in token_trades if t.action == 'SELL']
-
-            if buys:
                 fig.add_trace(
-                    go.Scatter(
-                        x=[t.timestamp.astimezone(et) for t in buys],
-                        y=[t.price for t in buys],
-                        mode='markers',
-                        name='BUY',
-                        marker=dict(symbol='triangle-up', size=10, color='green'),
-                        showlegend=(row == 1),
-                        hovertemplate='BUY %{y:.4f}<extra></extra>'
+                    go.Scattergl(
+                        x=times,
+                        y=prices,
+                        mode='lines',
+                        name=f'{side}',
+                        line=dict(width=1.5, color=colors[side]),
+                        showlegend=(row == 1)
                     ),
                     row=row, col=1
                 )
 
-            if sells:
-                fig.add_trace(
-                    go.Scatter(
-                        x=[t.timestamp.astimezone(et) for t in sells],
-                        y=[t.price for t in sells],
-                        mode='markers',
-                        name='SELL',
-                        marker=dict(symbol='triangle-down', size=10, color='red'),
-                        showlegend=(row == 1),
-                        hovertemplate='SELL %{y:.4f}<extra></extra>'
-                    ),
-                    row=row, col=1
-                )
+            # Add trades for this market
+            market_trades = [t for t in hour_trades if t.market_id == market_id]
+
+            for side in ['UP', 'DOWN']:
+                side_trades = [t for t in market_trades if t.side == side]
+                buys = [t for t in side_trades if t.action == 'BUY']
+                sells = [t for t in side_trades if t.action == 'SELL']
+
+                if buys:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[t.timestamp.astimezone(et) for t in buys],
+                            y=[t.price for t in buys],
+                            mode='markers',
+                            name=f'BUY {side}',
+                            marker=dict(
+                                symbol='triangle-up', size=12,
+                                color='green',
+                                line=dict(width=1, color='darkgreen')
+                            ),
+                            showlegend=(row == 1 and side == 'UP'),
+                            hovertemplate=f'BUY {side}<br>$%{{y:.4f}}<br>%{{x}}<extra></extra>'
+                        ),
+                        row=row, col=1
+                    )
+
+                if sells:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=[t.timestamp.astimezone(et) for t in sells],
+                            y=[t.price for t in sells],
+                            mode='markers',
+                            name=f'SELL {side}',
+                            marker=dict(
+                                symbol='triangle-down', size=12,
+                                color='orange',
+                                line=dict(width=1, color='darkorange')
+                            ),
+                            showlegend=(row == 1 and side == 'UP'),
+                            hovertemplate=f'SELL {side}<br>$%{{y:.4f}}<br>%{{x}}<extra></extra>'
+                        ),
+                        row=row, col=1
+                    )
+
+        # Count trades in this hour
+        total_buys = sum(1 for t in hour_trades if t.action == 'BUY')
+        total_sells = sum(1 for t in hour_trades if t.action == 'SELL')
 
         fig.update_layout(
-            title=f'{session_name} - Hour {hour:02d} ET',
-            height=200 * n_tokens,
-            showlegend=True
+            title=f'{session_name} - Hour {hour:02d} ET ({total_buys} buys, {total_sells} sells)',
+            height=250 * n_markets,
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0.5, xanchor="center")
         )
+
+        # Update y-axes
+        for i in range(1, n_markets + 1):
+            fig.update_yaxes(title_text="Price", row=i, col=1)
 
         output_path = output_dir / f'{session_name}_hour_{hour:02d}.html'
         fig.write_html(output_path, include_plotlyjs='cdn')
@@ -315,10 +383,10 @@ def create_summary_chart(
         shared_xaxes=True,
         vertical_spacing=0.06,
         subplot_titles=(
-            'Portfolio Value (Position Holdings)',
-            'Cash Flow (Spent vs Received)',
-            'Realized P&L',
-            'Unrealized P&L (Could Have Profited More?)'
+            'Portfolio Value (Position Holdings at Current Prices)',
+            'Net Cash (Received - Spent)',
+            'Unrealized P&L (Paper Gains/Losses)',
+            'Realized P&L (Locked In Gains/Losses)'
         ),
         row_heights=[0.25, 0.25, 0.25, 0.25]
     )
@@ -360,31 +428,31 @@ def create_summary_chart(
             row=1, col=1
         )
 
-    # Plot 2: Cash flow
+    # Plot 2: Net Cash (primary) with spent/received context
+    fig.add_trace(
+        go.Scattergl(x=times, y=net_cash, mode='lines',
+                    name='Net Cash', line=dict(color='darkblue', width=2.5)),
+        row=2, col=1
+    )
     fig.add_trace(
         go.Scattergl(x=times, y=cash_spent, mode='lines',
-                    name='Cash Spent', line=dict(color='orange', width=1.5)),
+                    name='Cash Spent', line=dict(color='orange', width=1, dash='dot'),
+                    opacity=0.5),
         row=2, col=1
     )
     fig.add_trace(
         go.Scattergl(x=times, y=cash_received, mode='lines',
-                    name='Cash Received', line=dict(color='green', width=1.5)),
+                    name='Cash Received', line=dict(color='green', width=1, dash='dot'),
+                    opacity=0.5),
         row=2, col=1
     )
+    fig.add_hline(y=0, line_dash="dash", line_color="gray", row=2, col=1)
 
-    # Plot 3: Realized P&L
-    fig.add_trace(
-        go.Scattergl(x=times, y=realized_pnls, mode='lines',
-                    name='Realized P&L', line=dict(color='purple', width=1.5)),
-        row=3, col=1
-    )
-    fig.add_hline(y=0, line_dash="dash", line_color="gray", row=3, col=1)
-
-    # Plot 4: Unrealized P&L with max envelope
+    # Plot 3: Unrealized P&L with max envelope
     fig.add_trace(
         go.Scattergl(x=times, y=unrealized_pnls, mode='lines',
                     name='Unrealized P&L', line=dict(color='teal', width=1.5)),
-        row=4, col=1
+        row=3, col=1
     )
 
     # Max unrealized envelope
@@ -398,6 +466,19 @@ def create_summary_chart(
     fig.add_trace(
         go.Scattergl(x=times, y=max_unrealized, mode='lines',
                     name='Max Unrealized (Peak)', line=dict(color='gold', width=1, dash='dot')),
+        row=3, col=1
+    )
+    fig.add_hline(y=0, line_dash="dash", line_color="gray", row=3, col=1)
+
+    # Plot 4: Realized P&L with Total P&L
+    fig.add_trace(
+        go.Scattergl(x=times, y=realized_pnls, mode='lines',
+                    name='Realized P&L', line=dict(color='purple', width=1.5)),
+        row=4, col=1
+    )
+    fig.add_trace(
+        go.Scattergl(x=times, y=total_pnls, mode='lines',
+                    name='Total P&L (Realized + Unrealized)', line=dict(color='darkgreen', width=2)),
         row=4, col=1
     )
     fig.add_hline(y=0, line_dash="dash", line_color="gray", row=4, col=1)
@@ -423,9 +504,9 @@ def create_summary_chart(
 
     fig.update_xaxes(title_text="Time (ET)", row=4, col=1)
     fig.update_yaxes(title_text="$ Value", row=1, col=1)
-    fig.update_yaxes(title_text="$ Cash", row=2, col=1)
-    fig.update_yaxes(title_text="$ Realized", row=3, col=1)
-    fig.update_yaxes(title_text="$ Unrealized", row=4, col=1)
+    fig.update_yaxes(title_text="$ Net Cash", row=2, col=1)
+    fig.update_yaxes(title_text="$ Unrealized", row=3, col=1)
+    fig.update_yaxes(title_text="$ P&L", row=4, col=1)
 
     return fig
 
@@ -453,10 +534,11 @@ def main():
 
     # Run tracking
     print("Running replay with snapshot tracking...")
-    states, trades, price_history = run_tracking(session_path, args.strategy)
+    states, trades, price_history, token_info = run_tracking(session_path, args.strategy)
 
     print(f"  Snapshots tracked: {len(states)}")
     print(f"  Our trades: {len(trades)} ({sum(1 for t in trades if t.action=='BUY')} buys, {sum(1 for t in trades if t.action=='SELL')} sells)")
+    print(f"  Tokens with market info: {len(token_info)}")
 
     if states:
         final = states[-1]
@@ -480,10 +562,10 @@ def main():
 
     # Create hourly charts if requested
     if args.hourly:
-        print("Creating hourly charts...")
+        print("Creating per-market hourly charts...")
         hourly_dir = output_dir / f'{session_path.stem}_hourly'
         hourly_dir.mkdir(exist_ok=True)
-        hourly_files = create_hourly_charts(price_history, trades, session_path.stem, hourly_dir)
+        hourly_files = create_hourly_charts(price_history, trades, token_info, session_path.stem, hourly_dir)
         print(f"  Created {len(hourly_files)} hourly charts in {hourly_dir}")
 
 
