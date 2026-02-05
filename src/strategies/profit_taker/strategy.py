@@ -162,7 +162,9 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         """Copy leader's buy."""
         trade, prices, cfg = event.trade, event.prices, self.config
         ask = prices.ask
-        if not ask or ask <= 0 or ask >= Decimal("1"):
+        if not ask or ask <= 0:
+            return self._skip("no_price")
+        if ask >= Decimal("1"):
             return self._skip("invalid_price")
 
         # Skip extreme low prices (0.01 or below - treated as zero value)
@@ -232,7 +234,9 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             return self._skip("no_position")
 
         bid = prices.bid
-        if not bid or bid <= 0 or bid >= Decimal("1"):
+        if not bid or bid <= 0:
+            return self._skip("no_price")
+        if bid >= Decimal("1"):
             return self._skip("invalid_price")
 
         # Ignore mini-sells (leader rebalancing, not exiting)
