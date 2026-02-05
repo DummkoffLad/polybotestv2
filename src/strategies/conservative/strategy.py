@@ -28,6 +28,7 @@ from ..base import (
     calculate_actual_spread_pct
 )
 from ...data.models import MarketEvent, PriceSnapshot, TradeAction, TradeSide
+from ..utils import to_side
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,6 @@ GLOBAL_EXPOSURE_PCT = Decimal("80")
 MAX_TOTAL_COST_PCT = Decimal("6")
 K_FACTOR_MULT = Decimal("0.7")  # Applied on top of config k_factor
 MIN_LEADER_TRADE_PCT = Decimal("1")  # Skip trades < 1% of leader capital
-
-
-def _to_side(side: TradeSide) -> Side:
-    return Side.UP if side == TradeSide.UP else Side.DOWN
 
 
 @register_strategy
@@ -85,7 +82,7 @@ class ConservativeMirrorStrategy(Strategy):
     def _check_extreme_prices(self, event: MarketEvent) -> Optional[TradeDecision]:
         """Check for price extremes - auto-sell at 0.99, treat 0.01 as 0."""
         trade, prices = event.trade, event.prices
-        pos = self.portfolio.get(trade.token_id, trade.market_id, _to_side(trade.side))
+        pos = self.portfolio.get(trade.token_id, trade.market_id, to_side(trade.side))
         
         if pos.shares > 0 and prices.bid and prices.bid >= PRICE_EXTREME_HIGH:
             logger.info(f"Auto-sell at extreme price {prices.bid}")
@@ -159,7 +156,7 @@ class ConservativeMirrorStrategy(Strategy):
         dollars = min(dollars, mkt_room)
 
         side_cap = cfg.starting_capital * PER_SIDE_PCT / 100
-        side_room = side_cap - self.portfolio.get_side_exposure(trade.market_id, _to_side(trade.side))
+        side_room = side_cap - self.portfolio.get_side_exposure(trade.market_id, to_side(trade.side))
         if side_room <= 0:
             return self._skip("side_cap")
         dollars = min(dollars, side_room)
@@ -191,7 +188,7 @@ class ConservativeMirrorStrategy(Strategy):
 
     def _sell(self, event: MarketEvent, scaled: Decimal) -> TradeDecision:
         trade, prices, cfg = event.trade, event.prices, self.config
-        pos = self.portfolio.get(trade.token_id, trade.market_id, _to_side(trade.side))
+        pos = self.portfolio.get(trade.token_id, trade.market_id, to_side(trade.side))
         if pos.shares <= 0:
             return self._skip("no_position")
 
@@ -231,7 +228,7 @@ class ConservativeMirrorStrategy(Strategy):
 
     def on_fill(self, event: MarketEvent, decision: TradeDecision) -> None:
         trade = event.trade
-        side = _to_side(trade.side)
+        side = to_side(trade.side)
         shares = decision.shares or Decimal("0")
         price = decision.price or Decimal("0")
 
