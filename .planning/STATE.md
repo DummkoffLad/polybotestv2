@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 Phase: 7 of 11 (Comparison Infrastructure) - COMPLETE
 Plan: 3 of 3 in current phase - COMPLETE
 Status: Phase 7 complete, ready for Phase 8
-Last activity: 2026-02-04 — Completed 07-03-PLAN.md
+Last activity: 2026-02-04 — Completed quick-005 (profit_taker docs & tools)
 
 Progress: [██████░░░░] 64% (27 of 42+ plans complete across milestones)
 
@@ -66,6 +66,9 @@ Recent decisions affecting v1.1 milestone:
 - **empyrical-reloaded for metrics (07-02):** Don't hand-roll Sharpe/Sortino/Calmar ratios
 - **Pandas Styler for decision matrix (07-03):** df.style.map() for cell colors, apply() for row highlighting
 - **QuantStats returns conversion (07-03):** equity.pct_change().dropna() for tear sheet generation
+- **Keep profit_taker params (quick-005):** Current 35/20/12% optimal given 2 sessions - avoid overfitting
+- **ET timezone for hourly analysis (quick-005):** Polymarket operates on US Eastern Time
+- **Max 10 tokens per viz (quick-005):** Prevent overwhelming charts with too many subplots
 
 ### Pending Todos
 
@@ -77,6 +80,8 @@ None yet.
 |---|-------------|------|-----------|
 | 001 | Fix WebSocket reconnection | 2026-02-03 | [001-fix-ws-reconnect](./quick/001-fix-ws-reconnect/) |
 | 003 | Refactor strategy cost to use real spread | 2026-02-04 | [003-refactor-strategy-config-real-spread](./quick/003-refactor-strategy-config-real-spread/) |
+| 004 | Reorganize sessions into day folders | 2026-02-04 | [004-reorganize-sessions-day-folders](./quick/004-reorganize-sessions-day-folders/) |
+| 005 | Profit taker docs, hourly split, visualization | 2026-02-04 | [005-profit-taker-hourly-viz-docs](./quick/005-profit-taker-hourly-viz-docs/) |
 
 ### Blockers/Concerns
 
@@ -112,10 +117,10 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-04
-Stopped at: Completed quick-003 (Real spread calculation)
+Stopped at: Completed quick-005 (profit_taker docs, hourly splitting, visualization)
 Resume file: None
 Next action: Phase 8 (Failure Mode Analysis)
-Testing script: `full_optimizer.py` — runs all strategies against recorded sessions
+Testing script: `python -m src.simulation.full_optimizer data/sessions/` — runs all strategies against all sessions
 
 **v1.0 Summary (COMPLETE):**
 - 5 phases, 21 plans, 461 tests passing
