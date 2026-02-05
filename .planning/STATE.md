@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 7.1 of 11 (Codebase Cleanup) - IN PROGRESS
-Plan: 5 of 7 in current phase
+Plan: 3 of 7 in current phase
 Status: Wave 2 execution - 3 plans complete
-Last activity: 2026-02-05 — Completed 07.1-05-PLAN.md (split replay module into package)
+Last activity: 2026-02-05 — Completed 07.1-03-PLAN.md (extracted strategy mixins)
 
 Progress: [███████░░░] 65% (30 of 46+ plans complete across milestones)
 
@@ -20,8 +20,8 @@ Progress: [███████░░░] 65% (30 of 46+ plans complete across 
 
 **Velocity:**
 - Total plans completed: 30 (v1.0 complete, v1.1 in progress)
-- Average duration: 4.6min (all time)
-- Total execution time: 2.29 hours (all time)
+- Average duration: 4.7min (all time)
+- Total execution time: 2.38 hours (all time)
 
 **By Phase:**
 
@@ -34,10 +34,10 @@ Progress: [███████░░░] 65% (30 of 46+ plans complete across 
 | 05-validation | 5 | 23min | 5min | Complete |
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
 | 07-comparison-infrastructure | 3 | 22min | 7min | Complete |
-| 07.1-codebase-cleanup | 3 | 17min | 6min | In Progress (3/7) |
+| 07.1-codebase-cleanup | 3 | 28min | 9min | In Progress (3/7) |
 
 **Recent Trend:**
-- Last 5 plans: 07-03 (11min), 07.1-01 (8min), 07.1-06 (4min), 07.1-05 (5min)
+- Last 5 plans: 07.1-01 (8min), 07.1-06 (4min), 07.1-05 (5min), 07.1-03 (11min)
 - Milestone v1.0: Complete (21 plans, 461 tests passing)
 - Milestone v1.1: In progress (8 plans complete, Phase 7 complete, Phase 7.1 in progress)
 
@@ -75,6 +75,8 @@ Recent decisions affecting v1.1 milestone:
 - **Hourly charts default (quick-006):** Generate per-market hourly charts by default (--no-hourly to skip)
 - **Public function naming (07.1-01):** Changed _to_side to to_side for shared utils (public API)
 - **utils.py for strategy utilities (07.1-01):** Place strategy-specific shared utilities in src/strategies/utils.py
+- **Explicit mixin init (07.1-03):** Each mixin has __init__ that strategies must call explicitly (avoids MRO complexity)
+- **Mixin composition (07.1-03):** Mixins before Strategy in inheritance list for proper method lookup
 - **PnL calculator location (07.1-06):** src/analysis/pnl_calculator.py for shared PnL logic (analysis concern, not strategy)
 - **Shared calculation pattern (07.1-06):** Extract duplicated calculations into modules with clean interfaces
 - **Package structure for large modules (07.1-05):** Split 800+ line files into focused packages with loader/processor/orchestrator pattern
@@ -132,9 +134,9 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 07.1-05-PLAN.md (split replay module into package)
+Stopped at: Completed 07.1-03-PLAN.md (extracted strategy mixins for shared behaviors)
 Resume file: None
-Next action: Continue Phase 7.1 execution - Plans 02, 03, 04, 07 remaining (4 cleanup plans)
+Next action: Continue Phase 7.1 execution - Plans 02, 04, 07 remaining (3 cleanup plans)
 Testing script: `python -m src.simulation.full_optimizer data/sessions/` — runs all strategies against all sessions
 
 **v1.0 Summary (COMPLETE):**
