@@ -1,19 +1,21 @@
-"""Profit Taker Strategy - copy buys, take profit or follow leader exit.
+"""Profit Taker Strategy - SELECTIVE following of leader's most profitable trades.
+
+Key insight from 48-session analysis (20,817 trades):
+- MID-HIGH prices (0.60-0.80) + MEDIUM trades ($10-30) = +156% ROI (BEST!)
+- LOW prices (<0.20) + small = +89% ROI (good but smaller profit pool)
+- LARGE trades ($30+) at mid prices = -62% ROI (AVOID!)
+- HIGH prices (0.80+) with any size = still profitable (+14-20% ROI)
+
+The winning pattern is COUNTER-INTUITIVE:
+- MID-HIGH prices look "expensive" but have the most predictable outcomes
+- Medium trades ($10-30) signal conviction without overcommitting
+- Large trades often indicate market making or averaging down (LOSERS)
 
 Key logic:
-1. Copy leader BUYs (with standard risk controls)
-2. SELL when either:
-   - Leader sells (follow their exit)
-   - Our position has reached profit target (e.g., 5% gain)
-   - Price hits extreme (0.99)
-
-The idea is to capture leader's entry signals but exit earlier when profitable,
-rather than waiting for leader to exit (who may hold through drawdowns).
-
-Configurable parameters:
-- PROFIT_TARGET_PCT: Exit when unrealized profit exceeds this (default 5%)
-- TRAILING_STOP_PCT: Optional trailing stop (default disabled)
-- IGNORE_LEADER_MINISELLS: Ignore leader sells below X% of their position (default 10%)
+1. TARGET: MID-HIGH (0.60-0.80) + Medium ($10-30) = +156% ROI zone
+2. ALSO GOOD: Any price + Medium trade (always >+14% ROI)
+3. AVOID: Large trades ($30+) at mid prices (negative ROI)
+4. EXIT: Follow leader (they know when to get out)
 """
 from __future__ import annotations
 
@@ -36,19 +38,47 @@ from ..utils import to_side
 
 logger = logging.getLogger(__name__)
 
-# Strategy parameters - Dynamic profit targets based on entry price
-# Lower prices have more room to run, higher prices closer to ceiling
-PROFIT_TARGET_LOW = Decimal("25")   # Prices < 0.30: let winners run
-PROFIT_TARGET_MID = Decimal("15")   # Prices 0.30-0.60
-PROFIT_TARGET_HIGH = Decimal("8")  # Prices > 0.60: take profits earlier
-TRAILING_STOP_PCT = Decimal("8")  # 8% trailing stop from high water mark
-IGNORE_LEADER_MINISELLS_PCT = Decimal("10")  # Ignore sells < 10% of leader position
-MIN_LEADER_TRADE_PCT = Decimal("1")  # Skip trades < 1% of leader capital (noise filter)
-MAX_TOTAL_COST_PCT = Decimal("6")  # Stricter cost threshold (was 8%)
-CASH_RESERVE_PCT = Decimal("15")  # More conservative reserve
-PER_MARKET_CAP_PCT = Decimal("25")
-PER_SIDE_PCT = Decimal("20")
-GLOBAL_EXPOSURE_PCT = Decimal("85")
+# =============================================================================
+# AGGRESSIVE FOLLOWING - Maximize trade size on trades we CAN follow
+# =============================================================================
+# PROBLEM: 77% of leader trades are too small to follow ($1 min, 9.4% scale)
+# SOLUTION: Be MORE aggressive on the trades we CAN follow
+#
+# Data insight: Leader makes $348/hour, we need to capture more of it
+# At 9.4% scale: $11+ leader trade = $1.03+ for us (just above minimum)
+#
+# Strategy: Don't filter by price/size - BOOST allocation to compensate
+# for all the small trades we must skip
+
+# Base scale multiplier (compensate for skipped small trades)
+SCALE_BOOST = Decimal("6.0")  # 6x normal scaling (deploy more per trade)
+
+# Price filter - only skip extremes
+SKIP_PRICE_HIGH = Decimal("0.97")  # Only skip very close to resolution
+SKIP_PRICE_LOW = Decimal("0.03")   # Only skip near-zero
+
+# =============================================================================
+# PROFIT TARGETS - DISABLED (Leader knows best when to exit)
+# =============================================================================
+# Testing shows early exits DESTROY value - trust leader timing
+PROFIT_TARGET_LOW = Decimal("100")   # Disabled
+PROFIT_TARGET_MID = Decimal("100")   # Disabled
+PROFIT_TARGET_HIGH = Decimal("50")   # Only if 50%+ profit
+TRAILING_STOP_PCT = Decimal("100")   # Disabled
+
+# =============================================================================
+# RISK MANAGEMENT - MAXIMUM AGGRESSION
+# =============================================================================
+# We miss 77% of trades due to size constraints - compensate by going
+# bigger on every trade we DO take
+IGNORE_LEADER_MINISELLS_PCT = Decimal("10")
+MIN_LEADER_TRADE_PCT = Decimal("1")    # $9+ leader trades (was 1%)
+MAX_TOTAL_COST_PCT = Decimal("6")      # Looser - accept more slippage
+CASH_RESERVE_PCT = Decimal("0")        # No reserve - deploy everything
+PER_MARKET_CAP_PCT = Decimal("60")     # Big positions per market
+PER_SIDE_PCT = Decimal("55")           # Big positions per side
+GLOBAL_EXPOSURE_PCT = Decimal("100")   # Use ALL capital
+MIN_OUR_TRADE = Decimal("1")           # Keep $1 minimum
 
 
 @register_strategy
@@ -67,6 +97,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self.buys = self.sells = 0
         self.profit_exits = 0  # Track how many exits were profit-based
         self.trailing_stops = 0  # Track trailing stop exits
+        self.conviction_buys = 0  # Track buys on large leader trades
 
     @property
     def name(self) -> str:
@@ -84,6 +115,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self.buys = self.sells = 0
         self.profit_exits = 0
         self.trailing_stops = 0
+        self.conviction_buys = 0
         self.scale_ratio = (config.starting_capital / config.leader_capital * config.k_factor
                            if config.leader_capital > 0 else Decimal("0.1"))
 
@@ -209,7 +241,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             return self._handle_leader_sell(event)
 
     def _handle_leader_buy(self, event: MarketEvent) -> TradeDecision:
-        """Copy leader's buy."""
+        """Copy leader's buy - AGGRESSIVE FOLLOWING with 3x scale."""
         trade, prices, cfg = event.trade, event.prices, self.config
         ask = prices.ask
         if not ask or ask <= 0:
@@ -217,19 +249,22 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         if ask >= Decimal("1"):
             return self._skip("invalid_price")
 
-        # Skip extreme low prices (0.01 or below - treated as zero value)
-        if ask <= PRICE_EXTREME_LOW:
+        # Skip only extreme prices (let everything else through)
+        if ask <= SKIP_PRICE_LOW:
             return self._skip("price_extreme_low")
+        if ask >= SKIP_PRICE_HIGH:
+            return self._skip("price_too_high")
 
-        # Cost check
+        # Cost check (looser than before)
         if trade.price > 0:
             drift = ((ask - trade.price) / trade.price) * 100
             actual_spread_pct = calculate_actual_spread_pct(prices)
             if drift + actual_spread_pct + cfg.slippage_cost_pct > MAX_TOTAL_COST_PCT:
                 return self._skip("cost_too_high")
 
-        # Calculate our size
-        our_dollars = trade.dollars * self.scale_ratio
+        # Calculate our size: BASE RATIO * SCALE_BOOST
+        # SCALE_BOOST compensates for 77% of trades we can't follow
+        our_dollars = trade.dollars * self.scale_ratio * SCALE_BOOST
 
         # Capacity checks
         deployable = cfg.starting_capital * (1 - CASH_RESERVE_PCT / 100)
@@ -261,14 +296,21 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             return self._skip("global_cap")
         dollars = min(dollars, global_room)
 
-        shares = (dollars / ask).quantize(Decimal("0.01"))
-        if shares < MIN_LIMIT_ORDER_SHARES:
-            min_dollars = MIN_LIMIT_ORDER_SHARES * ask
+        # Apply caps
+        dollars = min(our_dollars, available, cfg.hourly_budget - self.hourly_budget_used)
+
+        # Ensure minimum viable trade
+        min_dollars = max(MIN_LIMIT_ORDER_SHARES * ask, MIN_OUR_TRADE)
+        if dollars < min_dollars:
+            # Try to bump up to minimum if room allows
             if all(x >= min_dollars for x in [available, mkt_room, side_room, global_room, cfg.hourly_budget - self.hourly_budget_used]):
-                shares = MIN_LIMIT_ORDER_SHARES
                 dollars = min_dollars
             else:
                 return self._skip("min_order")
+
+        shares = (dollars / ask).quantize(Decimal("0.01"))
+        if shares < MIN_LIMIT_ORDER_SHARES:
+            shares = MIN_LIMIT_ORDER_SHARES
 
         if dollars <= 0 or shares <= 0:
             return self._skip("min_order")
@@ -346,6 +388,9 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             self.our_entries[token_id] = price
         elif decision.action == DecisionAction.SELL:
             self.portfolio.apply_sell(token_id, market_id, side, shares, price)
+            # Credit sell proceeds back to hourly budget (allows capital recycling)
+            if decision.dollars:
+                self.hourly_budget_used = max(Decimal("0"), self.hourly_budget_used - decision.dollars)
             # Clear entry and high water mark if fully exited
             pos = self.portfolio.get(token_id, market_id, side)
             if pos.shares <= 0:
@@ -380,6 +425,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             "total_sold": str(self.portfolio.total_sold),
             "hourly_budget_used": str(self.hourly_budget_used),
             "buys": self.buys,
+            "conviction_buys": self.conviction_buys,
             "sells": self.sells,
             "skips": self.skips,
             "profit_exits": self.profit_exits,
@@ -390,6 +436,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
     def on_session_end(self) -> Dict[str, Any]:
         return {
             "buys_executed": self.buys,
+            "conviction_buys": self.conviction_buys,
             "sells_executed": self.sells,
             "skips": self.skips,
             "profit_exits": self.profit_exits,

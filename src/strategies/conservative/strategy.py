@@ -35,12 +35,12 @@ from ..utils import to_side
 logger = logging.getLogger(__name__)
 
 # Conservative overrides applied on top of whatever config is passed
-CASH_RESERVE_PCT = Decimal("20")
+CASH_RESERVE_PCT = Decimal("25")
 PER_MARKET_CAP_PCT = Decimal("20")
 PER_SIDE_PCT = Decimal("18")
 GLOBAL_EXPOSURE_PCT = Decimal("80")
-MAX_TOTAL_COST_PCT = Decimal("6")
-K_FACTOR_MULT = Decimal("0.7")  # Applied on top of config k_factor
+MAX_TOTAL_COST_PCT = Decimal("7")
+K_FACTOR_MULT = Decimal("0.9")  # Applied on top of config k_factor
 MIN_LEADER_TRADE_PCT = Decimal("1")  # Skip trades < 1% of leader capital
 
 
