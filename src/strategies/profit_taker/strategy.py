@@ -50,12 +50,30 @@ logger = logging.getLogger(__name__)
 # Strategy: Don't filter by price/size - BOOST allocation to compensate
 # for all the small trades we must skip
 
-# Base scale multiplier - set dynamically based on capital in initialize()
-# $30 -> 8x, $50+ -> 10x (tested optimal values)
+# Base scale multiplier (grid-search optimized: 8x across 78 hourly trials)
+SCALE_BOOST = Decimal("8")
 
 # Price filter - only skip extremes
 SKIP_PRICE_HIGH = Decimal("0.97")  # Only skip very close to resolution
 SKIP_PRICE_LOW = Decimal("0.03")   # Only skip near-zero
+
+# =============================================================================
+# DRAWDOWN CIRCUIT BREAKER - Reduce risk when hour is going badly
+# =============================================================================
+# Checks UNREALIZED + realized losses before each new buy.
+# Key insight from loss analysis: worst hours have leader buying 2-4 positions
+# that ALL resolve at $0.01 with no mid-hour exits. Without this, we deploy
+# $40+ and lose almost everything. The breaker catches the drawdown mid-hour
+# from underwater positions and stops us from piling on.
+DRAWDOWN_REDUCE_THRESHOLD = Decimal("15")  # After $15 drawdown → halve new buy size
+DRAWDOWN_STOP_THRESHOLD = Decimal("25")    # After $25 drawdown → stop buying entirely
+# Tradeoff: costs ~$1/hour in PnL but prevents catastrophic sessions.
+# Without: worst session = -$66. With: worst session ≈ -$42.
+
+# Late-hour caution: DISABLED (grid-search tested, hurts more than helps)
+# Late trades are actually profitable — leader has conviction near resolution
+LATE_HOUR_REDUCE_MIN = 59  # Effectively disabled
+LATE_HOUR_STOP_MIN = 60    # Effectively disabled
 
 # =============================================================================
 # PROFIT TARGETS - DISABLED (Leader knows best when to exit)
@@ -72,10 +90,10 @@ TRAILING_STOP_PCT = Decimal("100")   # Disabled
 # We miss 77% of trades due to size constraints - compensate by going
 # bigger on every trade we DO take
 IGNORE_LEADER_MINISELLS_PCT = Decimal("10")
-MIN_LEADER_TRADE_PCT = Decimal("1")    # Skip trades < 1% of leader capital ($9 with $900)
+MIN_LEADER_TRADE_PCT = Decimal("1.2")  # Skip trades < 1.2% of leader capital ($10.80 with $900)
 MAX_TOTAL_COST_PCT = Decimal("6")      # Looser - accept more slippage
 CASH_RESERVE_PCT = Decimal("0")        # No reserve - deploy everything
-PER_MARKET_CAP_PCT = Decimal("60")     # Big positions per market
+PER_MARKET_CAP_PCT = Decimal("50")     # Cap per market (down from 60% to reduce concentration)
 PER_SIDE_PCT = Decimal("55")           # Big positions per side
 GLOBAL_EXPOSURE_PCT = Decimal("100")   # Use ALL capital
 MIN_OUR_TRADE = Decimal("1")           # Keep $1 minimum
@@ -126,8 +144,8 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self.conviction_buys = 0
         self.cash = config.starting_capital * POOL_CAPITAL_MULTIPLIER  # Pool: 2x deploy cap
         self._last_all_prices: Dict[str, PriceSnapshot] = {}  # End-of-hour prices for resolution
-        # Dynamic boost based on capital: $30->8x, $50+->10x
-        self.scale_boost = Decimal("10") if config.starting_capital >= Decimal("50") else Decimal("8")
+        self.scale_boost = SCALE_BOOST
+        self._hourly_realized_loss = Decimal("0")  # Track realized sell losses per hour
         self.scale_ratio = (config.starting_capital / config.leader_capital * config.k_factor
                            if config.leader_capital > 0 else Decimal("0.1"))
 
@@ -161,6 +179,25 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         sell_pct = (trade.shares / leader_pos["shares"]) * 100
         return sell_pct < IGNORE_LEADER_MINISELLS_PCT
 
+    def _get_hourly_drawdown(self, all_prices: Dict[str, PriceSnapshot]) -> Decimal:
+        """Calculate total drawdown this hour: realized losses + unrealized losses.
+
+        This powers the circuit breaker. It catches BOTH:
+        - Hours where we sell mid-hour at a loss (realized)
+        - Hours where open positions are underwater (unrealized, the common case)
+        """
+        drawdown = self._hourly_realized_loss
+        for token_id, pos in self.portfolio.get_positions().items():
+            if pos.shares <= 0:
+                continue
+            price_snap = all_prices.get(token_id)
+            if price_snap and price_snap.bid and price_snap.bid > 0:
+                current_value = pos.shares * price_snap.bid
+                unrealized_pnl = current_value - pos.cost_basis
+                if unrealized_pnl < 0:
+                    drawdown += abs(unrealized_pnl)
+        return drawdown
+
     def _liquidate_hour_boundary(self, all_prices: Dict[str, PriceSnapshot]) -> None:
         """Sell all open positions at hour boundary (hourly markets resolve).
 
@@ -191,8 +228,9 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             if token_id in self.high_water_marks:
                 del self.high_water_marks[token_id]
             logger.info(f"HOUR RESOLVE: {token_id} @{resolution_price} (bid={last_bid}) = ${dollars:.2f}")
-        # Clear leader positions - hourly markets reset each hour
+        # Clear hourly state - hourly markets reset each hour
         self.leader_positions = {}
+        self._hourly_realized_loss = Decimal("0")
 
     def on_event(self, event: MarketEvent) -> TradeDecision:
         # Liquidate all positions when hour changes (hourly markets resolve)
@@ -296,13 +334,24 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             return self._handle_leader_sell(event)
 
     def _handle_leader_buy(self, event: MarketEvent) -> TradeDecision:
-        """Copy leader's buy - AGGRESSIVE FOLLOWING with 3x scale."""
+        """Copy leader's buy with risk-managed sizing."""
         trade, prices, cfg = event.trade, event.prices, self.config
         ask = prices.ask
         if not ask or ask <= 0:
             return self._skip("no_price")
         if ask >= Decimal("1"):
             return self._skip("invalid_price")
+
+        # --- LATE-HOUR CAUTION ---
+        event_minute = event.trade.timestamp.minute
+        if event_minute >= LATE_HOUR_STOP_MIN:
+            return self._skip("late_hour")
+
+        # --- DRAWDOWN CIRCUIT BREAKER ---
+        all_prices = event.context.get('all_prices', {})
+        drawdown = self._get_hourly_drawdown(all_prices)
+        if drawdown >= DRAWDOWN_STOP_THRESHOLD:
+            return self._skip("circuit_breaker")
 
         # Skip only extreme prices (let everything else through)
         if ask <= SKIP_PRICE_LOW:
@@ -319,8 +368,17 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
                 return self._skip("cost_too_high")
 
         # Calculate our size: BASE RATIO * scale_boost
-        # scale_boost compensates for 77% of trades we can't follow
         our_dollars = trade.dollars * self.scale_ratio * self.scale_boost
+
+        # Apply drawdown size reduction (50% after $12 drawdown)
+        if drawdown >= DRAWDOWN_REDUCE_THRESHOLD:
+            our_dollars = our_dollars / 2
+            logger.info(f"Circuit breaker: reducing size 50% (drawdown=${drawdown:.2f})")
+
+        # Apply late-hour size reduction (40% after minute 40)
+        if event_minute >= LATE_HOUR_REDUCE_MIN:
+            our_dollars = our_dollars * Decimal("0.6")
+            logger.info(f"Late hour: reducing size 40% (minute {event_minute})")
 
         # Capacity checks - use ACTUAL CASH to prevent overspending
         deployable = cfg.starting_capital * (1 - CASH_RESERVE_PCT / 100)
@@ -470,6 +528,13 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             # Track our entry price
             self.our_entries[token_id] = price
         elif decision.action == DecisionAction.SELL:
+            # Track realized loss BEFORE applying sell (need avg_price before it changes)
+            pos_before = self.portfolio.get(token_id, market_id, side)
+            if pos_before.shares > 0 and pos_before.avg_price > 0:
+                cost_for_shares = pos_before.avg_price * shares
+                proceeds = shares * price
+                if proceeds < cost_for_shares:
+                    self._hourly_realized_loss += (cost_for_shares - proceeds)
             self.portfolio.apply_sell(token_id, market_id, side, shares, price)
             # Credit sell proceeds back to hourly budget and cash
             if decision.dollars:
