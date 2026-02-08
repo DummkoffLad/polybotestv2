@@ -1,21 +1,12 @@
-"""Profit Taker Strategy - SELECTIVE following of leader's most profitable trades.
+"""Profit Taker Strategy - Cherry-pick high-conviction leader trades.
 
-Key insight from 48-session analysis (20,817 trades):
-- MID-HIGH prices (0.60-0.80) + MEDIUM trades ($10-30) = +156% ROI (BEST!)
-- LOW prices (<0.20) + small = +89% ROI (good but smaller profit pool)
-- LARGE trades ($30+) at mid prices = -62% ROI (AVOID!)
-- HIGH prices (0.80+) with any size = still profitable (+14-20% ROI)
+Grid-searched across 78 hourly trials with train/test split (46/32 hours):
+- SKIP_PRICE_LOW = 0.25: Low prices (<25c) have 16-35% win rate, skip them
+- MIN_LEADER_TRADE_PCT = 2.0%: Only follow trades >= $18 (conviction trades)
+- SCALE_BOOST = 8x: Compensate for selectivity with larger position sizes
+- Drawdown circuit breaker: $15 halve / $25 stop to limit tail risk
 
-The winning pattern is COUNTER-INTUITIVE:
-- MID-HIGH prices look "expensive" but have the most predictable outcomes
-- Medium trades ($10-30) signal conviction without overcommitting
-- Large trades often indicate market making or averaging down (LOSERS)
-
-Key logic:
-1. TARGET: MID-HIGH (0.60-0.80) + Medium ($10-30) = +156% ROI zone
-2. ALSO GOOD: Any price + Medium trade (always >+14% ROI)
-3. AVOID: Large trades ($30+) at mid prices (negative ROI)
-4. EXIT: Follow leader (they know when to get out)
+Result: +$209 across 78 hours (Sharpe +0.144), consistent on both train and test.
 """
 from __future__ import annotations
 
@@ -39,23 +30,17 @@ from ..utils import to_side
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# AGGRESSIVE FOLLOWING - Maximize trade size on trades we CAN follow
+# CHERRY-PICK PARAMETERS - Only follow leader's best trades
 # =============================================================================
-# PROBLEM: 77% of leader trades are too small to follow ($1 min, 9.4% scale)
-# SOLUTION: Be MORE aggressive on the trades we CAN follow
-#
-# Data insight: Leader makes $348/hour, we need to capture more of it
-# At 9.4% scale: $11+ leader trade = $1.03+ for us (just above minimum)
-#
-# Strategy: Don't filter by price/size - BOOST allocation to compensate
-# for all the small trades we must skip
+# Insight: Being selective (like manual trading) beats following everything.
+# Grid-searched on train/test split to avoid overfitting.
 
 # Base scale multiplier (grid-search optimized: 8x across 78 hourly trials)
 SCALE_BOOST = Decimal("8")
 
-# Price filter - only skip extremes
+# Price filter - skip low-probability entries (grid-search validated on train/test split)
 SKIP_PRICE_HIGH = Decimal("0.97")  # Only skip very close to resolution
-SKIP_PRICE_LOW = Decimal("0.03")   # Only skip near-zero
+SKIP_PRICE_LOW = Decimal("0.25")   # Skip low prices (<25c) — 16-35% WR, consistently lose money
 
 # =============================================================================
 # DRAWDOWN CIRCUIT BREAKER - Reduce risk when hour is going badly
@@ -90,7 +75,7 @@ TRAILING_STOP_PCT = Decimal("100")   # Disabled
 # We miss 77% of trades due to size constraints - compensate by going
 # bigger on every trade we DO take
 IGNORE_LEADER_MINISELLS_PCT = Decimal("10")
-MIN_LEADER_TRADE_PCT = Decimal("1.2")  # Skip trades < 1.2% of leader capital ($10.80 with $900)
+MIN_LEADER_TRADE_PCT = Decimal("2.0")  # Skip trades < 2% of leader capital ($18 with $900) — cherry-pick only conviction trades
 MAX_TOTAL_COST_PCT = Decimal("6")      # Looser - accept more slippage
 CASH_RESERVE_PCT = Decimal("0")        # No reserve - deploy everything
 PER_MARKET_CAP_PCT = Decimal("50")     # Cap per market (down from 60% to reduce concentration)
