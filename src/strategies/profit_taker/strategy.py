@@ -1,12 +1,12 @@
 """Profit Taker Strategy - Cherry-pick high-conviction leader trades.
 
 Grid-searched across 78 hourly trials with train/test split (46/32 hours):
-- SKIP_PRICE_LOW = 0.25: Low prices (<25c) have 16-35% win rate, skip them
+- SKIP_PRICE_LOW = 0.45: Low prices add variance without PnL (0% WR at resolution)
 - MIN_LEADER_TRADE_PCT = 2.0%: Only follow trades >= $18 (conviction trades)
 - SCALE_BOOST = 8x: Compensate for selectivity with larger position sizes
 - Drawdown circuit breaker: $15 halve / $25 stop to limit tail risk
 
-Result: +$209 across 78 hours (Sharpe +0.144), consistent on both train and test.
+Result: +$438 across 78 hours (Sharpe +0.450), consistent on both train and test.
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ SCALE_BOOST = Decimal("8")
 
 # Price filter - skip low-probability entries (grid-search validated on train/test split)
 SKIP_PRICE_HIGH = Decimal("0.97")  # Only skip very close to resolution
-SKIP_PRICE_LOW = Decimal("0.25")   # Skip low prices (<25c) — 16-35% WR, consistently lose money
+SKIP_PRICE_LOW = Decimal("0.45")   # Skip low prices (<45c) — adds variance without PnL improvement
 
 # =============================================================================
 # DRAWDOWN CIRCUIT BREAKER - Reduce risk when hour is going badly
