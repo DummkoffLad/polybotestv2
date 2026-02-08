@@ -1,5 +1,6 @@
 """Universal Strategy Runner - polls data, feeds events to strategy."""
 from __future__ import annotations
+import csv
 import json
 import os
 import signal
@@ -8,7 +9,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional, Set, Dict, Any, TYPE_CHECKING
+from typing import Optional, Set, Dict, Any, TextIO, TYPE_CHECKING
 if TYPE_CHECKING:
     from ..core.config import BotConfig
     from .recorder import SessionRecorder
@@ -43,6 +44,11 @@ class UniversalRunner:
         self._start = 0.0
         self._last_reconcile = 0.0
         self.stats = {"buys": 0, "sells": 0, "skips": 0, "order_errors": 0}
+
+        # Trade log for comparing with simulation
+        self._trade_log_file: Optional[TextIO] = None
+        self._trade_log_writer = None
+        self._trade_sequence = 0
         
         # Ensure state directory exists
         STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,6 +132,9 @@ class UniversalRunner:
                 for token_id in self.data_source._token_to_market.keys():
                     self.recorder.add_token(token_id)
             print(f"  📼 Recording session: {self.recorder.session_id}")
+
+            # Start trade log for comparison with simulation
+            self._start_trade_log()
         
         try:
             while self._running:
@@ -161,7 +170,8 @@ class UniversalRunner:
         
         clock = SystemClock()
         snap = self.data_source.build_leader_snapshot(clock.now())
-        leader_cap = Decimal(str(snap.total_assets)) if snap.total_assets else Decimal("900")
+        # Use fixed leader capital from config (don't auto-detect - open positions skew it)
+        leader_cap = self.config.scaling.leader_capital
         our_cap, k = self.config.scaling.our_capital, self.config.scaling.k_factor
         scale = (our_cap / leader_cap) * k if leader_cap > 0 else Decimal("0.1")
 
@@ -272,6 +282,11 @@ class UniversalRunner:
                 self.stats["buys" if decision.action == DecisionAction.BUY else "sells"] += 1
                 logger.info(f"ORDER SUCCESS: {decision.action.value} ${decision.dollars:.2f} @{decision.price:.4f}")
                 print(f"    -> {decision.action.value} ${decision.dollars:.2f}")
+
+                # Log trade for comparison with simulation
+                if self._trade_log_writer:
+                    cash_after = getattr(self.strategy, 'cash', Decimal("0"))
+                    self._log_trade(event, decision, cash_after)
             else:
                 self.stats["order_errors"] += 1
                 logger.error(f"ORDER FAILED: {decision.action.value} ${decision.dollars:.2f} - not applying to portfolio")
@@ -451,20 +466,85 @@ class UniversalRunner:
         print("  Ready for new hour.\n")
     
     def _hash(self, t) -> str: return f"{t.transaction_hash or ''}_{t.asset}_{t.timestamp}"
-    
+
+    # ========== TRADE LOG FOR DRY RUN COMPARISON ==========
+
+    def _start_trade_log(self) -> None:
+        """Start trade log CSV file for comparison with simulation."""
+        if not self.recorder:
+            return
+
+        # Create trade log in same directory as session file
+        session_dir = self.recorder.output_dir / self.recorder.session_id.split("/")[0]
+        time_part = self.recorder.session_id.split("/")[1]
+        trade_log_path = session_dir / f"{time_part}_trades.csv"
+
+        try:
+            self._trade_log_file = open(trade_log_path, "w", newline="", encoding="utf-8")
+            self._trade_log_writer = csv.writer(self._trade_log_file)
+            # Write header matching simulation output format
+            self._trade_log_writer.writerow([
+                "seq", "time", "action", "side", "leader_$", "our_$",
+                "price", "shares", "bid", "ask", "cash_after", "token_id"
+            ])
+            self._trade_log_file.flush()
+            print(f"  📊 Trade log: {trade_log_path}")
+            logger.info(f"Trade log started: {trade_log_path}")
+        except Exception as e:
+            logger.error(f"Could not start trade log: {e}")
+
+    def _log_trade(self, event: MarketEvent, decision, cash_after: Decimal) -> None:
+        """Log a trade to the trade log CSV."""
+        if not self._trade_log_writer:
+            return
+
+        self._trade_sequence += 1
+        try:
+            self._trade_log_writer.writerow([
+                self._trade_sequence,
+                datetime.now(timezone.utc).strftime("%H:%M:%S"),
+                decision.action.value,
+                event.trade.side.value,
+                f"{event.trade.dollars:.2f}",
+                f"{decision.dollars:.2f}",
+                f"{decision.price:.4f}",
+                f"{decision.shares:.2f}",
+                f"{event.prices.bid:.4f}" if event.prices.bid else "N/A",
+                f"{event.prices.ask:.4f}" if event.prices.ask else "N/A",
+                f"{cash_after:.2f}",
+                event.trade.token_id[:16] + "...",
+            ])
+            self._trade_log_file.flush()
+        except Exception as e:
+            logger.error(f"Could not log trade: {e}")
+
+    def _close_trade_log(self) -> None:
+        """Close the trade log file."""
+        if self._trade_log_file:
+            try:
+                self._trade_log_file.close()
+                self._trade_log_file = None
+                self._trade_log_writer = None
+                logger.info("Trade log closed")
+            except Exception as e:
+                logger.error(f"Could not close trade log: {e}")
+
     def _shutdown(self) -> None:
         """Graceful shutdown with state persistence."""
         logger.info("Shutting down...")
         self._running = False
-        
+
         # Stop price service
         if self.price_service:
             try: self.price_service.stop()
             except: pass
-        
+
+        # Close trade log before ending recording
+        self._close_trade_log()
+
         # Get final summary
         summary = self.strategy.on_session_end()
-        
+
         # End recording session if active
         if self.recorder:
             session_path = self.recorder.end_session(summary={

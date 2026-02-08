@@ -40,7 +40,8 @@ class SessionReplayer:
         return self.loader.load()
 
     def run(self, simulate_resolution: bool = False, collect_trades: bool = False,
-            track_follow_metrics: bool = True, track_analysis: bool = False) -> ReplayResult:
+            track_follow_metrics: bool = True, track_analysis: bool = False,
+            liquidate_hourly: bool = False) -> ReplayResult:
         """Run the replay.
 
         Args:
@@ -49,6 +50,7 @@ class SessionReplayer:
             collect_trades: If True, record each executed trade for analysis.
             track_follow_metrics: If True, track follow quality metrics.
             track_analysis: If True, run full performance analysis (attribution, equity, drawdown, slippage).
+            liquidate_hourly: If True, force-sell all positions at hour boundaries.
         """
         config = self._merge_config()
         strategy_config = StrategyConfig.from_dict(config)
@@ -82,9 +84,20 @@ class SessionReplayer:
             config=config,
         )
 
+        # Track hour boundaries for liquidation
+        current_hour = None
+
         # Process all events
         for i, event in enumerate(self.loader.events):
             all_prices_at_time = self.loader.get_all_prices_at_time(event.trade.timestamp)
+
+            # Liquidate all positions at hour boundary
+            if liquidate_hourly:
+                event_hour = event.trade.timestamp.hour
+                if current_hour is not None and event_hour != current_hour:
+                    self._liquidate_all_positions(all_prices_at_time, result)
+                current_hour = event_hour
+
             processor.process_event(i, event, all_prices_at_time)
 
         # Compute PnL using final recorded prices
@@ -111,6 +124,43 @@ class SessionReplayer:
 
         self.strategy.on_session_end()
         return result
+
+    def _liquidate_all_positions(self, current_prices: dict, result: ReplayResult) -> None:
+        """Force-sell all open positions at current bid prices (hour boundary liquidation)."""
+        if not hasattr(self.strategy, 'portfolio'):
+            return
+
+        positions = self.strategy.portfolio.get_positions()
+        for token_id, pos in list(positions.items()):
+            if pos.shares <= 0:
+                continue
+
+            price_snap = current_prices.get(token_id)
+            if not price_snap or not price_snap.bid or price_snap.bid <= 0:
+                continue
+
+            bid = price_snap.bid
+            shares = pos.shares
+            dollars = shares * bid
+
+            # Apply sell to portfolio (updates realized PnL)
+            self.strategy.portfolio.apply_sell(token_id, pos.market_id, pos.side, shares, bid)
+
+            # Update strategy cash if tracked
+            if hasattr(self.strategy, 'cash'):
+                self.strategy.cash += dollars
+
+            # Clean up strategy tracking
+            if hasattr(self.strategy, 'our_entries') and token_id in self.strategy.our_entries:
+                del self.strategy.our_entries[token_id]
+            if hasattr(self.strategy, 'high_water_marks') and token_id in self.strategy.high_water_marks:
+                del self.strategy.high_water_marks[token_id]
+
+            # Track in result
+            result.sells_executed += 1
+            result.sell_dollars += dollars
+
+            logger.info(f"LIQUIDATE hour boundary: {token_id} {shares} shares @{bid} = ${dollars:.2f}")
 
     def _calculate_resolved_pnl(self) -> tuple:
         """Calculate PnL assuming markets resolve at extremes.
@@ -176,12 +226,14 @@ class SessionReplayer:
         return config
 
 
-def run_session_replay(session_path: str, strategy: Strategy) -> ReplayResult:
+def run_session_replay(session_path: str, strategy: Strategy,
+                       liquidate_hourly: bool = False) -> ReplayResult:
     """Convenience function to run a session replay.
 
     Args:
         session_path: Path to the session JSONL file
         strategy: The strategy instance to replay through
+        liquidate_hourly: If True, force-sell all positions at hour boundaries.
 
     Returns:
         ReplayResult with stats
@@ -192,7 +244,7 @@ def run_session_replay(session_path: str, strategy: Strategy) -> ReplayResult:
     if replayer.loader._dropped_no_prices:
         print(f"  WARNING: {replayer.loader._dropped_no_prices} events dropped (no real bid/ask prices)")
 
-    result = replayer.run()
+    result = replayer.run(liquidate_hourly=liquidate_hourly)
 
     # Print summary
     print(f"\n{'='*50}")

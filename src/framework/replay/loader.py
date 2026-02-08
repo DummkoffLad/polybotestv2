@@ -303,12 +303,15 @@ class SessionLoader:
     def get_all_prices_at_time(self, timestamp: datetime) -> Dict[str, PriceSnapshot]:
         """Get all known prices at a given timestamp.
 
-        Returns the most recent snapshot for each token before the timestamp.
+        Only includes snapshots from the same hour as the requested timestamp.
+        Hourly markets resolve each hour, so prices from previous hours are stale.
         """
+        target_hour = timestamp.hour
         result: Dict[str, PriceSnapshot] = {}
         for snapshot in self._price_snapshots:
             if snapshot.timestamp <= timestamp:
-                result.update(snapshot.prices)
+                if snapshot.timestamp.hour == target_hour:
+                    result.update(snapshot.prices)
             else:
                 break
         return result

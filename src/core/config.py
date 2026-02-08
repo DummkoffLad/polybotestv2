@@ -100,6 +100,7 @@ def load_config(config_path: Optional[Path] = None) -> BotConfig:
         our_capital=Decimal(str(scaling_raw.get("dry_run_capital", 50))),
         k_factor=Decimal(str(scaling_raw.get("k_factor", 0.7))),
         hourly_budget=Decimal(str(scaling_raw.get("hourly_budget", 45))),
+        leader_capital=Decimal(str(scaling_raw.get("leader_estimated_capital", 900))),
     )
     
     mirror_raw = raw.get("mirror_strategy", {})

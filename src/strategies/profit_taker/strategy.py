@@ -50,8 +50,8 @@ logger = logging.getLogger(__name__)
 # Strategy: Don't filter by price/size - BOOST allocation to compensate
 # for all the small trades we must skip
 
-# Base scale multiplier (compensate for skipped small trades)
-SCALE_BOOST = Decimal("6.0")  # 6x normal scaling (deploy more per trade)
+# Base scale multiplier - set dynamically based on capital in initialize()
+# $30 -> 8x, $50+ -> 10x (tested optimal values)
 
 # Price filter - only skip extremes
 SKIP_PRICE_HIGH = Decimal("0.97")  # Only skip very close to resolution
@@ -72,13 +72,19 @@ TRAILING_STOP_PCT = Decimal("100")   # Disabled
 # We miss 77% of trades due to size constraints - compensate by going
 # bigger on every trade we DO take
 IGNORE_LEADER_MINISELLS_PCT = Decimal("10")
-MIN_LEADER_TRADE_PCT = Decimal("1")    # $9+ leader trades (was 1%)
+MIN_LEADER_TRADE_PCT = Decimal("1")    # Skip trades < 1% of leader capital ($9 with $900)
 MAX_TOTAL_COST_PCT = Decimal("6")      # Looser - accept more slippage
 CASH_RESERVE_PCT = Decimal("0")        # No reserve - deploy everything
 PER_MARKET_CAP_PCT = Decimal("60")     # Big positions per market
 PER_SIDE_PCT = Decimal("55")           # Big positions per side
 GLOBAL_EXPOSURE_PCT = Decimal("100")   # Use ALL capital
 MIN_OUR_TRADE = Decimal("1")           # Keep $1 minimum
+POOL_CAPITAL_MULTIPLIER = Decimal("2") # Pool = 2x starting capital (e.g. $100 pool for $50 deploy)
+
+# Realistic slippage: tiered based on order size
+# Small orders (<$15) likely get best price, larger orders eat into book
+SLIPPAGE_THRESHOLD = Decimal("15")     # Orders below this get no slippage
+SLIPPAGE_PER_SHARE = Decimal("0.01")   # $0.01 worse per share on larger orders
 
 
 @register_strategy
@@ -98,6 +104,8 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self.profit_exits = 0  # Track how many exits were profit-based
         self.trailing_stops = 0  # Track trailing stop exits
         self.conviction_buys = 0  # Track buys on large leader trades
+        self.cash = Decimal("0")  # Track actual cash balance (set in initialize)
+        self.scale_boost = Decimal("8")  # Default, set properly in initialize()
 
     @property
     def name(self) -> str:
@@ -116,6 +124,10 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self.profit_exits = 0
         self.trailing_stops = 0
         self.conviction_buys = 0
+        self.cash = config.starting_capital * POOL_CAPITAL_MULTIPLIER  # Pool: 2x deploy cap
+        self._last_all_prices: Dict[str, PriceSnapshot] = {}  # End-of-hour prices for resolution
+        # Dynamic boost based on capital: $30->8x, $50+->10x
+        self.scale_boost = Decimal("10") if config.starting_capital >= Decimal("50") else Decimal("8")
         self.scale_ratio = (config.starting_capital / config.leader_capital * config.k_factor
                            if config.leader_capital > 0 else Decimal("0.1"))
 
@@ -149,11 +161,54 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         sell_pct = (trade.shares / leader_pos["shares"]) * 100
         return sell_pct < IGNORE_LEADER_MINISELLS_PCT
 
+    def _liquidate_hour_boundary(self, all_prices: Dict[str, PriceSnapshot]) -> None:
+        """Sell all open positions at hour boundary (hourly markets resolve).
+
+        Uses resolution prices: if last bid >= 0.50 our side won -> $0.99,
+        otherwise our side lost -> $0.01.
+        If no price data available, use entry price to guess outcome.
+        """
+        for token_id, pos in list(self.portfolio.get_positions().items()):
+            if pos.shares <= 0:
+                continue
+            price_snap = all_prices.get(token_id)
+            if price_snap and price_snap.bid and price_snap.bid > 0:
+                last_bid = price_snap.bid
+            else:
+                # No price snapshot — use entry price as best guess
+                last_bid = self.our_entries.get(token_id, Decimal("0.50"))
+            # Resolution price: winning side -> $0.99, losing side -> $0.01
+            if last_bid >= Decimal("0.50"):
+                resolution_price = Decimal("0.99")
+            else:
+                resolution_price = Decimal("0.01")
+            dollars = pos.shares * resolution_price
+            self.portfolio.apply_sell(token_id, pos.market_id, pos.side, pos.shares, resolution_price)
+            self.cash += dollars
+            self.sells += 1
+            if token_id in self.our_entries:
+                del self.our_entries[token_id]
+            if token_id in self.high_water_marks:
+                del self.high_water_marks[token_id]
+            logger.info(f"HOUR RESOLVE: {token_id} @{resolution_price} (bid={last_bid}) = ${dollars:.2f}")
+        # Clear leader positions - hourly markets reset each hour
+        self.leader_positions = {}
+
     def on_event(self, event: MarketEvent) -> TradeDecision:
+        # Liquidate all positions when hour changes (hourly markets resolve)
+        all_prices = event.context.get('all_prices', {})
+        prev_hour = self._current_hour
         self._check_hourly_reset(event.trade.timestamp)
+        if prev_hour is not None and self._current_hour != prev_hour:
+            # Use END-of-previous-hour prices for resolution (more accurate than
+            # start-of-next-hour, since old hour's tokens may have stale prices by then)
+            resolve_prices = self._last_all_prices if self._last_all_prices else all_prices
+            self._liquidate_hour_boundary(resolve_prices)
+        self._last_all_prices = all_prices
+
         trade, prices = event.trade, event.prices
 
-        # Skip tiny leader trades (noise filter) - applies to ALL trades like conservative
+        # Skip tiny leader trades (noise filter) - 1% of leader capital
         if self.config.leader_capital > 0:
             trade_pct = trade.dollars / self.config.leader_capital * 100
             if trade_pct < MIN_LEADER_TRADE_PCT:
@@ -255,23 +310,25 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         if ask >= SKIP_PRICE_HIGH:
             return self._skip("price_too_high")
 
-        # Cost check (looser than before)
-        if trade.price > 0:
+        # Cost check - but ALWAYS take trade if our price is better than leader's
+        if trade.price > 0 and ask > trade.price:
+            # Only check cost if we're paying MORE than leader
             drift = ((ask - trade.price) / trade.price) * 100
             actual_spread_pct = calculate_actual_spread_pct(prices)
             if drift + actual_spread_pct + cfg.slippage_cost_pct > MAX_TOTAL_COST_PCT:
                 return self._skip("cost_too_high")
 
-        # Calculate our size: BASE RATIO * SCALE_BOOST
-        # SCALE_BOOST compensates for 77% of trades we can't follow
-        our_dollars = trade.dollars * self.scale_ratio * SCALE_BOOST
+        # Calculate our size: BASE RATIO * scale_boost
+        # scale_boost compensates for 77% of trades we can't follow
+        our_dollars = trade.dollars * self.scale_ratio * self.scale_boost
 
-        # Capacity checks
+        # Capacity checks - use ACTUAL CASH to prevent overspending
         deployable = cfg.starting_capital * (1 - CASH_RESERVE_PCT / 100)
         deployed = self.portfolio.get_total_deployed()
-        available = deployable - deployed
+        position_room = deployable - deployed  # Room based on position caps
+        available = min(position_room, self.cash)  # Enforce actual cash limit
         if available <= 0:
-            return self._skip("reserve")
+            return self._skip("no_cash" if self.cash <= 0 else "reserve")
 
         dollars = min(our_dollars, available, cfg.hourly_budget - self.hourly_budget_used)
         if cfg.hourly_budget - self.hourly_budget_used <= 0:
@@ -296,9 +353,6 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             return self._skip("global_cap")
         dollars = min(dollars, global_room)
 
-        # Apply caps
-        dollars = min(our_dollars, available, cfg.hourly_budget - self.hourly_budget_used)
-
         # Ensure minimum viable trade
         min_dollars = max(MIN_LIMIT_ORDER_SHARES * ask, MIN_OUR_TRADE)
         if dollars < min_dollars:
@@ -308,7 +362,12 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             else:
                 return self._skip("min_order")
 
-        shares = (dollars / ask).quantize(Decimal("0.01"))
+        # Apply slippage only on larger orders (small orders get best price)
+        if dollars >= SLIPPAGE_THRESHOLD:
+            exec_price = ask + SLIPPAGE_PER_SHARE
+        else:
+            exec_price = ask
+        shares = (dollars / exec_price).quantize(Decimal("0.01"))
         if shares < MIN_LIMIT_ORDER_SHARES:
             shares = MIN_LIMIT_ORDER_SHARES
 
@@ -316,7 +375,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             return self._skip("min_order")
 
         self.buys += 1
-        return TradeDecision.buy(dollars, shares, ask)
+        return TradeDecision.buy(dollars, shares, exec_price)
 
     def _handle_leader_sell(self, event: MarketEvent) -> TradeDecision:
         """Follow leader's sell (unless it's a mini-sell)."""
@@ -335,17 +394,23 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         if self._is_leader_minisell(event):
             return self._skip("leader_minisell")
 
-        # Loss protection - don't sell at loss if leader is selling at profit
-        if pos.avg_price > 0 and bid < pos.avg_price:
+        # Loss protection - but ALWAYS sell if our bid is better than leader's sale price
+        if bid <= trade.price and pos.avg_price > 0 and bid < pos.avg_price:
+            # Only check loss protection if we're getting WORSE price than leader
             lp = self.leader_positions.get(trade.token_id)
             if lp and lp.get("shares", 0) > 0:
                 leader_avg = lp["cost_basis"] / lp["shares"] if lp["shares"] > 0 else Decimal("0")
                 if leader_avg > 0 and trade.price >= leader_avg:
                     return self._skip("leader_profit_our_loss")
 
-        # Follow the sell
+        # Follow the sell - apply slippage only on larger orders
         scaled = trade.dollars * self.scale_ratio
         shares = min((scaled / bid).quantize(Decimal("0.01")), pos.shares)
+        dollars_approx = shares * bid
+        if dollars_approx >= SLIPPAGE_THRESHOLD:
+            exec_price = max(bid - SLIPPAGE_PER_SHARE, Decimal("0.01"))
+        else:
+            exec_price = bid
         if shares < MIN_LIMIT_ORDER_SHARES:
             if pos.shares >= MIN_LIMIT_ORDER_SHARES:
                 shares = MIN_LIMIT_ORDER_SHARES
@@ -355,19 +420,36 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         if shares <= 0:
             return self._skip("zero_shares")
 
+        # Enforce $1 minimum on sells
+        dollars = shares * exec_price
+        if dollars < MIN_OUR_TRADE:
+            return self._skip("sell_too_small")
+
         self.sells += 1
-        return TradeDecision.sell(shares * bid, shares, bid)
+        return TradeDecision.sell(dollars, shares, exec_price)
 
     def _exit_position(self, pos, bid: Decimal, reason: str, **kwargs) -> TradeDecision:
         """Exit a position completely.
 
         kwargs can include token_id, market_id, side for cross-token profit exits.
         """
+        # Apply slippage only on larger orders
         shares = pos.shares
+        dollars_approx = shares * bid
+        if dollars_approx >= SLIPPAGE_THRESHOLD:
+            exec_price = max(bid - SLIPPAGE_PER_SHARE, Decimal("0.01"))
+        else:
+            exec_price = bid
         if shares < MIN_LIMIT_ORDER_SHARES:
             shares = pos.shares  # Sell all even if below min
+
+        # Enforce $1 minimum on exits
+        dollars = shares * exec_price
+        if dollars < MIN_OUR_TRADE:
+            return self._skip("exit_too_small")
+
         self.sells += 1
-        return TradeDecision.sell(shares * bid, shares, bid, exit_reason=reason, **kwargs)
+        return TradeDecision.sell(dollars, shares, exec_price, exit_reason=reason, **kwargs)
 
     def on_fill(self, event: MarketEvent, decision: TradeDecision) -> None:
         trade = event.trade
@@ -384,13 +466,15 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             self.portfolio.apply_buy(token_id, market_id, side, shares, price)
             if decision.dollars:
                 self.hourly_budget_used += decision.dollars
+                self.cash -= decision.dollars  # Spend cash
             # Track our entry price
             self.our_entries[token_id] = price
         elif decision.action == DecisionAction.SELL:
             self.portfolio.apply_sell(token_id, market_id, side, shares, price)
-            # Credit sell proceeds back to hourly budget (allows capital recycling)
+            # Credit sell proceeds back to hourly budget and cash
             if decision.dollars:
                 self.hourly_budget_used = max(Decimal("0"), self.hourly_budget_used - decision.dollars)
+                self.cash += decision.dollars  # Receive cash from sale
             # Clear entry and high water mark if fully exited
             pos = self.portfolio.get(token_id, market_id, side)
             if pos.shares <= 0:
@@ -424,6 +508,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             "total_bought": str(self.portfolio.total_bought),
             "total_sold": str(self.portfolio.total_sold),
             "hourly_budget_used": str(self.hourly_budget_used),
+            "cash": str(self.cash),
             "buys": self.buys,
             "conviction_buys": self.conviction_buys,
             "sells": self.sells,

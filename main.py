@@ -104,6 +104,14 @@ def main():
         default="mirror",
         help="Strategy to use for replay (default: mirror)",
     )
+
+    # Hourly liquidation for replay
+    parser.add_argument(
+        "--liquidate-hourly",
+        action="store_true",
+        dest="liquidate_hourly",
+        help="Force-sell all positions at hour boundaries during replay",
+    )
     
     # Optimization variant
     parser.add_argument(
@@ -145,7 +153,10 @@ def main():
         
         try:
             strategy = get_strategy(strategy_name)
-            result = run_session_replay(args.replay_session, strategy)
+            result = run_session_replay(
+                args.replay_session, strategy,
+                liquidate_hourly=args.liquidate_hourly,
+            )
         except ValueError as e:
             print(f"Error: {e}")
             print(f"Available strategies: {', '.join(list_strategies())}")
