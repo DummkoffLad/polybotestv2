@@ -95,7 +95,11 @@ class SessionReplayer:
             if liquidate_hourly:
                 event_hour = event.trade.timestamp.hour
                 if current_hour is not None and event_hour != current_hour:
-                    self._liquidate_all_positions(all_prices_at_time, result)
+                    # Use end-of-previous-hour prices for resolution (matches live runner)
+                    end_of_hour_prices = self.loader.get_last_prices_for_hour(current_hour)
+                    # Fall back to event prices if no snapshots for that hour
+                    liq_prices = end_of_hour_prices if end_of_hour_prices else all_prices_at_time
+                    self._liquidate_all_positions(liq_prices, result)
                 current_hour = event_hour
 
             processor.process_event(i, event, all_prices_at_time)

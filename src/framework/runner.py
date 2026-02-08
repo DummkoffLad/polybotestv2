@@ -49,7 +49,8 @@ class UniversalRunner:
         self._trade_log_file: Optional[TextIO] = None
         self._trade_log_writer = None
         self._trade_sequence = 0
-        
+        self._carry_cash: Optional[Decimal] = None  # Cash to carry across hourly resets
+
         # Ensure state directory exists
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         
@@ -260,7 +261,10 @@ class UniversalRunner:
             if self.price_service:
                 try: bid, ask = self.price_service.get_prices(bt.token_id)
                 except: pass
-            return MarketEvent(trade=trade, prices=PriceSnapshot(token_id=bt.token_id, bid=bid, ask=ask))
+            event = MarketEvent(trade=trade, prices=PriceSnapshot(token_id=bt.token_id, bid=bid, ask=ask))
+            # Pass all_prices in context — required by circuit breaker and resolution logic
+            event.context['all_prices'] = self._build_all_prices()
+            return event
         except Exception as e:
             logger.error(f"Event error: {e}")
             return None
@@ -374,62 +378,45 @@ class UniversalRunner:
         return self._get_seconds_until_hour_end() <= threshold_sec
 
     def _hourly_cleanup(self) -> None:
-        """Clean up positions before hourly market transition."""
-        logger.info("🕐 Hourly market transition starting - cleaning up positions")
+        """Resolve positions at hour boundary — matches simulation logic exactly.
+
+        Uses _liquidate_hour_boundary to resolve all positions at $0.99/$0.01
+        based on last known bid, then saves cash to carry forward to next hour.
+        """
+        logger.info("Hourly market transition starting - resolving positions")
         print(f"\n{'='*50}")
-        print("  HOURLY TRANSITION - Cleaning up positions")
+        print("  HOURLY RESOLUTION")
         print(f"{'='*50}")
 
-        state = self.strategy.get_state()
-        positions = state.get("positions", {})
+        cash_before = getattr(self.strategy, 'cash', Decimal("0"))
 
-        if not positions:
-            logger.info("No positions to clean up")
-            print("  No positions to clean up")
-            return
+        # Build all_prices from price service (same as what events get)
+        all_prices = self._build_all_prices()
 
-        cleaned = 0
-        for token_id, pos_data in positions.items():
-            shares = Decimal(pos_data.get("shares", "0"))
-            if shares <= 0:
-                continue
+        # Also update strategy's _last_all_prices so it has end-of-hour prices
+        if hasattr(self.strategy, '_last_all_prices'):
+            self.strategy._last_all_prices = all_prices
 
-            # Get current price
-            bid = None
-            if self.price_service:
-                try:
-                    bid, _ = self.price_service.get_prices(token_id)
-                except:
-                    pass
+        # Call the strategy's own resolution logic — identical to simulation
+        if hasattr(self.strategy, '_liquidate_hour_boundary'):
+            self.strategy._liquidate_hour_boundary(all_prices)
+        else:
+            logger.warning("Strategy has no _liquidate_hour_boundary method")
 
-            if bid is None:
-                logger.warning(f"No price for {token_id[:16]}... - position will expire")
-                print(f"  ⚠️ No price for {token_id[:16]}... - will expire")
-                continue
+        cash_after = getattr(self.strategy, 'cash', Decimal("0"))
+        hour_pnl = cash_after - cash_before
 
-            if bid >= EXTREME_HIGH_PRICE:
-                # Auto-sell at high price (take profit)
-                logger.info(f"Auto-sell at {bid}: {shares} shares of {token_id[:16]}...")
-                print(f"  💰 Auto-sell at {bid}: {shares:.2f} shares (take profit)")
-                # The actual sell would need to go through execution adapter
-                # For now we log and let strategy handle it
-                cleaned += 1
-            elif bid <= EXTREME_LOW_PRICE:
-                # Accept loss - don't sell, let expire
-                logger.info(f"Accept loss at {bid}: {shares} shares of {token_id[:16]}...")
-                print(f"  📉 Accept loss at {bid}: {shares:.2f} shares (let expire)")
-                cleaned += 1
-            else:
-                logger.warning(f"Mid-priced position {bid}: {shares} shares of {token_id[:16]}...")
-                print(f"  ⚠️ Mid-price {bid}: {shares:.2f} shares (may lose value)")
+        # Save cash to carry forward (don't let _init reset it to $100)
+        self._carry_cash = cash_after
 
-        logger.info(f"Hourly cleanup complete: {cleaned} positions processed")
-        print(f"  Cleanup complete: {cleaned} positions processed")
+        logger.info(f"Hour resolved: cash ${cash_before:.2f} -> ${cash_after:.2f} (PnL ${hour_pnl:+.2f})")
+        print(f"  Cash: ${cash_before:.2f} -> ${cash_after:.2f} (PnL ${hour_pnl:+.2f})")
+        print(f"  Cumulative: ${cash_after:.2f}")
 
     def _hourly_restart(self) -> None:
-        """Restart the bot for new hourly market."""
+        """Restart the bot for new hourly market, carrying cash forward."""
         sec_until_end = self._get_seconds_until_hour_end()
-        logger.info(f"🕐 Waiting {sec_until_end:.0f}s until hour end...")
+        logger.info(f"Waiting {sec_until_end:.0f}s until hour end...")
         print(f"  Waiting {sec_until_end:.0f}s until hour end...")
 
         # Stop price service
@@ -451,12 +438,19 @@ class UniversalRunner:
         if self.data_source:
             self.data_source._token_to_market.clear()
 
-        # Re-initialize
-        logger.info("🔄 Restarting with fresh state...")
+        # Re-initialize strategy and connections
+        logger.info("Restarting with fresh state...")
         print(f"\n{'='*50}")
-        print("  RESTARTING WITH FRESH STATE")
+        print("  NEW HOUR - FRESH STATE")
         print(f"{'='*50}")
         self._init()
+
+        # Carry cash forward from previous hour (don't reset to starting capital)
+        if self._carry_cash is not None and hasattr(self.strategy, 'cash'):
+            default_cash = self.strategy.cash
+            self.strategy.cash = self._carry_cash
+            logger.info(f"Cash carried forward: ${self._carry_cash:.2f} (default was ${default_cash:.2f})")
+            print(f"  Cash carried forward: ${self._carry_cash:.2f}")
 
         # Reconnect recorder if active
         if self.recorder and self.price_service:
@@ -465,6 +459,20 @@ class UniversalRunner:
         logger.info("Hourly restart complete - resuming trading")
         print("  Ready for new hour.\n")
     
+    def _build_all_prices(self) -> Dict[str, PriceSnapshot]:
+        """Build all_prices dict from price_service — same format as replay loader."""
+        all_prices: Dict[str, PriceSnapshot] = {}
+        if not self.price_service:
+            return all_prices
+        for token_id in list(self.price_service._subscribed):
+            try:
+                bid, ask = self.price_service.get_prices(token_id)
+                if bid is not None or ask is not None:
+                    all_prices[token_id] = PriceSnapshot(token_id=token_id, bid=bid, ask=ask)
+            except Exception:
+                pass
+        return all_prices
+
     def _hash(self, t) -> str: return f"{t.transaction_hash or ''}_{t.asset}_{t.timestamp}"
 
     # ========== TRADE LOG FOR DRY RUN COMPARISON ==========

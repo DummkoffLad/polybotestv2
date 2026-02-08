@@ -315,3 +315,18 @@ class SessionLoader:
             else:
                 break
         return result
+
+    def get_last_prices_for_hour(self, hour: int) -> Dict[str, PriceSnapshot]:
+        """Get the latest known prices for a given hour (end-of-hour prices).
+
+        Returns the accumulated prices from ALL snapshots within that hour,
+        giving the most accurate view of prices at hour boundary / resolution time.
+        This matches what the live runner sees when it resolves at the hour boundary.
+        """
+        result: Dict[str, PriceSnapshot] = {}
+        for snapshot in self._price_snapshots:
+            if snapshot.timestamp.hour == hour:
+                result.update(snapshot.prices)
+            elif snapshot.timestamp.hour > hour or (hour == 23 and snapshot.timestamp.hour == 0):
+                break  # Past this hour, stop
+        return result
