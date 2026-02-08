@@ -35,7 +35,7 @@ class SessionRecorder:
     - Periodic price snapshots for all subscribed markets
     """
     
-    def __init__(self, output_dir: Path = Path("data/sessions"), 
+    def __init__(self, output_dir: Path = Path("data/sessions"),
                  price_snapshot_interval_sec: float = 2.0):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -43,7 +43,13 @@ class SessionRecorder:
         self.file: Optional[TextIO] = None
         self.sequence = 0
         self.start_time: Optional[datetime] = None
-        
+
+        # Hour-splitting: per-hour files alongside continuous
+        self._hour_file: Optional[TextIO] = None
+        self._current_hour: Optional[int] = None
+        self._session_time_name: str = ""
+        self._day_path: Path = Path()
+
         # Price snapshot config
         self.price_snapshot_interval_sec = price_snapshot_interval_sec
         self._last_price_snapshot: float = 0.0
@@ -63,7 +69,13 @@ class SessionRecorder:
         day_path.mkdir(parents=True, exist_ok=True)
         filepath = day_path / f"{time_name}.jsonl"
         self.file = open(filepath, "w", encoding="utf-8")
-        
+
+        # Store for hour file naming
+        self._session_time_name = time_name
+        self._day_path = day_path
+        self._current_hour = None
+        self._hour_file = None
+
         self._write({"type": "session_start", "timestamp": self.start_time.isoformat(),
                      "session_id": self.session_id, "config": self._clean(config)})
         return self.session_id
@@ -117,8 +129,13 @@ class SessionRecorder:
                 "skip_reason": decision.skip_reason,
                 "our_dollars": str(decision.dollars) if decision.dollars else None,
             }
-        self._write(record)
-        
+
+        # Detect hour from trade timestamp and rotate hour file if needed
+        event_hour = event.trade.timestamp.hour
+        self._check_hour_rotation(event_hour)
+
+        self._write_all(record)
+
         # Track this token for price snapshots
         self._subscribed_tokens.add(event.trade.token_id)
     
@@ -165,7 +182,12 @@ class SessionRecorder:
                 pass  # Token might not have prices yet
         
         if prices_data:
-            self._write({
+            # Rotate hour file if needed (only after first event set the hour)
+            if self._current_hour is not None:
+                now_hour = datetime.now(timezone.utc).hour
+                self._check_hour_rotation(now_hour)
+
+            self._write_all({
                 "type": "price_snapshot",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "prices": prices_data,
@@ -176,23 +198,77 @@ class SessionRecorder:
     def end_session(self, summary: Optional[Dict] = None) -> Path:
         if not self.file:
             return Path()
-        
+
         # Record final price snapshot before ending
         if self._price_service:
             self._record_price_snapshot()
-        
+
         end_time = datetime.now(timezone.utc)
-        self._write({"type": "session_end", "timestamp": end_time.isoformat(),
-                     "session_id": self.session_id, "summary": summary or {}})
+        end_record = {"type": "session_end", "timestamp": end_time.isoformat(),
+                      "session_id": self.session_id, "summary": summary or {}}
+
+        # Close continuous file
+        self._write(end_record)
         filepath = Path(self.file.name)
         self.file.close()
         self.file = None
+
+        # Close hour file
+        if self._hour_file:
+            self._write_hour(end_record)
+            self._hour_file.close()
+            self._hour_file = None
+            self._current_hour = None
+
         return filepath
     
+    def _check_hour_rotation(self, event_hour: int) -> None:
+        """Rotate per-hour file when the UTC hour changes."""
+        if self._current_hour == event_hour:
+            return
+
+        # Close old hour file with session_end
+        if self._hour_file:
+            self._write_hour({"type": "session_end",
+                              "timestamp": datetime.now(timezone.utc).isoformat(),
+                              "session_id": self.session_id, "hour": self._current_hour})
+            self._hour_file.close()
+            self._hour_file = None
+            logger.info(f"Hour file closed for hour {self._current_hour}")
+
+        # Open new hour file
+        self._current_hour = event_hour
+        filename = f"{self._session_time_name}_hour_{event_hour:02d}.jsonl"
+        filepath = self._day_path / filename
+        self._hour_file = open(filepath, "w", encoding="utf-8")
+
+        # Write session_start to hour file
+        self._write_hour({"type": "session_start",
+                          "timestamp": datetime.now(timezone.utc).isoformat(),
+                          "session_id": self.session_id, "hour": event_hour})
+        logger.info(f"Hour file opened: {filepath}")
+
     def _write(self, data: Dict) -> None:
+        """Write to continuous file only."""
         if self.file:
             self.file.write(json.dumps(data, cls=DecimalEncoder) + "\n")
             self.file.flush()
+
+    def _write_all(self, data: Dict) -> None:
+        """Write to both continuous and current hour file."""
+        line = json.dumps(data, cls=DecimalEncoder) + "\n"
+        if self.file:
+            self.file.write(line)
+            self.file.flush()
+        if self._hour_file:
+            self._hour_file.write(line)
+            self._hour_file.flush()
+
+    def _write_hour(self, data: Dict) -> None:
+        """Write to hour file only."""
+        if self._hour_file:
+            self._hour_file.write(json.dumps(data, cls=DecimalEncoder) + "\n")
+            self._hour_file.flush()
     
     def _clean(self, obj):
         if isinstance(obj, Decimal):

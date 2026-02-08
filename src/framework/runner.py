@@ -51,6 +51,11 @@ class UniversalRunner:
         self._trade_sequence = 0
         self._carry_cash: Optional[Decimal] = None  # Cash to carry across hourly resets
 
+        # Per-hour trade log
+        self._hour_trade_log_file: Optional[TextIO] = None
+        self._hour_trade_log_writer = None
+        self._current_trade_log_hour: Optional[int] = None
+
         # Ensure state directory exists
         STATE_DIR.mkdir(parents=True, exist_ok=True)
         
@@ -393,6 +398,20 @@ class UniversalRunner:
         # Build all_prices from price service (same as what events get)
         all_prices = self._build_all_prices()
 
+        # Capture positions BEFORE liquidation so we can record resolution sells
+        positions_before = {}
+        for token_id, pos in self.strategy.portfolio.get_positions().items():
+            if pos.shares > 0:
+                entry = self.strategy.our_entries.get(token_id, Decimal("0"))
+                ps = all_prices.get(token_id)
+                bid = ps.bid if ps and ps.bid and ps.bid > 0 else entry
+                res_price = Decimal("0.99") if bid >= Decimal("0.50") else Decimal("0.01")
+                positions_before[token_id] = {
+                    "shares": pos.shares, "entry": entry, "bid": bid,
+                    "res_price": res_price, "market_id": pos.market_id,
+                    "side": pos.side,
+                }
+
         # Also update strategy's _last_all_prices so it has end-of-hour prices
         if hasattr(self.strategy, '_last_all_prices'):
             self.strategy._last_all_prices = all_prices
@@ -405,6 +424,56 @@ class UniversalRunner:
 
         cash_after = getattr(self.strategy, 'cash', Decimal("0"))
         hour_pnl = cash_after - cash_before
+
+        # Record resolution sells in JSONL and trade CSV
+        now_ts = datetime.now(timezone.utc)
+        for token_id, info in positions_before.items():
+            dollars = info["shares"] * info["res_price"]
+            won = info["res_price"] == Decimal("0.99")
+            wl = "WIN" if won else "LOSS"
+            print(f"  RESOLVE: {token_id[:16]}... @{info['res_price']} ({wl}) = ${dollars:.2f}")
+
+            # Record in JSONL session file
+            if self.recorder and self.recorder.file:
+                self.recorder._write_all({
+                    "type": "hour_resolution",
+                    "timestamp": now_ts.isoformat(),
+                    "token_id": token_id,
+                    "action": "RESOLVE",
+                    "shares": str(info["shares"]),
+                    "entry_price": str(info["entry"]),
+                    "last_bid": str(info["bid"]),
+                    "resolution_price": str(info["res_price"]),
+                    "dollars": str(dollars),
+                    "won": won,
+                })
+
+            # Record in trade CSV
+            if self._trade_log_writer:
+                self._trade_sequence += 1
+                row = [
+                    self._trade_sequence,
+                    now_ts.strftime("%H:%M:%S"),
+                    f"RESOLVE_{wl}",
+                    str(info["side"].value) if hasattr(info["side"], "value") else str(info["side"]),
+                    "0.00",  # no leader dollars for resolution
+                    f"{dollars:.2f}",
+                    f"{info['res_price']:.4f}",
+                    f"{info['shares']:.2f}",
+                    f"{info['bid']:.4f}",
+                    "N/A",
+                    f"{cash_after:.2f}",
+                    token_id[:16] + "...",
+                ]
+                try:
+                    self._trade_log_writer.writerow(row)
+                    self._trade_log_file.flush()
+                    # Also write to hour CSV
+                    if self._hour_trade_log_writer:
+                        self._hour_trade_log_writer.writerow(row)
+                        self._hour_trade_log_file.flush()
+                except Exception as e:
+                    logger.error(f"Could not log resolution: {e}")
 
         # Save cash to carry forward (don't let _init reset it to $100)
         self._carry_cash = cash_after
@@ -502,32 +571,75 @@ class UniversalRunner:
             logger.error(f"Could not start trade log: {e}")
 
     def _log_trade(self, event: MarketEvent, decision, cash_after: Decimal) -> None:
-        """Log a trade to the trade log CSV."""
+        """Log a trade to both continuous and per-hour trade log CSVs."""
         if not self._trade_log_writer:
             return
 
         self._trade_sequence += 1
+        row = [
+            self._trade_sequence,
+            datetime.now(timezone.utc).strftime("%H:%M:%S"),
+            decision.action.value,
+            event.trade.side.value,
+            f"{event.trade.dollars:.2f}",
+            f"{decision.dollars:.2f}",
+            f"{decision.price:.4f}",
+            f"{decision.shares:.2f}",
+            f"{event.prices.bid:.4f}" if event.prices.bid else "N/A",
+            f"{event.prices.ask:.4f}" if event.prices.ask else "N/A",
+            f"{cash_after:.2f}",
+            event.trade.token_id[:16] + "...",
+        ]
         try:
-            self._trade_log_writer.writerow([
-                self._trade_sequence,
-                datetime.now(timezone.utc).strftime("%H:%M:%S"),
-                decision.action.value,
-                event.trade.side.value,
-                f"{event.trade.dollars:.2f}",
-                f"{decision.dollars:.2f}",
-                f"{decision.price:.4f}",
-                f"{decision.shares:.2f}",
-                f"{event.prices.bid:.4f}" if event.prices.bid else "N/A",
-                f"{event.prices.ask:.4f}" if event.prices.ask else "N/A",
-                f"{cash_after:.2f}",
-                event.trade.token_id[:16] + "...",
-            ])
+            # Write to continuous CSV
+            self._trade_log_writer.writerow(row)
             self._trade_log_file.flush()
+
+            # Rotate and write to per-hour CSV
+            trade_hour = datetime.now(timezone.utc).hour
+            self._rotate_trade_log_hour(trade_hour)
+            if self._hour_trade_log_writer:
+                self._hour_trade_log_writer.writerow(row)
+                self._hour_trade_log_file.flush()
         except Exception as e:
             logger.error(f"Could not log trade: {e}")
 
+    def _rotate_trade_log_hour(self, hour: int) -> None:
+        """Rotate per-hour trade log CSV when the UTC hour changes."""
+        if self._current_trade_log_hour == hour:
+            return
+
+        # Close old hour CSV
+        if self._hour_trade_log_file:
+            try:
+                self._hour_trade_log_file.close()
+            except Exception:
+                pass
+            self._hour_trade_log_file = None
+            self._hour_trade_log_writer = None
+
+        # Open new hour CSV
+        if not self.recorder:
+            return
+        self._current_trade_log_hour = hour
+        session_dir = self.recorder.output_dir / self.recorder.session_id.split("/")[0]
+        time_part = self.recorder.session_id.split("/")[1]
+        path = session_dir / f"{time_part}_trades_hour_{hour:02d}.csv"
+
+        try:
+            self._hour_trade_log_file = open(path, "w", newline="", encoding="utf-8")
+            self._hour_trade_log_writer = csv.writer(self._hour_trade_log_file)
+            self._hour_trade_log_writer.writerow([
+                "seq", "time", "action", "side", "leader_$", "our_$",
+                "price", "shares", "bid", "ask", "cash_after", "token_id"
+            ])
+            self._hour_trade_log_file.flush()
+            logger.info(f"Hour trade log opened: {path}")
+        except Exception as e:
+            logger.error(f"Could not start hour trade log: {e}")
+
     def _close_trade_log(self) -> None:
-        """Close the trade log file."""
+        """Close both continuous and per-hour trade log files."""
         if self._trade_log_file:
             try:
                 self._trade_log_file.close()
@@ -536,6 +648,14 @@ class UniversalRunner:
                 logger.info("Trade log closed")
             except Exception as e:
                 logger.error(f"Could not close trade log: {e}")
+        if self._hour_trade_log_file:
+            try:
+                self._hour_trade_log_file.close()
+                self._hour_trade_log_file = None
+                self._hour_trade_log_writer = None
+                self._current_trade_log_hour = None
+            except Exception as e:
+                logger.error(f"Could not close hour trade log: {e}")
 
     def _shutdown(self) -> None:
         """Graceful shutdown with state persistence."""

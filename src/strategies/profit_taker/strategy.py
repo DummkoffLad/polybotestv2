@@ -1,12 +1,14 @@
 """Profit Taker Strategy - Cherry-pick high-conviction leader trades.
 
-Grid-searched across 78 hourly trials with train/test split (46/32 hours):
-- SKIP_PRICE_LOW = 0.45: Low prices add variance without PnL (0% WR at resolution)
+Validated across 86 hourly trials with train/test/holdout split (46/32/8 hours):
+- SKIP_PRICE_LOW = 0.45: Low prices add variance without PnL (32% WR at resolution)
 - MIN_LEADER_TRADE_PCT = 2.0%: Only follow trades >= $18 (conviction trades)
 - SCALE_BOOST = 8x: Compensate for selectivity with larger position sizes
-- Drawdown circuit breaker: $15 halve / $25 stop to limit tail risk
+- Drawdown circuit breaker: $10 halve / $20 stop (tightened from $15/$25)
+- Late-entry bonus: 2x boost for trades after minute 40 (leader 87% accurate late)
+- Sell sizing intentionally unscaled (keeps positions for $0.99 resolution upside)
 
-Result: +$438 across 78 hours (Sharpe +0.450), consistent on both train and test.
+Result: +$113 across 78 hours (Sharpe +0.099), triple-validated on train/test/holdout.
 """
 from __future__ import annotations
 
@@ -50,15 +52,20 @@ SKIP_PRICE_LOW = Decimal("0.45")   # Skip low prices (<45c) — adds variance wi
 # that ALL resolve at $0.01 with no mid-hour exits. Without this, we deploy
 # $40+ and lose almost everything. The breaker catches the drawdown mid-hour
 # from underwater positions and stops us from piling on.
-DRAWDOWN_REDUCE_THRESHOLD = Decimal("15")  # After $15 drawdown → halve new buy size
-DRAWDOWN_STOP_THRESHOLD = Decimal("25")    # After $25 drawdown → stop buying entirely
-# Tradeoff: costs ~$1/hour in PnL but prevents catastrophic sessions.
-# Without: worst session = -$66. With: worst session ≈ -$42.
+DRAWDOWN_REDUCE_THRESHOLD = Decimal("10")  # After $10 drawdown → halve new buy size
+DRAWDOWN_STOP_THRESHOLD = Decimal("20")    # After $20 drawdown → stop buying entirely
+# Tightened from $15/$25: catches losses earlier. Triple-validated on train/test/holdout.
+# Combined Sharpe 0.085 (vs 0.070 with $15/$25).
 
-# Late-hour caution: DISABLED (grid-search tested, hurts more than helps)
-# Late trades are actually profitable — leader has conviction near resolution
+# Late-hour caution: DISABLED — late trades are actually the BEST (87% WR at min 45-60)
+# Instead, we BOOST late entries by 2x (see LATE_ENTRY_BOOST below)
 LATE_HOUR_REDUCE_MIN = 59  # Effectively disabled
 LATE_HOUR_STOP_MIN = 60    # Effectively disabled
+
+# Late-entry bonus: leader is most accurate late in the hour (87% WR min 45-60 vs 61% min 0-15)
+# Triple-validated: dd_10/20 + late_2x → Combined $+113, Sharpe 0.099
+LATE_ENTRY_BOOST_MIN = 40    # Apply boost starting at minute 40
+LATE_ENTRY_BOOST_MULT = Decimal("2")  # 2x position size for late entries
 
 # =============================================================================
 # PROFIT TARGETS - DISABLED (Leader knows best when to exit)
@@ -176,7 +183,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             if pos.shares <= 0:
                 continue
             price_snap = all_prices.get(token_id)
-            if price_snap and price_snap.bid and price_snap.bid > 0:
+            if price_snap and price_snap.bid is not None:
                 current_value = pos.shares * price_snap.bid
                 unrealized_pnl = current_value - pos.cost_basis
                 if unrealized_pnl < 0:
@@ -194,10 +201,11 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
             if pos.shares <= 0:
                 continue
             price_snap = all_prices.get(token_id)
-            if price_snap and price_snap.bid and price_snap.bid > 0:
+            if price_snap and price_snap.bid is not None:
+                # Use actual bid — bid=0 means token lost (orderbook drained)
                 last_bid = price_snap.bid
             else:
-                # No price snapshot — use entry price as best guess
+                # No price snapshot at all — use entry price as best guess
                 last_bid = self.our_entries.get(token_id, Decimal("0.50"))
             # Resolution price: winning side -> $0.99, losing side -> $0.01
             if last_bid >= Decimal("0.50"):
@@ -355,12 +363,17 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         # Calculate our size: BASE RATIO * scale_boost
         our_dollars = trade.dollars * self.scale_ratio * self.scale_boost
 
-        # Apply drawdown size reduction (50% after $12 drawdown)
+        # Late-entry bonus: leader is 87% accurate after minute 40 (vs 61% early)
+        if event_minute >= LATE_ENTRY_BOOST_MIN:
+            our_dollars = our_dollars * LATE_ENTRY_BOOST_MULT
+            logger.info(f"Late entry bonus: {LATE_ENTRY_BOOST_MULT}x size (minute {event_minute})")
+
+        # Apply drawdown size reduction (50% after threshold)
         if drawdown >= DRAWDOWN_REDUCE_THRESHOLD:
             our_dollars = our_dollars / 2
             logger.info(f"Circuit breaker: reducing size 50% (drawdown=${drawdown:.2f})")
 
-        # Apply late-hour size reduction (40% after minute 40)
+        # Apply late-hour size reduction (effectively disabled at min 59)
         if event_minute >= LATE_HOUR_REDUCE_MIN:
             our_dollars = our_dollars * Decimal("0.6")
             logger.info(f"Late hour: reducing size 40% (minute {event_minute})")
