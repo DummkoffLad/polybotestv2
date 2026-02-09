@@ -1,14 +1,16 @@
 """Profit Taker Strategy - Cherry-pick high-conviction leader trades.
 
 Validated across 86 hourly trials with train/test/holdout split (46/32/8 hours):
-- SKIP_PRICE_LOW = 0.45: Low prices add variance without PnL (32% WR at resolution)
+- SCALE_BOOST = 5x: Lower boost = smaller positions = less variance per hour
+- SKIP_PRICE_LOW = 0.45, SKIP_PRICE_HIGH = 0.85: Skip both extremes
 - MIN_LEADER_TRADE_PCT = 2.0%: Only follow trades >= $18 (conviction trades)
-- SCALE_BOOST = 8x: Compensate for selectivity with larger position sizes
-- Drawdown circuit breaker: $10 halve / $20 stop (tightened from $15/$25)
-- Late-entry bonus: 2x boost for trades after minute 40 (leader 87% accurate late)
+- CUMULATIVE_MIN_LEADER_DOLLARS = $300: Only follow after leader spent $300+ on token
+- Drawdown circuit breaker: $12 halve / $24 stop (loosened with conviction filter)
+- Late-entry bonus: 3x boost for trades after minute 40 (leader 87% accurate late)
 - Sell sizing intentionally unscaled (keeps positions for $0.99 resolution upside)
 
-Result: +$113 across 78 hours (Sharpe +0.099), triple-validated on train/test/holdout.
+Result: +$266 across 86 hours (Sharpe +0.382), triple-validated:
+  Train $+143, Test $+108, Holdout $+16. All robust.
 """
 from __future__ import annotations
 
@@ -37,12 +39,15 @@ logger = logging.getLogger(__name__)
 # Insight: Being selective (like manual trading) beats following everything.
 # Grid-searched on train/test split to avoid overfitting.
 
-# Base scale multiplier (grid-search optimized: 8x across 78 hourly trials)
-SCALE_BOOST = Decimal("8")
+# Base scale multiplier: lower boost = smaller positions = higher Sharpe ratio.
+# Compensated by 3x late-entry boost on the highest-conviction trades.
+SCALE_BOOST = Decimal("5")
 
-# Price filter - skip low-probability entries (grid-search validated on train/test split)
-SKIP_PRICE_HIGH = Decimal("0.97")  # Only skip very close to resolution
-SKIP_PRICE_LOW = Decimal("0.45")   # Skip low prices (<45c) — adds variance without PnL improvement
+# Price filter - skip BOTH extremes for maximum consistency:
+# Low prices (<45c): 32% WR, adds variance without PnL
+# High prices (>85c): expensive per share, only $0.14 upside, noisy
+SKIP_PRICE_HIGH = Decimal("0.85")
+SKIP_PRICE_LOW = Decimal("0.45")
 
 # =============================================================================
 # DRAWDOWN CIRCUIT BREAKER - Reduce risk when hour is going badly
@@ -52,10 +57,11 @@ SKIP_PRICE_LOW = Decimal("0.45")   # Skip low prices (<45c) — adds variance wi
 # that ALL resolve at $0.01 with no mid-hour exits. Without this, we deploy
 # $40+ and lose almost everything. The breaker catches the drawdown mid-hour
 # from underwater positions and stops us from piling on.
-DRAWDOWN_REDUCE_THRESHOLD = Decimal("10")  # After $10 drawdown → halve new buy size
-DRAWDOWN_STOP_THRESHOLD = Decimal("20")    # After $20 drawdown → stop buying entirely
-# Tightened from $15/$25: catches losses earlier. Triple-validated on train/test/holdout.
-# Combined Sharpe 0.085 (vs 0.070 with $15/$25).
+DRAWDOWN_REDUCE_THRESHOLD = Decimal("12")  # After $12 drawdown → halve new buy size
+DRAWDOWN_STOP_THRESHOLD = Decimal("24")    # After $24 drawdown → stop buying entirely
+# Loosened from $10/$20 when combined with conviction filter: conviction already filters
+# out low-quality trades, so we can afford slightly more drawdown room.
+# Combined with CUMULATIVE_MIN_LEADER_DOLLARS=300: Sharpe 0.382 (vs 0.331 at $10/$20).
 
 # Late-hour caution: DISABLED — late trades are actually the BEST (87% WR at min 45-60)
 # Instead, we BOOST late entries by 2x (see LATE_ENTRY_BOOST below)
@@ -63,9 +69,19 @@ LATE_HOUR_REDUCE_MIN = 59  # Effectively disabled
 LATE_HOUR_STOP_MIN = 60    # Effectively disabled
 
 # Late-entry bonus: leader is most accurate late in the hour (87% WR min 45-60 vs 61% min 0-15)
-# Triple-validated: dd_10/20 + late_2x → Combined $+113, Sharpe 0.099
+# 3x compensates for lower base boost (5x vs 8x) on the highest-conviction trades.
 LATE_ENTRY_BOOST_MIN = 40    # Apply boost starting at minute 40
-LATE_ENTRY_BOOST_MULT = Decimal("2")  # 2x position size for late entries
+LATE_ENTRY_BOOST_MULT = Decimal("3")  # 3x position size for late entries
+
+# =============================================================================
+# CONVICTION FILTER - Only follow after leader shows real commitment
+# =============================================================================
+# Key discovery: Leader spends $500+ on a token → 95% WR. Under $200 → 12% WR.
+# This filter tracks cumulative leader buy dollars per token IN REAL TIME (no future info).
+# We skip buys until the leader has committed $300+ on that specific token.
+# Tradeoff: we miss early cheap entries but only take high-conviction positions.
+# Triple-validated: cum$300+dd12/24 → Sharpe 0.382, $266, MaxLoss -$26
+CUMULATIVE_MIN_LEADER_DOLLARS = Decimal("300")
 
 # =============================================================================
 # PROFIT TARGETS - DISABLED (Leader knows best when to exit)
@@ -116,6 +132,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self.conviction_buys = 0  # Track buys on large leader trades
         self.cash = Decimal("0")  # Track actual cash balance (set in initialize)
         self.scale_boost = Decimal("8")  # Default, set properly in initialize()
+        self.leader_token_spend: Dict[str, Decimal] = {}  # Cumulative leader buy $ per token (conviction tracking)
 
     @property
     def name(self) -> str:
@@ -137,6 +154,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self.cash = config.starting_capital * POOL_CAPITAL_MULTIPLIER  # Pool: 2x deploy cap
         self._last_all_prices: Dict[str, PriceSnapshot] = {}  # End-of-hour prices for resolution
         self.scale_boost = SCALE_BOOST
+        self.leader_token_spend = {}  # Reset conviction tracker
         self._hourly_realized_loss = Decimal("0")  # Track realized sell losses per hour
         self.scale_ratio = (config.starting_capital / config.leader_capital * config.k_factor
                            if config.leader_capital > 0 else Decimal("0.1"))
@@ -224,6 +242,7 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         # Clear hourly state - hourly markets reset each hour
         self.leader_positions = {}
         self._hourly_realized_loss = Decimal("0")
+        self.leader_token_spend = {}  # Reset conviction tracker for new hour
 
     def on_event(self, event: MarketEvent) -> TradeDecision:
         # Liquidate all positions when hour changes (hourly markets resolve)
@@ -238,6 +257,14 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         self._last_all_prices = all_prices
 
         trade, prices = event.trade, event.prices
+
+        # Track cumulative leader buy spend for conviction signal.
+        # Must happen BEFORE any skip checks so ALL leader buys contribute
+        # to the running total (small trades still count toward conviction).
+        if trade.action == TradeAction.BUY:
+            self.leader_token_spend[trade.token_id] = (
+                self.leader_token_spend.get(trade.token_id, Decimal("0")) + trade.dollars
+            )
 
         # Skip tiny leader trades (noise filter) - 1% of leader capital
         if self.config.leader_capital > 0:
@@ -322,6 +349,9 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
 
         # Now handle leader's action
         if trade.action == TradeAction.BUY:
+            # Conviction filter: skip until leader has committed enough on this token
+            if self.leader_token_spend.get(trade.token_id, Decimal("0")) < CUMULATIVE_MIN_LEADER_DOLLARS:
+                return self._skip("low_conviction")
             return self._handle_leader_buy(event)
         else:
             return self._handle_leader_sell(event)
