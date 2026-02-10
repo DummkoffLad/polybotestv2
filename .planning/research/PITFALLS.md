@@ -1,1267 +1,852 @@
-# Pitfalls Research: Strategy Debugging & Comparison
+# Domain Pitfalls: Copy Trading Bot Simulation to Live
 
-**Domain:** Trading Strategy Performance Analysis
-**Context:** Understanding why conservative strategy won vs others in 12-session test
-**Researched:** 2026-02-03
-**Confidence:** HIGH (verified with multiple 2026 sources)
-
----
-
-## Executive Summary
-
-Strategy debugging fails primarily through **small sample bias** (12 sessions is not statistically significant), **overfitting explanations to noise** (finding patterns that don't generalize), and **confusing correlation with causation** (conservative traded more ≠ more trades caused profit). The path from "conservative won on 12 sessions" to "deploy a better strategy" is filled with cognitive traps that lead to strategies optimized for historical data that fail live.
-
-**Critical insight:** With only 12 sessions, a 95% confidence interval on performance is ±42%. Conservative may have won by luck, not skill. Any new strategy based on this limited data risks overfitting to noise.
-
-**Research foundation:** Analysis synthesizes findings from [Backtesting Traps](https://www.luxalgo.com/blog/backtesting-traps-common-errors-to-avoid/), [Overfitting in Trading](https://blog.traderspost.io/article/understanding-overfitting-in-trading-strategy-development), [Sample Size Requirements](https://medium.com/@trading.dude/how-many-trades-are-enough-a-guide-to-statistical-significance-in-backtesting-093c2eac6f05), [Polymarket Trading Mistakes](https://www.crypticorn.com/how-to-trade-polymarket-profitably-what-actually-works-in-2026/), and [Strategy Comparison Best Practices](https://www.quantstart.com/articles/Successful-Backtesting-of-Algorithmic-Trading-Strategies-Part-II/).
+**Domain:** Copy trading bot transitioning from simulation to live trading on Polymarket
+**Researched:** 2026-02-09
+**Confidence:** HIGH (based on official docs, community issues, and codebase analysis)
 
 ---
 
-## Analysis Pitfalls
+## CRITICAL PITFALLS
 
-### Pitfall 1: Small Sample Size Illusion
+These mistakes cause immediate money loss or catastrophic failure. Must be addressed before live trading.
 
-**What goes wrong:** Drawing conclusions from 12 sessions when 200-500 trades are needed for statistical significance at 95% confidence.
+---
+
+### Pitfall 1: Environment Variable Misconfiguration Leading to Wrong Network/Wallet
+
+**What goes wrong:** Wrong private key, wrong funder address, or wrong signature type causes orders to:
+- Submit to wrong wallet (lose access to funds)
+- Fail silently with wrong signature type (think you're trading but you're not)
+- Use testnet credentials on mainnet (orders rejected, miss trades)
+- Expose private key in logs/errors/commits
 
 **Why it happens:**
-- User observes: conservative profitable, others not
-- Intuition: 12 sessions feels like "enough data"
-- Reality: need 385 trades for 95% confidence, 107 for 70% confidence
-- With 12 sessions averaging 8-15 trades each, you have ~100-180 trades total
-- This gives you only 70-80% confidence — meaning 20-30% chance results are random
-
-**Research evidence:**
-- [Sample Size Study](https://medium.com/@trading.dude/how-many-trades-are-enough-a-guide-to-statistical-significance-in-backtesting-093c2eac6f05): "To achieve statistical confidence, you need at least 107 trades for 70% confidence, 385 trades for 95% confidence"
-- [Statistical Power](https://www.backtestbase.com/education/how-many-trades-for-backtest): "With 20 trades, a win rate of 65% still has p-value > 0.2, meaning 20%+ chance this is just noise"
-- [Trading System Evaluation](https://www.dara.trade/blog/2019/10/14/how-to-build-a-profitable-trading-system-part-1-confidence-in-numbers): "A system showing 60% profitable trades over 50 trades remains highly uncertain, while 60% over 500 trades suggests much stronger evidence"
+- Multiple .env files (.env, .env.local, .env.production) get out of sync
+- Copy-paste errors when moving keys between environments
+- Private key from testnet used in production config
+- Signature type mismatch (EOA=0, POLY_PROXY=1, GNOSIS_SAFE=2)
+- .env file accidentally committed to git
 
 **Consequences:**
-- Conservative's win is likely luck, not skill
-- Build new strategy based on pattern, deploy live, loses money
-- Team wastes time "understanding" noise instead of gathering more data
-- Premature optimization before validation
+- MONEY LOSS: Orders go to wrong wallet, can't recover funds
+- SILENT FAILURE: Wrong signature type = rejected orders you don't see
+- SECURITY BREACH: Private key exposed in git history
+- MISSED TRADES: Credential errors during high-conviction entries
 
-**Warning signs:**
-- "Conservative won 12/12" feels conclusive (it's not)
-- Focusing on "what did conservative do right" without checking if significance
-- Planning to build new strategy before statistical validation
-- Confidence in conclusions >> confidence supported by data
-
-**Prevention strategies:**
-
-1. **Statistical significance first:**
+**Prevention:**
+1. **Validation at startup** - Verify env vars match expected wallet BEFORE arming
    ```python
-   # Before analysis, check if results are significant
-   from scipy import stats
-
-   n_trades = 120  # across all strategies
-   win_rate = 0.58  # conservative's rate
-   expected = 0.50  # null hypothesis
-
-   z_score = (win_rate - expected) / (0.5 / sqrt(n_trades))
-   p_value = stats.norm.sf(abs(z_score))
-
-   if p_value > 0.05:
-       print("NOT SIGNIFICANT - need more data")
+   # Check: Does funder address match derived address from private key?
+   # Check: Can we query balance? Does it match expected amount?
+   # Check: Is signature_type correct for this wallet type?
    ```
 
-2. **Confidence intervals on metrics:**
-   - Conservative PnL: +$18.50 ± $14.20 (95% CI)
-   - That means true performance could be +$4.30 to +$32.70
-   - Overlaps with zero — not conclusively profitable
-   - Report: "Conservative appears profitable but sample too small to confirm"
+2. **Preflight checks** (already in code but needs hardening):
+   - Query wallet balance, verify it's > 0 and matches expected
+   - Submit tiny test order ($1) to unused market, verify it executes
+   - Log wallet address on every startup for manual verification
+   - NEVER log private key (already handled, but verify)
 
-3. **Power analysis:**
-   - To detect 10% edge with 95% confidence, need 280 trades minimum
-   - To detect 5% edge, need 1,120 trades
-   - Current data: 120 trades — can only detect 20%+ edge reliably
-   - Conclusion: "Need 160 more trades before meaningful comparison"
+3. **Environment isolation**:
+   - Use separate .env files: `.env.testnet`, `.env.mainnet`
+   - Script to load correct file: `python run.py --env mainnet`
+   - Add `.env*` to .gitignore (already present, verify)
+   - Use environment variable validation library (pydantic-settings)
 
-4. **Defer pattern analysis:**
-   - Don't ask "why did conservative win" until significance confirmed
-   - First: gather 200+ more trades
-   - Then: if conservative STILL wins, analyze why
-   - Otherwise you're finding patterns in noise
+4. **Security hardening**:
+   - Store private keys in secret manager (AWS Secrets, 1Password, Vault)
+   - Never echo/print private key even in debug mode
+   - Use read-only API keys for data fetching where possible
+   - Rotate keys periodically
 
-**Detection checklist:**
-- [ ] Calculate n_trades across all sessions
-- [ ] Compute 95% confidence interval on win rate and PnL
-- [ ] Check if confidence interval excludes zero
-- [ ] Require p-value < 0.05 before declaring "winner"
-- [ ] Report "insufficient data" if n < 200 trades
+**Detection (warning signs):**
+- Startup logs show different address than expected
+- Balance queries fail or show $0 when wallet has funds
+- All orders return "unauthorized" or "invalid signature"
+- py-clob-client returns `get_ok() = False`
 
-**Phase implications:** Phase 1 (comparison tooling) should calculate and display confidence intervals, NOT just raw PnL. Phase 2 (attribution analysis) should only proceed if Phase 1 shows statistical significance.
+**Phase to address:** Phase 1 (Environment Setup & Validation)
+
+**Reference:** Current code has basic env loading (`src/core/config.py` lines 84-96) but lacks validation.
+
+**Sources:**
+- [Security concerns with env variables](https://securityboulevard.com/2025/12/are-environment-variables-still-safe-for-secrets-in-2026/)
+- Current `.env.example` and `config.py` analysis
 
 ---
 
-### Pitfall 2: Correlation vs Causation Confusion
+### Pitfall 2: WebSocket Connection Drops Without Detection/Reconnection
 
-**What goes wrong:** Observing "conservative took MORE trades than mirror" and concluding "taking more trades made it profitable" when causation may be reversed or spurious.
-
-**Why it happens:**
-- Observation: conservative 65 trades, mirror 48 trades, conservative profitable
-- Intuition: more trades → more profit → new strategy should trade more
-- Reality: correlation could be:
-  - Conservative traded more BECAUSE it had winning positions (pyramid effect)
-  - Mirror skipped trades due to caps being hit (losing positions tied up capital)
-  - Both strategies entered same markets, but conservative exited faster freeing capital
-  - More trades is EFFECT of profitability, not CAUSE
-
-**Research evidence:**
-- [Backtesting Errors](https://www.luxalgo.com/blog/backtesting-traps-common-errors-to-avoid/): "Correlation does not imply causation — strategies with higher trade counts may simply have different market exposure periods"
-- [Strategy Analysis Pitfalls](https://www.quantstart.com/articles/Successful-Backtesting-of-Algorithmic-Trading-Strategies-Part-II/): "When comparing strategies, ensure you're measuring the mechanism, not just the outcome"
-
-**Real example from project:**
-```
-Conservative: 65 trades, +$18.50 PnL
-Mirror: 48 trades, -$4.20 PnL
-
-Wrong conclusion: "Trade more to profit more"
-Right question: "WHY did conservative trade 17 more times?"
-
-Possible answers:
-A) Conservative entered MORE markets (selection)
-B) Conservative exited faster, freeing capital (turnover)
-C) Conservative positions went profitable, triggered pyramid rules (feedback)
-D) Mirror hit risk caps early from losing positions (constraint)
-
-Only A suggests "enter more markets"
-B/C/D suggest conservative's advantage was EXIT timing or risk management
-```
-
-**Consequences:**
-- Build "aggressive" strategy that enters more markets
-- Strategy loses because problem wasn't entry count, it was exit timing
-- Team chases wrong variable, fails to find real edge
-- Waste development time on correlation theater
-
-**Warning signs:**
-- Statements like "X did Y, therefore we should do Y"
-- Comparing OUTPUT metrics (trade count, PnL) without analyzing INPUT decisions
-- Missing the "why" — what decision logic led to the outcome
-- Assuming first observed difference is the cause
-
-**Prevention strategies:**
-
-1. **Causal path analysis:**
-   ```
-   Trace decision logic:
-
-   Conservative Trade 1: Leader bought, we bought (same as mirror)
-   Conservative Trade 2: Leader sold, we sold (same as mirror)
-   Conservative Trade 3: Leader bought again, we bought (mirror skipped - WHY?)
-
-   Mirror skip reason: "global_cap_hit"
-   Root cause: Mirror still holding losing position from Trade 1
-   Conservative no longer holding it (exited early on stop loss?)
-
-   Causation: Early exit → freed capital → could take Trade 3
-   NOT: "Take more trades" → profit
-   ```
-
-2. **Controlled comparison:**
-   - Hold one variable constant, change another
-   - Test: conservative with mirror's exit rules
-   - Test: mirror with conservative's risk caps
-   - Isolate which component drives performance difference
-
-3. **Mechanism hypothesis:**
-   - Before building new strategy, write hypothesis:
-   - "Conservative wins because [specific mechanism]"
-   - Test mechanism directly, not just correlation
-   - Example: "Conservative exits losing trades faster, preserving capital"
-   - Test: measure avg hold time on losing positions
-
-4. **Decomposition:**
-   ```
-   PnL difference = Entry difference + Exit difference + Sizing difference
-
-   Entry: Did conservative enter better markets? Measure win rate per market.
-   Exit: Did conservative exit at better times? Measure avg hold time.
-   Sizing: Did conservative size better? Measure dollars per trade.
-
-   Only optimize the component that actually differs.
-   ```
-
-**Detection checklist:**
-- [ ] Every "X caused Y" claim has causal mechanism explained
-- [ ] Correlation backed by decision logic trace
-- [ ] Controlled experiments isolate variables
-- [ ] Can explain why conservative traded more (not just that it did)
-
-**Phase implications:** Phase 2 (per-trade attribution) MUST separate correlation from causation by tracing decision paths. Phase 3 (root cause) requires controlled experiments, not just observation.
-
----
-
-### Pitfall 3: Overfitting Explanations to Limited Data
-
-**What goes wrong:** Finding a pattern that "explains" conservative's wins on 12 sessions, but pattern is noise that won't generalize to future sessions.
+**What goes wrong:**
+- WebSocket drops, bot thinks it's connected, misses leader trades
+- Infinite reconnection loop during high volatility
+- Heartbeat stops, connection hangs but doesn't close
+- Reconnect happens but subscriptions not restored
 
 **Why it happens:**
-- User analyzes 12 sessions, finds: "Conservative won when it avoided markets with spread >2%"
-- Insight feels profound: spread avoidance = profitability
-- Reality: with 12 sessions, you can find 100 patterns by chance
-- New strategy implements spread filter
-- Next 12 sessions: spread filter hurts performance (pattern was noise)
-
-**Research evidence:**
-- [Overfitting Study](https://blog.traderspost.io/article/understanding-overfitting-in-trading-strategy-development): "Quantopian's 888-strategy study found that Sharpe ratios from backtests had almost zero predictive power for live returns. The more a quant optimized, the worse it performed live."
-- [Multiple Testing Bias](https://www.luxalgo.com/blog/backtesting-traps-common-errors-to-avoid/): "Testing hundreds of strategies or tweaking parameters endlessly makes you more likely to stumble upon setups that seem profitable purely by chance"
-- [Pattern Reliability](https://algotrading101.com/learn/what-is-overfitting-in-trading/): "A 2014 study found that 44% of published trading strategies couldn't replicate their success when applied to new data"
-
-**Example of overfitting explanation:**
-```
-Analyst: "I found it! Conservative won because:
-1. It avoided markets where leader's first trade was >$100
-2. It only entered when bid/ask spread was <2.5%
-3. It exited when unrealized profit hit +8%
-4. It had higher exposure limits on YES side
-
-These 4 rules perfectly explain all 12 sessions!"
-
-Reality check:
-- 12 sessions × 10 markets = 120 data points
-- Testing 100 possible rules → expect 5 false positives at p=0.05
-- Rules aren't causal, they're curve-fit to outcome
-- Next 12 sessions: rules perform randomly (50/50)
-```
+- Network instability (wifi drops, ISP issues)
+- Polymarket server restarts or maintenance
+- No heartbeat/PING sent (connection times out server-side)
+- Reconnection logic has bugs (race conditions, missing resubscribe)
+- Connection appears healthy but data stops flowing
 
 **Consequences:**
-- Build "improved" strategy based on discovered patterns
-- Deploy on fresh data → performance regresses to mean
-- Pattern was memorization of 12 sessions, not insight
-- Team loses confidence in analysis when predictions fail
-
-**Warning signs:**
-- Pattern has many conditions (>3 rules)
-- Pattern explains ALL sessions perfectly (100% fit = overfitting)
-- Pattern "makes sense in hindsight" but wasn't hypothesized upfront
-- Can't articulate WHY pattern should work (no causal mechanism)
-- Performance difference is large (>50% better) on small sample
-
-**Prevention strategies:**
-
-1. **Train/validation/test split:**
-   ```
-   12 sessions available:
-
-   Training: Sessions 1-7 (find patterns)
-   Validation: Sessions 8-10 (compare patterns)
-   Test: Sessions 11-12 (final check - NEVER TOUCH until end)
-
-   Process:
-   1. Analyze training set, find patterns
-   2. Test patterns on validation set
-   3. If validation performance drops >20%, pattern is overfit
-   4. Only report test set results
-   ```
-
-2. **Hypothesis-driven analysis:**
-   ```
-   WRONG: "Let's find what conservative did differently"
-   RIGHT: "I hypothesize conservative wins because it uses tighter risk caps"
-
-   Test hypothesis:
-   1. Measure: conservative's avg position size vs mirror
-   2. Predict: if hypothesis true, conservative should have smaller positions
-   3. Verify: check if true on ALL 12 sessions (not cherry-picked)
-   4. Validate: test on NEW sessions before building strategy
-   ```
-
-3. **Out-of-sample requirement:**
-   - Never deploy strategy based only on 12 sessions
-   - Require validation on 12 NEW sessions before live deployment
-   - If performance degrades >20% out-of-sample, explanation was overfit
-   - Accept that you might need 24-50 sessions total for reliable pattern
-
-4. **Simplicity penalty:**
-   - Prefer simple explanations over complex ones
-   - "Conservative uses lower k_factor" (1 variable)
-   - Better than: "Conservative uses lower k_factor when spread >2% on YES side in first 10min" (4 variables)
-   - Each parameter increases overfitting risk exponentially
-
-5. **Mechanism requirement:**
-   - Pattern must have causal story
-   - "Spread avoidance works because high spread = low liquidity = higher slippage"
-   - That's testable and generalizable
-   - "Conservative entered markets ending in odd minutes" — spurious, will fail
-
-**Detection checklist:**
-- [ ] Pattern tested on hold-out set (not just training data)
-- [ ] Pattern has ≤3 parameters
-- [ ] Pattern has causal mechanism, not just correlation
-- [ ] Out-of-sample performance within 20% of in-sample
-- [ ] Can explain why pattern should work on NEW data
-
-**Phase implications:** Phase 2 (attribution) should use 7 sessions for analysis, hold out 5 for validation. Phase 3 (root cause) should require out-of-sample validation before declaring "found the answer."
-
----
-
-### Pitfall 4: Ignoring Regime Change
-
-**What goes wrong:** Conservative won during specific market conditions (e.g., high volatility period), but those conditions won't persist, making conservative's advantage temporary.
-
-**Why it happens:**
-- 12 sessions happened during specific regime (e.g., election prediction markets)
-- Markets had high volatility, fast price moves, frequent reversals
-- Conservative's tight stops and quick exits thrived in this regime
-- Regime shifts (post-election, markets become slower, trends persistent)
-- Conservative's strategy now underperforms (stops hit on normal noise)
-
-**Research evidence:**
-- [2026 Market Regime Change](https://home.cib.natixis.com/articles/2026-entering-a-new-market-regime): "Markets are experiencing broader regime change, with low-volatility 2010s giving way to greater macro uncertainty and policy unpredictability"
-- [Strategy Failure Modes](https://www.blackrock.com/us/financial-professionals/insights/2026-macro-outlook): "2026 will be defined by structural adjustment rather than cyclical repetition, with higher volatility and greater dispersion reshaping market dynamics"
-- [Regime Risk](https://realinvestmentadvice.com/resources/blog/the-market-risk-in-2026-if-growth-projections-fail/): "Analysts projecting growth into 2026 are assuming demand-driven economy without income growth needed to support it — assumption is increasingly fragile"
-
-**Example:**
-```
-Sessions 1-12 (Nov 2025 - Jan 2026): Election prediction markets
-- High volume, fast price discovery, frequent new information
-- Conservative: tight stops, quick exits → worked well
-- Mirror: held positions longer → stopped out on volatility
-
-Sessions 13-24 (Feb 2026 - Apr 2026): Sports/entertainment markets
-- Lower volume, slower price moves, trend-following profitable
-- Conservative: stops hit on normal noise → death by 1000 cuts
-- Mirror: held positions captured trends → profitable
-
-Conclusion: Conservative didn't have "better strategy"
-It had "strategy matched to regime"
-```
-
-**Consequences:**
-- Deploy conservative-inspired strategy in wrong regime
-- Strategy loses because market behavior changed
-- Team doesn't understand why "winning strategy" stopped working
-- Constant strategy switching chasing recent performance
-
-**Warning signs:**
-- All 12 sessions are similar time period (same regime)
-- Markets were all same type (elections, sports, etc.)
-- Conservative's advantage is large (>30% better) suggesting regime-specific edge
-- Can't explain why conservative's rules would work in ALL conditions
-
-**Prevention strategies:**
-
-1. **Regime diversity check:**
-   ```
-   Sessions 1-12 analysis:
-   - Market types: 10 political, 2 sports
-   - Volatility: avg 3.2% spreads (HIGH)
-   - Volume: avg $2M liquidity (HIGH)
-
-   Conclusion: Data is regime-homogeneous
-   Risk: Findings may not generalize to low-vol, low-liquidity regimes
-   Mitigation: Defer conclusions until testing on diverse regimes
-   ```
-
-2. **Regime segmentation:**
-   ```
-   Segment 12 sessions by regime:
-
-   High volatility (spreads >2.5%): Sessions 1,3,5,7,8,10,12
-   Low volatility (spreads <2.5%): Sessions 2,4,6,9,11
-
-   Test: Does conservative win in BOTH regimes?
-   If only high-vol: advantage is regime-specific
-   If both: advantage is robust
-   ```
-
-3. **Walk-forward validation:**
-   ```
-   Train on Sessions 1-6 → test on 7-8
-   Train on Sessions 3-8 → test on 9-10
-   Train on Sessions 5-10 → test on 11-12
-
-   If performance degrades in out-of-sample period:
-   Strategy is overfitting to past regime
-   ```
-
-4. **Explicit regime assumptions:**
-   ```
-   Document: "Conservative wins when:
-   - Spreads are >2% (high volatility)
-   - Price moves >10% intraday (fast discovery)
-   - Leader trades >8x per session (active period)
-
-   If these conditions change, strategy may underperform."
-
-   Then: Monitor for regime shift before deploying
-   ```
-
-**Detection checklist:**
-- [ ] 12 sessions span multiple market types
-- [ ] Volatility regime varies (high/low periods)
-- [ ] Strategy performance tested across regime splits
-- [ ] Explicit assumptions about when strategy works
-- [ ] Plan for regime monitoring post-deployment
-
-**Phase implications:** Phase 1 (comparison) should segment sessions by regime. Phase 2 (attribution) should test if patterns hold across regimes. Phase 4 (new strategy) should include regime-detection logic or explicit scope.
-
----
-
-### Pitfall 5: Survivorship Bias in Strategy Selection
-
-**What goes wrong:** Focusing only on strategies that completed all 12 sessions, ignoring strategies that "failed" early (hit stop-loss, depleted capital, crashed), which biases analysis toward survivorship.
-
-**Why it happens:**
-- 7 strategies started: mirror, conservative, aggressive, momentum, velocity, price_level, hybrid
-- After 12 sessions: conservative still running, others stopped/lost capital
-- Analysis: "Let's compare conservative vs others"
-- Problem: "Others" includes dead strategies — survivorship bias
-- Should compare: conservative vs strategies that COULD HAVE survived
-
-**Research evidence:**
-- [Survivorship Bias Impact](http://adventuresofgreg.com/blog/2026/01/14/survivorship-bias-backtesting-avoiding-traps/): "Survivorship-biased analysis of mutual funds might show annual returns inflated by 2.1% simply by excluding failed funds"
-- [Quantdare Study](https://quantdare.com/survivorship-bias-an-investment-decision-trap/): "Excluding just one delisted asset might inflate a strategy's average quarterly return from 0.50% to 2.00% and push the Sharpe ratio from 0.09 to 0.66 — an 86% jump in performance metrics"
-- [Selection Bias](https://www.luxalgo.com/blog/survivorship-bias-in-backtesting-explained/): "Survivorship bias occurs when backtesting only includes securities that currently exist, ignoring delisted, bankrupt, or failed companies"
-
-**Example:**
-```
-Session 1: All 7 strategies start with $100
-Session 6: Aggressive depletes to $12, stops trading (survival failure)
-Session 12: Conservative at $118, Mirror at $96, others at $80-95
-
-Analysis question: "Why did conservative win?"
-
-Biased comparison:
-Conservative +18% vs Mirror -4% (compares survivor to survivor)
-
-Unbiased comparison:
-Conservative +18% vs Aggressive -88% (includes failure)
-
-Insight: Conservative's advantage may be "didn't blow up"
-Not "made most profit" but "avoided ruin"
-```
-
-**Consequences:**
-- Optimize for "highest return" when should optimize for "survival"
-- New strategy takes excessive risk (like aggressive) but luckier sample
-- Deploy → blows up on first drawdown
-- Survivorship bias made conservative look "moderately better" when it was "massively more robust"
-
-**Warning signs:**
-- Some strategies missing from final comparison (where did they go?)
-- Analysis focuses on "best performer" not "survivors vs failures"
-- No measurement of drawdown or ruin risk
-- Equity curves show only end-state, not blow-up paths
-
-**Prevention strategies:**
-
-1. **Include failure analysis:**
-   ```
-   Strategy outcomes after 12 sessions:
-
-   Survived:
-   - Conservative: +$18.50 (max drawdown -$3.20)
-   - Mirror: -$4.20 (max drawdown -$8.40)
-   - Momentum: +$2.10 (max drawdown -$11.20)
-
-   Failed (stopped trading):
-   - Aggressive: -$88.40 (depleted at Session 6)
-   - Velocity: -$42.10 (stopped at Session 9 on risk limit)
-
-   Key insight: Conservative's edge is ROBUSTNESS, not just return
-   ```
-
-2. **Risk-adjusted metrics:**
-   ```
-   Instead of comparing PnL:
-   Compare Sharpe ratio, Sortino ratio, max drawdown
-
-   Conservative: Sharpe 1.2, max DD -3.2%
-   Mirror: Sharpe 0.4, max DD -8.4%
-   Aggressive: Sharpe -1.8, max DD -88.4% (RUIN)
-
-   Conservative wins on risk-adjusted basis by huge margin
-   ```
-
-3. **Ruin probability:**
-   ```
-   Calculate: What's probability each strategy hits $0 in 100 sessions?
-
-   Conservative: 2% ruin probability (very safe)
-   Mirror: 12% ruin probability (moderate risk)
-   Aggressive: 67% ruin probability (unsafe)
-
-   This explains why aggressive "failed" — not bad luck, high ruin risk
-   ```
-
-4. **Survival curve:**
-   ```
-   Plot: % of starting capital over time for ALL strategies
-
-   Conservative: Smooth curve, stays 95-118% entire period
-   Mirror: Volatile, dips to 85%, recovers to 96%
-   Aggressive: Crashes from 100% to 12% by Session 6
-
-   Visualization makes survivorship bias obvious
-   ```
-
-**Detection checklist:**
-- [ ] All strategies tracked through full period (even failures)
-- [ ] Max drawdown calculated for each strategy
-- [ ] Risk-adjusted metrics (Sharpe, Sortino) used, not just PnL
-- [ ] Ruin probability or survival analysis included
-- [ ] Comparison explains WHY some strategies failed
-
-**Phase implications:** Phase 1 (comparison tooling) should track survival metrics, not just PnL. Phase 2 (attribution) should analyze failure modes, not just wins. Phase 3 (root cause) should include "what prevented ruin" as primary question.
-
----
-
-## Development Pitfalls
-
-### Pitfall 6: Building Strategy Based on Insufficient Insight
-
-**What goes wrong:** Rush to implement "improved strategy" after superficial analysis, before understanding causal mechanisms, resulting in strategy that doesn't capture the real edge.
-
-**Why it happens:**
-- Analysis finds: conservative takes more trades and wins
-- Team: "Let's build strategy that takes more trades!"
-- Implementation: New strategy enters markets more aggressively
-- Reality: More trades was EFFECT of better risk management, not CAUSE
-- New strategy takes more trades but loses money (missed root cause)
-
-**Research evidence:**
-- [Strategy Development Process](https://www.quantstart.com/articles/Successful-Backtesting-of-Algorithmic-Trading-Strategies-Part-II/): "Develop clear economic hypotheses before backtesting by asking why the strategy should work and what market inefficiency it exploits"
-- [Hypothesis-Driven Trading](https://quantlane.com/blog/avoid-overfitting-trading-strategies/): "Start with a hypothesis based on sound market principles and use a simple and focused approach rather than overcomplicating your strategy"
-
-**Example of premature development:**
-```
-Week 1: Run 12-session comparison
-Finding: Conservative traded 65 times, others 40-50 times
-
-Week 2: Build "TakeMoreTrades" strategy
-Logic: Enter markets faster, lower thresholds
-
-Week 3: Test on 12 new sessions
-Result: TakeMoreTrades loses -$12 (worse than original)
-
-Root cause: Missed that conservative's trades came from:
-1. Better exit discipline (freed capital for new trades)
-2. Avoiding markets that hit risk caps (preserved budget)
-3. NOT from "entering faster" (which is what was implemented)
-
-Should have spent Week 2 on deeper analysis, not building
-```
-
-**Consequences:**
-- Waste development time on wrong strategy
-- Deploy strategy based on misunderstanding
-- Strategy fails, team loses confidence in analysis process
-- Cycle repeats (new superficial analysis, new failed strategy)
-
-**Warning signs:**
-- Moving from comparison to development in <1 week
-- Can't articulate specific mechanism being implemented
-- Strategy has vague goal ("be more like conservative")
-- No controlled experiment validating hypothesis
-
-**Prevention strategies:**
-
-1. **Mechanism requirement:**
-   ```
-   Before building, document:
-
-   Observation: Conservative takes 30% more trades
-
-   Hypothesis A: Conservative enters markets faster
-   Hypothesis B: Conservative exits faster, freeing capital
-   Hypothesis C: Conservative avoids markets that hit caps
-
-   Test each hypothesis:
-   A: Measure avg time from leader trade to our trade (same for both)
-   B: Measure avg hold time (conservative 45min, mirror 90min) ✓
-   C: Measure skip rate by reason (conservative skips caps less) ✓
-
-   Conclusion: B+C explain difference, not A
-   Implication: New strategy should optimize EXITS and CAP AVOIDANCE
-   ```
-
-2. **Prototype validation:**
-   ```
-   Before full implementation:
-   1. Modify existing strategy with single change
-   2. Test change on validation sessions
-   3. If improvement <10%, change isn't the driver
-   4. Iterate until finding mechanism that works
-   5. Then build full strategy
-   ```
-
-3. **Causal diagram:**
-   ```
-   Draw decision flow for both strategies:
-
-   Conservative:
-   Leader trades → Check if will hit cap → No → Enter
-                                         → Yes → Skip
-   Position → Reaches +5% → Partial exit → Frees capital
-
-   Mirror:
-   Leader trades → Enter (no cap lookahead)
-   Position → Hold until leader exits
-
-   Difference: Conservative has cap-awareness and partial exits
-   New strategy: Implement THOSE mechanisms
-   ```
-
-4. **Minimum viable hypothesis:**
-   ```
-   Build simplest possible strategy to test hypothesis:
-
-   Hypothesis: Partial exits improve performance
-
-   MVH: Mirror strategy + "exit 50% at +5% profit"
-   Test on 5 sessions
-   If better than mirror → hypothesis supported
-   If not → hypothesis rejected, don't build full strategy
-   ```
-
-**Detection checklist:**
-- [ ] Can explain in 2 sentences WHY new strategy should work
-- [ ] Mechanism tested independently before full build
-- [ ] Controlled experiment validates hypothesis
-- [ ] Causal path from observation to implementation documented
-- [ ] Prototype tested before full development
-
-**Phase implications:** Phase 3 (root cause analysis) MUST complete before Phase 4 (new strategy development). No development without validated causal hypothesis.
-
----
-
-### Pitfall 7: Copying Conservative's Parameters Instead of Principles
-
-**What goes wrong:** New strategy copies conservative's exact parameters (k_factor, caps, thresholds) which were tuned to 12-session sample, instead of copying conservative's underlying principles.
-
-**Why it happens:**
-- Analysis: Conservative uses k_factor=0.7, per_market_cap=35%, hourly_budget=$85
-- Team: "Let's use those parameters in new strategy!"
-- Reality: Those parameters were optimized for those 12 sessions (overfit)
-- New sessions: Parameters fail because market conditions different
-- Should have copied: "Use conservative sizing" not "Use 0.7"
-
-**Research evidence:**
-- [Parameter Overfitting](https://blog.traderspost.io/article/understanding-overfitting-in-trading-strategy-development): "Excessive parameter optimization — developers endlessly fine-tune parameters to achieve flawless historical results. Testing slightly different variations gives false confidence."
-- [Quantlane Best Practices](https://quantlane.com/blog/avoid-overfitting-trading-strategies/): "Reducing the number of variables and rules in your strategy makes it generally more reliable and less prone to overfitting"
-
-**Example:**
-```
-Conservative's configuration (from 12 sessions):
-k_factor: 0.7
-per_market_cap: 35%
-per_side_cap: 30%
-hourly_budget: $85
-stop_loss: -8%
-
-Team builds "ConservativeV2" with exact parameters
-
-Next 12 sessions: ConservativeV2 loses -$8
-Why? Market conditions changed:
-- Spreads narrower now (35% cap too restrictive)
-- Leader trading less frequently (0.7 k_factor too aggressive)
-
-Should have copied PRINCIPLE:
-"Size conservatively relative to market conditions"
-Not exact number 0.7 which was sample-specific
-```
-
-**Consequences:**
-- New strategy performs well on historical 12 sessions (by design)
-- Performs poorly on new sessions (parameters don't generalize)
-- Team concludes "analysis was wrong" when actually implementation was wrong
-- Miss opportunity to build robust strategy
-
-**Warning signs:**
-- New strategy config looks identical to conservative's
-- Parameters are specific decimals (0.7, 0.35) not ranges
-- No adaptation logic (fixed parameters)
-- Documentation says "use conservative's parameters" not principles
-
-**Prevention strategies:**
-
-1. **Extract principles, not parameters:**
-   ```
-   Wrong:
-   "Conservative uses k_factor=0.7"
-
-   Right:
-   "Conservative sizes positions 30% smaller than typical"
-
-   Implementation:
-   # Wrong
-   k_factor = 0.7  # fixed number
-
-   # Right
-   typical_k = calculate_typical_k_for_regime()
-   conservative_k = typical_k * 0.7  # scales with regime
-   ```
-
-2. **Parameter ranges, not points:**
-   ```
-   Conservative analysis shows:
-   k_factor: 0.6-0.8 (depending on session)
-   per_market_cap: 30-40% (depending on leader activity)
-
-   New strategy: Use adaptive parameters
-   If leader_trade_frequency > 10/hr: k_factor = 0.6
-   If leader_trade_frequency < 5/hr: k_factor = 0.8
-
-   This captures principle: "be more conservative when leader is active"
-   ```
-
-3. **Mechanism over values:**
-   ```
-   Conservative's real edge (hypothesized):
-   1. Avoids positions that would hit risk caps
-   2. Exits partial positions to free capital
-   3. Uses tighter stops on losing positions
-
-   New strategy should implement THOSE mechanisms
-   Not copy the numeric values conservative happened to use
-   ```
-
-4. **Walk-forward parameter adaptation:**
-   ```
-   Instead of fixed parameters:
-
-   Every 10 sessions:
-   - Measure recent market volatility
-   - Measure recent leader activity level
-   - Adjust k_factor, caps based on current regime
-
-   This prevents overfitting to single regime
-   ```
-
-**Detection checklist:**
-- [ ] New strategy parameters are ranges or adaptive, not fixed
-- [ ] Can explain principle behind each parameter
-- [ ] Parameters tested on multiple regimes
-- [ ] Implementation focuses on mechanisms, not values
-- [ ] No decimal-precision parameters (0.7342 is overfitting)
-
-**Phase implications:** Phase 3 (root cause) should identify principles, not parameters. Phase 4 (new strategy) should implement adaptive mechanisms, not copy configs.
-
----
-
-## Validation Pitfalls
-
-### Pitfall 8: Testing New Strategy on Same 12 Sessions
-
-**What goes wrong:** Validate new strategy by testing on the same 12 sessions used for analysis, creating circular validation that guarantees good results but proves nothing.
-
-**Why it happens:**
-- Analyze 12 sessions → find patterns → build strategy
-- Test strategy: "Let's see if it beats conservative on those 12 sessions!"
-- Result: New strategy wins (because it was designed to win on that data)
-- Conclude: "Strategy validated!" Deploy live
-- Reality: Strategy was tested on training data, not validation data
-- Live performance: Strategy fails (optimized for historical noise)
-
-**Research evidence:**
-- [Backtesting Validation](https://www.luxalgo.com/blog/backtesting-traps-common-errors-to-avoid/): "At least 30% of historical data should be reserved for out-of-sample testing, as this untouched data serves as a reality check"
-- [Walk-Forward Testing](https://quantlane.com/blog/avoid-overfitting-trading-strategies/): "Walk-forward optimization tests your strategy across multiple rolling time windows, ensuring it adapts to changing market conditions"
-- [Train-Test Split](https://www.quantstart.com/articles/Successful-Backtesting-of-Algorithmic-Trading-Strategies-Part-II/): "Never test on the same data used for development — requires separate validation and test sets"
-
-**Example of circular validation:**
-```
-Phase 1: Analyze Sessions 1-12
-Finding: Conservative wins with tight stops
-
-Phase 2: Build "TightStop" strategy
-Logic: Use -5% stop loss (tighter than conservative's -8%)
-
-Phase 3: Validate (WRONG)
-Test TightStop on Sessions 1-12
-Result: TightStop gets +$22 (beats conservative's +$18.50)
-Team: "Validated! Deploy!"
-
-Phase 4: Deploy on Sessions 13-24
-Result: TightStop gets -$14 (worse than conservative would be)
-
-What went wrong:
-- Sessions 1-12 were LOW volatility (tight stops worked)
-- Strategy was optimized for low-vol
-- Sessions 13-24 are HIGHER volatility (tight stops get stopped out)
-- Circular validation gave false confidence
-```
-
-**Consequences:**
-- Strategy appears validated but isn't
-- Deploy with false confidence
-- Strategy fails on fresh data
-- Team loses trust in validation process
-- May abandon working principles because validation was flawed
-
-**Warning signs:**
-- Validation uses same sessions as analysis
-- No mention of "held-out data" or "test set"
-- Validation performance is suspiciously good (>90% win rate)
-- Team is confident based on one validation run
-
-**Prevention strategies:**
-
-1. **Strict data splitting:**
-   ```
-   Available: 24 sessions total
-
-   Training: Sessions 1-14 (60%) - analyze, find patterns
-   Validation: Sessions 15-19 (20%) - compare strategies
-   Test: Sessions 20-24 (20%) - final check, ONE TIME ONLY
-
-   Rules:
-   - NEVER look at test set during development
-   - If validation fails, go back to training (not test)
-   - Only use test set for final decision
-   - Report test performance as "real" estimate
-   ```
-
-2. **Walk-forward validation:**
-   ```
-   Instead of single train/test split:
-
-   Train Sessions 1-7 → Test on 8-10 → Performance A
-   Train Sessions 4-10 → Test on 11-13 → Performance B
-   Train Sessions 7-13 → Test on 14-16 → Performance C
-
-   If A, B, C are consistent: Strategy is robust
-   If degrading: Strategy is overfitting
-   ```
-
-3. **Paper trading requirement:**
-   ```
-   Before live deployment:
-   1. Record 12 NEW sessions (paper trading mode)
-   2. Test new strategy on those sessions
-   3. Compare to conservative's performance on SAME sessions
-   4. If new strategy wins by <10%: Not worth switching
-   5. If wins by >30%: Check for regime shift
-   6. Only deploy if wins by 15-25% on fresh data
-   ```
-
-4. **Cross-validation (if sample size allows):**
-   ```
-   With 24 sessions, 4-fold cross-validation:
-
-   Fold 1: Train 1-18, Test 19-24
-   Fold 2: Train 1-12 + 19-24, Test 13-18
-   Fold 3: Train 1-6 + 13-24, Test 7-12
-   Fold 4: Train 7-24, Test 1-6
-
-   Average test performance across folds
-   This prevents lucky train/test split from creating false confidence
-   ```
-
-**Detection checklist:**
-- [ ] Test data was NEVER seen during analysis or development
-- [ ] Test performance within 20% of validation performance
-- [ ] Multiple validation windows (walk-forward)
-- [ ] Paper trading on fresh data before live
-- [ ] Document exact sessions used for train/validation/test
-
-**Phase implications:** Phase 1 (comparison) should use Sessions 1-7 ONLY. Sessions 8-12 reserved for Phase 4 validation. New sessions recorded specifically for final test.
-
----
-
-### Pitfall 9: Mistaking Backtest Edge for Execution Edge
-
-**What goes wrong:** New strategy shows +25% improvement in backtest, but improvement assumes perfect fills, no slippage, zero latency — none of which are realistic in live trading.
-
-**Why it happens:**
-- Backtest: New strategy makes 5% more profit than conservative
-- Assumes: Can execute at observed bid/ask prices
-- Reality: By time we react, prices moved (latency), or liquidity gone (slippage)
-- Live trading: "5% edge" becomes -2% after execution costs
-- Net: Strategy loses money despite positive backtest
-
-**Research evidence:**
-- [Implementation Slippage](https://www.luxalgo.com/blog/backtesting-limitations-slippage-and-liquidity-explained/): "Backtests often assume perfect fills with no slippage and minimal spread, but real trading rarely looks like this"
-- [Execution Costs](https://medium.com/@jpolec_72972/building-a-robust-backtesting-framework-trading-costs-1bb75f063756): "Slippage can be as low as 0.1% in liquid markets or well above 1% when liquidity thins out"
-- [Reality Gap](https://www.exegy.com/avoiding-slippage-equities-trading-with-backtesting/): "The gap between backtested results and live performance is often explained by execution costs, not strategy flaws"
-- [Transaction Costs](https://support.capitalise.ai/en/articles/5963164-trading-slippage-and-how-it-affects-live-trading-simulated-trading-and-backtests): "Systematic traders aim to minimize slippage relative to benchmark, aligning actual trading performance more closely with strategy's projected results"
-
-**Example:**
-```
-Backtest results:
-Conservative: +$18.50 over 12 sessions
-NewStrategy: +$23.40 over 12 sessions (26% better!)
-
-Backtest assumptions:
-- Execute at recorded bid/ask
-- No latency (instant fills)
-- No slippage on market orders
-- Limit orders fill when price touches
-
-Reality in live trading:
-- Conservative: +$14.20 (23% worse than backtest due to execution costs)
-- NewStrategy: +$8.10 (65% worse!)
-
-Why NewStrategy worse?
-- Takes 30% more trades than conservative
-- Each trade pays spread cost (~2%)
-- 30% more trades = 30% more spread costs
-- Backtest didn't model cumulative spread impact
-```
-
-**Consequences:**
-- Deploy strategy expecting +25% edge
-- Actual results: -30% (worse than baseline)
-- Team concludes "strategy doesn't work" when problem is execution realism
-- May abandon valid strategy insights
-
-**Warning signs:**
-- Backtest edge is <10% (likely wiped out by execution costs)
-- New strategy trades MORE frequently (more spread costs)
-- Backtest assumes limit orders fill at high rate (>70%)
-- No slippage modeling in backtest
-- Polymarket specific: No consideration for market impact on thin markets
-
-**Prevention strategies:**
-
-1. **Model execution costs in backtest:**
+- MONEY LOSS: Miss high-conviction leader trades during connection gap
+- STALE DATA: Make decisions on outdated prices (slippage, wrong side)
+- RESOURCE LEAK: Reconnection loop creates 100+ connections
+- SILENT FAILURE: Connection looks ok but events not arriving
+
+**Prevention:**
+1. **Heartbeat implementation**:
+   - Send PING every 10 seconds (Polymarket CLOB requirement)
+   - Track last received message timestamp
+   - Alarm if no message received in 30 seconds
+   - Force reconnect if 60 seconds without data
+
+2. **Reconnection with exponential backoff**:
    ```python
-   # Add to backtest
-   SPREAD_COST = 0.02  # 2% typical Polymarket spread
-   SLIPPAGE = 0.003  # 0.3% market order slippage
-   LATENCY_COST = 0.005  # 0.5% price move during delay
-
-   execution_cost = (ask - bid) / ask  # actual spread
-   execution_cost += SLIPPAGE if market_order else 0
-   execution_cost += LATENCY_COST
-
-   pnl_after_costs = pnl - (execution_cost * position_size)
+   # Initial: 1s, then 2s, 4s, 8s, max 60s
+   # Add jitter to avoid thundering herd
+   backoff = min(60, base_delay * (2 ** attempt)) + random(0, 1)
    ```
 
-2. **Limit order realism:**
-   ```python
-   # Backtest: Conservative fill assumption
-   def limit_order_fills(limit_price, market_prices):
-       # Fills only if price moves THROUGH limit (not just touches)
-       # And only if we'd be ahead of queue (prob < 50%)
+3. **Connection health monitoring**:
+   - Track: messages/sec, last message time, connection state
+   - Alert if message rate drops to zero
+   - Log connection state changes (connecting, connected, disconnected)
+   - Dashboard showing connection health
 
-       fill_prob = 0.4  # pessimistic
-       return filled if (random() < fill_prob and
-                         market_crossed_limit_with_volume)
-   ```
+4. **Subscription restoration**:
+   - Track all active subscriptions (markets, tokens, user events)
+   - On reconnect: resubscribe to ALL previous subscriptions
+   - Fetch missed data via REST API after reconnect gap
+   - Verify subscription confirmed before resuming trading
 
-3. **Cost break-even analysis:**
-   ```
-   Strategy comparison (after execution costs):
+5. **Graceful degradation**:
+   - If WS down: fall back to REST polling (higher latency but works)
+   - Pause trading during reconnection (don't trade on stale data)
+   - Resume only after connection stable for 30+ seconds
 
-   Conservative: 45 trades, 2% spread each, -$1.80 in costs
-   Net PnL: $18.50 - $1.80 = $16.70
+**Detection (warning signs):**
+- No leader trades received for 5+ minutes (leader is very active)
+- Last price update timestamp is stale (> 1 minute old)
+- WebSocket library logs connection errors
+- Order submissions timing out
 
-   NewStrategy: 68 trades, 2% spread each, -$2.72 in costs
-   Backtest PnL: $23.40, Net PnL: $23.40 - $2.72 = $20.68
+**Phase to address:** Phase 2 (WebSocket Reliability & Monitoring)
 
-   Advantage: $20.68 - $16.70 = $3.98 (24% better after costs)
+**Reference:** Community reports show data streams stopping after 20 minutes, reconnection mechanisms broken.
 
-   If execution costs were 3% instead of 2%:
-   Conservative: $18.50 - $2.70 = $15.80
-   NewStrategy: $23.40 - $4.08 = $19.32
-   Advantage only $3.52 (22% better)
-
-   Edge is fragile to execution cost assumptions
-   ```
-
-4. **Paper trading stress test:**
-   ```
-   Before live deployment:
-   1. Run strategy in paper trading mode
-   2. Measure ACTUAL spread costs per trade
-   3. Measure ACTUAL fill rates for limit orders
-   4. Measure ACTUAL latency from signal to execution
-   5. Recalculate backtest with realistic costs
-   6. If edge drops below 10%, strategy too marginal
-   ```
-
-5. **Polymarket-specific costs:**
-   ```
-   Polymarket considerations:
-   - Spreads widen during news events (2% → 5%)
-   - Thin markets have higher market impact
-   - Limit orders may sit unfilled for minutes
-   - Position minimums ($1 market, 5 shares limit)
-
-   Backtest should model:
-   - Time-varying spreads (not constant 2%)
-   - Market impact on $100+ orders
-   - Limit order fill rate <60%
-   - Order minimums causing position rounding
-   ```
-
-**Detection checklist:**
-- [ ] Backtest includes spread costs (2-5%)
-- [ ] Backtest includes slippage on market orders (0.3-0.5%)
-- [ ] Limit order fill rate <60%
-- [ ] Latency cost modeled (0.5%+)
-- [ ] Edge remains >15% after all costs
-- [ ] Paper trading validates cost assumptions
-
-**Phase implications:** Phase 1 (comparison) should add execution cost modeling to replay. Phase 4 (validation) should require paper trading to measure real costs before deployment.
+**Sources:**
+- [Polymarket WebSocket Overview](https://docs.polymarket.com/developers/CLOB/websocket/wss-overview)
+- [WebSocket data stream stops after some time](https://github.com/Polymarket/real-time-data-client/issues/26)
+- [Websocket reconnection mechanism isn't working](https://github.com/Polymarket/rs-clob-client/issues/185)
+- [News-Driven Polymarket Bots Guide](https://www.quantvps.com/blog/news-driven-polymarket-bots)
 
 ---
 
-### Pitfall 10: Ignoring Roll-Forward Performance Degradation
+### Pitfall 3: Order Rejections Not Detected or Handled
 
-**What goes wrong:** Strategy performs well on historical 12 sessions, but performance degrades steadily over time as markets/leader behavior evolves, yet team doesn't monitor this degradation.
+**What goes wrong:**
+- FOK order rejected (insufficient liquidity), bot thinks it executed
+- Order below minimum size ($1 market, 5 shares limit) rejected silently
+- Balance insufficient, order rejected, bot doesn't decrement budget
+- Partial fill treated as full fill (size validation bug)
 
 **Why it happens:**
-- Strategy validated on Sessions 1-12
-- Deploy live starting Session 13
-- Performance: Session 13-15 good, 16-18 okay, 19-21 poor, 22+ bad
-- Team doesn't notice degradation because each session looks "reasonable"
-- After 30 sessions: Strategy is consistently losing but no intervention
-- Root cause: Markets evolved, strategy didn't adapt
-
-**Research evidence:**
-- [Walk-Forward Validation](https://quantlane.com/blog/avoid-overfitting-trading-strategies/): "Walk-forward optimization tests your strategy across multiple rolling time windows, ensuring it adapts to changing market conditions"
-- [Performance Monitoring](https://www.quantstart.com/articles/Successful-Backtesting-of-Algorithmic-Trading-Strategies-Part-II/): "If performance degrades >20% out-of-sample, parameters are overfit and strategy needs revalidation"
-
-**Example:**
-```
-Validation (Sessions 1-12): NewStrategy +$24
-Deploy (Sessions 13-20):
-  13-14: +$4.20 (good start)
-  15-16: +$1.80 (okay)
-  17-18: -$0.60 (hmm)
-  19-20: -$3.10 (concerning)
-
-Cumulative: +$2.30 (still positive, team keeps running)
-
-Sessions 21-28:
-  21-22: -$4.20
-  23-24: -$6.10
-  25-26: -$8.20
-  27-28: -$5.30
-
-Cumulative: -$21.50 (now clearly failing)
-
-Problem: Didn't catch degradation early
-Should have stopped at Session 18 when rolling 6-session avg went negative
-```
+- py-clob-client returns `success: false` but code doesn't check
+- Async order submission: response comes back after next decision
+- Minimum size validation missing (Polymarket: $1 market orders, 5 shares limit)
+- No retry logic for transient failures
+- Budget tracking assumes order filled before confirmation
 
 **Consequences:**
-- Strategy loses money for extended period
-- Team doesn't realize strategy "stopped working"
-- By time degradation is obvious, significant capital lost
-- Delayed intervention (should have stopped earlier)
+- MONEY LOSS: Think you bought, didn't, miss the trade resolution
+- BUDGET LEAK: Hourly budget depleted tracking phantom orders
+- OVEREXPOSURE: Retry logic submits duplicate orders
+- SILENT FAILURE: Strategy says "bought at 0.55" but no position
 
-**Warning signs:**
-- No monitoring process after deployment
-- Team checks performance monthly, not weekly
-- Focus on cumulative PnL (masks recent degradation)
-- No alerts for degradation thresholds
-
-**Prevention strategies:**
-
-1. **Rolling window monitoring:**
+**Prevention:**
+1. **Synchronous order confirmation** (already present but verify):
    ```python
-   # Alert system
-   def check_performance_degradation(recent_sessions, baseline):
-       rolling_6_session = recent_sessions[-6:].sum()
-       rolling_12_session = recent_sessions[-12:].sum()
-
-       if rolling_6_session < baseline * 0.5:
-           alert("WARNING: 6-session performance 50% below baseline")
-
-       if rolling_12_session < 0:
-           alert("CRITICAL: 12-session performance is negative - STOP STRATEGY")
+   resp = self._client.post_order(signed, OrderType.FOK)
+   success = resp.get("success", False)  # Line 140 in live.py
+   if not success:
+       # CRITICAL: Don't update portfolio, don't decrement budget
+       logger.warning(f"ORDER REJECTED: {resp.get('errorMsg')}")
    ```
 
-2. **Statistical process control:**
-   ```
-   Baseline: Conservative averaged +$1.54 per session (std $4.20)
-
-   Control limits:
-   Upper: +$9.94 (+2 std)
-   Lower: -$6.86 (-2 std)
-
-   If 3 consecutive sessions below mean: Warning
-   If 5 consecutive sessions below mean: Stop
-   If 1 session below lower limit: Stop
-
-   This catches degradation early
+2. **Minimum size validation** (BEFORE submission):
+   ```python
+   if request.action == "BUY" and request.amount_dollars < 1.0:
+       return OrderResponse(status=REJECTED, error="Below $1 minimum")
+   if request.action == "SELL" and request.shares < 5:
+       return OrderResponse(status=REJECTED, error="Below 5 share minimum")
    ```
 
-3. **Comparative benchmarking:**
-   ```
-   Every 6 sessions, compare:
-   NewStrategy last 6: +$0.80
-   Conservative last 6 (simulated): +$4.20
+3. **Post-order verification**:
+   - After order submission: query positions via REST API
+   - Verify position increased by expected amount
+   - If mismatch: log alert, don't count order as filled
+   - Reconcile portfolio state every 5 minutes
 
-   If NewStrategy < Conservative for 2 consecutive windows:
-   → Revert to conservative
-   → Investigate what changed
-   ```
+4. **Budget tracking with confirmations**:
+   ```python
+   # Reserve budget when submitting order
+   budget_manager.reserve(amount)
 
-4. **Regime detection:**
-   ```
-   Monitor market regime indicators:
-   - Avg spread: was 2.1%, now 4.3% (regime shift)
-   - Leader trade frequency: was 12/session, now 6/session
-   - Market types: was 80% political, now 60% sports
+   # On fill confirmation: commit reservation
+   budget_manager.commit(order_id)
 
-   If regime shifts significantly:
-   → Flag for strategy review
-   → May need parameter adaptation
+   # On rejection: release reservation
+   budget_manager.release(order_id)
    ```
 
-**Detection checklist:**
-- [ ] Rolling performance monitored every session
-- [ ] Alerts for 20%+ degradation vs baseline
-- [ ] Comparative benchmark (conservative or other baseline)
-- [ ] Regime indicators tracked
-- [ ] Clear stop-loss rules (when to halt strategy)
+5. **Rejection alerting**:
+   - Track rejection rate (should be < 5%)
+   - Alert if rejection rate spikes (liquidity dried up?)
+   - Log rejection reasons for debugging
+   - If 3+ consecutive rejections: pause trading, investigate
 
-**Phase implications:** Phase 5 (deployment) should include monitoring dashboard. Phase 6+ (maintenance) requires ongoing performance tracking and revalidation protocol.
+**Detection (warning signs):**
+- Simulation shows +$324 PnL, live shows $0 (orders not filling)
+- Hourly budget depletes but positions not increasing
+- Leader makes 8 trades, bot only has 2 positions
+- Logs show "ORDER FILLED" but balance unchanged
+
+**Phase to address:** Phase 3 (Order Management & Confirmation)
+
+**Reference:** Current code has basic rejection handling (`live.py` lines 140-150) but lacks budget reconciliation.
+
+**Sources:**
+- [Polymarket Place Order Docs](https://docs.polymarket.com/developers/CLOB/orders/create-order)
+- [FOK order decimal places error](https://github.com/Polymarket/py-clob-client/issues/121)
 
 ---
 
-## Summary
+### Pitfall 4: Slippage & Timing Lag in Copy Trading
 
-### Critical Insights for v1.1 Milestone
+**What goes wrong:**
+- Leader buys at 0.55c, you buy at 0.68c (slippage ate your edge)
+- Leader's trade moves market, you chase the pump
+- By the time you see trade (API lag), liquidity dried up
+- Multiple bots copying same leader = thundering herd slippage
 
-**The user observation:** "Conservative took MORE trades than mirror but was only profitable strategy"
+**Why it happens:**
+- API latency: Leader's trade confirmed on-chain → API update → you fetch = 1-5 seconds lag
+- Order book thin: Leader's $50 trade moves price 10 cents
+- FOK aggressive pricing: current code uses `mid + 0.05` for buys (line 125)
+- Multiple followers: 10 bots see same trade, all buy simultaneously
+- News events: Leader trades on breaking news, you're too slow
 
-**Key pitfalls to avoid:**
+**Consequences:**
+- MONEY LOSS: Slippage erodes Sharpe 0.345 → 0.20 or negative
+- ADVERSE SELECTION: Only catch trades where market moved against you
+- OVERPAYING: Simulation assumes mid price, live pays ask
+- MISSED TRADES: Slippage so bad, FOK order doesn't fill
 
-1. **Small sample bias:** 12 sessions is insufficient for statistical significance (need 200+ trades for 95% confidence)
-2. **Correlation ≠ causation:** More trades may be EFFECT of profitability, not CAUSE
-3. **Overfitting patterns:** Patterns found on 12 sessions likely won't generalize
-4. **Regime specificity:** Conservative may have won due to temporary market conditions
-5. **Survivorship bias:** Must analyze WHY other strategies failed, not just that they did
+**Prevention:**
+1. **Slippage cost modeling** (already in config but verify usage):
+   - `spread_cost_pct = 2%` - Cost to cross spread
+   - `slippage_cost_pct = 1%` - Additional slippage from market impact
+   - `max_total_cost_pct = 8%` - Maximum acceptable total cost
+   - Strategy should CHECK these costs BEFORE submitting order
 
-**Recommended approach:**
+2. **Timing lag measurement**:
+   - Track: Leader trade timestamp → You see it → You submit order
+   - Target: < 2 seconds end-to-end (WebSocket helps)
+   - Alert if lag > 5 seconds (infrastructure problem)
+   - Record slippage per trade: (your fill price - leader fill price)
 
-```
-Phase 1: Validate significance FIRST
-- Calculate confidence intervals on conservative's edge
-- Check if statistically significant (p < 0.05)
-- If not significant: Gather more data before analysis
+3. **Aggressive limit pricing** (current code already does this):
+   ```python
+   # Buy: mid + 0.05 (pay up to cross spread)
+   price = min(0.99, mid + 0.05)  # Line 125
+   # Sell: mid - 0.05 (accept lower price to fill)
+   price = max(0.01, mid - 0.05)  # Line 129
+   ```
 
-Phase 2: Causal mechanism analysis
-- Trace decision paths: WHY did conservative trade more?
-- Test hypotheses with controlled experiments
-- Separate correlation from causation
+4. **Slippage circuit breaker**:
+   ```python
+   if abs(fill_price - expected_price) > 0.15:  # 15 cent slippage
+       logger.error("EXCESSIVE SLIPPAGE - pause trading")
+       self.pause_trading()
+   ```
 
-Phase 3: Out-of-sample validation
-- Hold out 30-40% of data for testing
-- Build strategy on training data only
-- Validate on held-out data before deployment
+5. **Anti-thundering-herd**:
+   - Add random jitter: 0-500ms delay before submitting
+   - Reduces chance all bots submit simultaneously
+   - Small enough delay doesn't hurt edge
 
-Phase 4: Realistic execution costs
-- Model spread costs (2-5%), slippage (0.3-0.5%)
-- Ensure edge remains >15% after costs
-- Paper trade before live deployment
+**Detection (warning signs):**
+- Live PnL significantly worse than simulation
+- Average buy price > leader's average by 10+ cents
+- Fill rate drops (many FOK orders rejected)
+- Hourly Sharpe 0.345 → 0.10 or negative
 
-Phase 5: Ongoing monitoring
-- Track rolling performance windows
-- Alert on degradation vs baseline
-- Be ready to revert if strategy stops working
-```
+**Phase to address:** Phase 4 (Slippage Monitoring & Mitigation)
 
-### Quick Reference: Research-Backed Requirements
+**Reference:** Config has slippage parameters but strategy doesn't enforce limits before submission.
 
-Based on 2026 research sources:
-
-| Metric | Minimum Requirement | Source |
-|--------|---------------------|--------|
-| Sample size for 95% confidence | 385 trades | [Medium](https://medium.com/@trading.dude/how-many-trades-are-enough-a-guide-to-statistical-significance-in-backtesting-093c2eac6f05) |
-| Sample size for 70% confidence | 107 trades | [Medium](https://medium.com/@trading.dude/how-many-trades-are-enough-a-guide-to-statistical-significance-in-backtesting-093c2eac6f05) |
-| Minimum Sharpe ratio (non-overfit) | <3.0 | [LuxAlgo](https://www.luxalgo.com/blog/backtesting-traps-common-errors-to-avoid/) |
-| Profit factor range (realistic) | 1.5-2.0 | [TradersPost](https://blog.traderspost.io/article/understanding-overfitting-in-trading-strategy-development) |
-| Out-of-sample data reservation | 30%+ | [LuxAlgo](https://www.luxalgo.com/blog/backtesting-traps-common-errors-to-avoid/) |
-| Performance degradation threshold | <20% drop | [QuantStart](https://www.quantstart.com/articles/Successful-Backtesting-of-Algorithmic-Trading-Strategies-Part-II/) |
-| Spread cost (Polymarket typical) | 0.5-5% | [Polymarket Guide](https://www.crypticorn.com/how-to-trade-polymarket-profitably-what-actually-works-in-2026/) |
-| Slippage (market orders) | 0.3-1% | [LuxAlgo](https://www.luxalgo.com/blog/backtesting-limitations-slippage-and-liquidity-explained/) |
-| Position sizing (Polymarket risk) | 3-5% per event | [BeInCrypto](https://beincrypto.com/polymarket-trader-loss-risk-management/) |
-| Limit order fill rate (realistic) | <60-70% | [Capitalise.ai](https://support.capitalise.ai/en/articles/5963164-trading-slippage-and-how-it-affects-live-trading-simulated-trading-and-backtests) |
-
-### Warning Signs Checklist
-
-Before deploying a new strategy, verify:
-
-- [ ] Sample size ≥200 trades OR confidence intervals explicitly calculated
-- [ ] Pattern tested on held-out data (not same 12 sessions)
-- [ ] Can explain causal mechanism (not just correlation)
-- [ ] Tested across multiple market regimes
-- [ ] Edge remains >15% after modeling execution costs
-- [ ] Performance monitored with rolling windows and alerts
-- [ ] Strategy implements principles (adaptive), not fixed parameters
-- [ ] Included failed strategies in analysis (survivorship check)
-- [ ] Paper traded on fresh data before live deployment
-- [ ] Clear stop-loss rules (when to halt strategy)
+**Sources:**
+- [Understanding Slippage in Copy Trading](https://copytrading.combiz.org/blogs/understanding-slippage-in-copy-trading-and-how-to-avoid-it)
+- [Copy Trading Slippage Explanation](https://www.toobit.com/en-US/support/copy-trading-with-zero-slippage-explained)
+- [Crypto Slippage in Arbitrage Bots](https://medium.com/@swaphunt/slippage-in-crypto-swaps-why-your-arbitrage-bot-keeps-crying-and-what-i-did-about-it-e561c0603e86)
 
 ---
 
-## Sources
+## MODERATE PITFALLS
 
-### High Confidence (2026 Research)
+These cause delays, degraded performance, or technical debt. Address during phased rollout.
 
-**Statistical Foundations:**
-- [Sample Size Requirements](https://medium.com/@trading.dude/how-many-trades-are-enough-a-guide-to-statistical-significance-in-backtesting-093c2eac6f05) - Trading Dude, Medium 2026
-- [Confidence in Numbers](https://www.dara.trade/blog/2019/10/14/how-to-build-a-profitable-trading-system-part-1-confidence-in-numbers) - DARA.TRADE
-- [Sample Size Calculator](https://www.backtestbase.com/education/how-many-trades-for-backtest) - BacktestBase 2026
+---
 
-**Overfitting & Backtesting:**
-- [Understanding Overfitting](https://blog.traderspost.io/article/understanding-overfitting-in-trading-strategy-development) - TradersPost Blog 2026
-- [Backtesting Traps](https://www.luxalgo.com/blog/backtesting-traps-common-errors-to-avoid/) - LuxAlgo 2026
-- [Overfitting in Algorithmic Trading](https://bookmap.com/blog/what-is-overfitting-in-algorithmic-trading) - Bookmap 2026
-- [Avoiding Overfitting](https://quantlane.com/blog/avoid-overfitting-trading-strategies/) - Quantlane 2026
-- [How to Avoid Overfitting Testing Rules](http://adventuresofgreg.com/blog/2025/12/18/avoid-overfitting-testing-trading-rules/) - Greg's Blog 2025
+### Pitfall 5: Regression Bugs from Codebase Refactoring
 
-**Strategy Validation:**
-- [Successful Backtesting Part II](https://www.quantstart.com/articles/Successful-Backtesting-of-Algorithmic-Trading-Strategies-Part-II/) - QuantStart
-- [Backtesting Strategies That Work](https://www.fortraders.com/blog/backtesting-strategies-that-actually-work) - ForTraders 2026
+**What goes wrong:**
+- Refactor conviction tracking logic, breaks cumulative spend tracking
+- Move files around, import paths break in production
+- Simplify code, accidentally remove critical edge case handling
+- Test passes but behavior subtly different (WR drops 50% → 45%)
 
-**Bias & Pitfalls:**
-- [Survivorship Bias in Backtesting](http://adventuresofgreg.com/blog/2026/01/14/survivorship-bias-backtesting-avoiding-traps/) - Greg's Blog 2026
-- [Survivorship Bias Explained](https://www.luxalgo.com/blog/survivorship-bias-in-backtesting-explained/) - LuxAlgo 2026
-- [Survivorship Bias in Market Data](https://bookmap.com/blog/survivorship-bias-in-market-data-what-traders-need-to-know) - Bookmap 2026
-- [Survivorship Bias Investment Trap](https://quantdare.com/survivorship-bias-an-investment-decision-trap/) - Quantdare
+**Why it happens:**
+- No comprehensive regression test suite
+- Simulation test on old data doesn't catch new bugs
+- Code cleanup removes "weird" logic that was actually critical
+- Refactor changes timing (order of operations matters in trading)
 
-**Execution & Slippage:**
-- [Backtesting Limitations: Slippage](https://www.luxalgo.com/blog/backtesting-limitations-slippage-and-liquidity-explained/) - LuxAlgo 2026
-- [Trading Slippage Effects](https://support.capitalise.ai/en/articles/5963164-trading-slippage-and-how-it-affects-live-trading-simulated-trading-and-backtests) - Capitalise.ai
-- [Building Robust Backtesting Framework](https://medium.com/@jpolec_72972/building-a-robust-backtesting-framework-trading-costs-1bb75f063756) - Medium 2026
-- [Using Backtesting to Avoid Slippage](https://www.exegy.com/avoiding-slippage-equities-trading-with-backtesting/) - Exegy
+**Consequences:**
+- MONEY LOSS: "Improved" code loses money in production
+- SILENT DEGRADATION: PnL slowly declines, hard to pinpoint cause
+- PRODUCTION INCIDENT: Bot crashes, misses trading hours
+- ROLLBACK PAIN: Can't easily revert to working version
 
-**Market Regime:**
-- [2026: Entering a New Market Regime](https://home.cib.natixis.com/articles/2026-entering-a-new-market-regime) - Natixis 2026
-- [2026 Macro Outlook](https://www.blackrock.com/us/financial-professionals/insights/2026-macro-outlook) - BlackRock 2026
-- [Market Risk in 2026](https://realinvestmentadvice.com/resources/blog/the-market-risk-in-2026-if-growth-projections-fail/) - RIA 2026
+**Prevention:**
+1. **Comprehensive test coverage**:
+   - Unit tests for all strategy logic (conviction, drawdown, late-entry)
+   - Integration tests for order submission flow
+   - Regression test: replay 86-hour dataset, verify PnL matches
+   - Property-based tests: conviction always increases, never resets mid-hour
 
-**Polymarket-Specific:**
-- [How To Trade Polymarket Profitably 2026](https://www.crypticorn.com/how-to-trade-polymarket-profitably-what-actually-works-in-2026/) - Crypticorn 2026
-- [Trader Lost $2M on Polymarket](https://beincrypto.com/polymarket-trader-loss-risk-management/) - BeInCrypto 2026
-- [Complete Polymarket Playbook](https://medium.com/thecapital/the-complete-polymarket-playbook-finding-real-edges-in-the-9b-prediction-market-revolution-a2c1d0a47d9d) - The Capital, Medium Jan 2026
-- [Market Making on Prediction Markets 2026](https://newyorkcityservers.com/blog/prediction-market-making-guide) - NYC Servers 2026
+2. **Automated validation pipeline**:
+   ```bash
+   # Before any deployment
+   pytest tests/
+   python scripts/regression_test.py --expected-pnl 324 --tolerance 5
+   python scripts/validate_config.py
+   ```
 
-**Copy Trading:**
-- [Smart Copy Trading Strategies 2026](https://bestcopytrading.com/strategies/smart-copy-trading-strategies/) - BestCopyTrading 2026
-- [Copy Trading Risks](https://tradefundrr.com/copy-trading-risks/) - TradeFundrr 2026
-- [Risk Management for Copy Trading](https://capitalxtend.com/forex-academy/forex/how-to-manage-risk-while-copy-trading) - CapitalXtend
+3. **Staged rollout**:
+   - Step 1: Run refactored code in DRY_RUN mode for 24 hours
+   - Step 2: Paper trade (track decisions but don't execute)
+   - Step 3: Live with 10% capital for 8 hours
+   - Step 4: Full capital only if metrics match baseline
 
-### Medium Confidence (Domain Knowledge)
+4. **Behavior checksums**:
+   - Log: "Hour 1 decisions: [buy MARKET_A@0.55, skip MARKET_B@0.89]"
+   - Compare logs before/after refactor on same data
+   - Any difference = investigate thoroughly
 
-- General algorithmic trading principles (training data)
-- Statistical analysis methods (training data)
-- Trading psychology and behavioral biases (training data)
+5. **Git discipline**:
+   - Feature branches for all changes
+   - PR reviews required (even solo developer: review your own code)
+   - Tag releases: `v1.0-simulation-only`, `v1.1-live-ready`
+   - Easy rollback: `git checkout v1.0-simulation-only`
 
-### Verification Status
+**Detection (warning signs):**
+- Live PnL diverges from simulation baseline
+- WR drops from 50% to 45% (still positive but degraded)
+- Logs show different decisions on same data
+- Tests pass but "feels wrong"
 
-**Verified with multiple 2026 sources:**
-- Small sample requirements (3+ sources agree on 200-500 trades)
-- Overfitting detection methods (5+ sources describe same techniques)
-- Execution cost ranges (2+ sources for Polymarket specifically)
-- Survivorship bias impact (4+ sources with quantified effects)
+**Phase to address:** Phase 5 (Testing & Validation Pipeline)
 
-**Inferred from domain knowledge:**
-- Specific application to user's 12-session scenario
-- Integration with existing codebase context
-- Polymarket-specific nuances (limited sources, extrapolated from prediction market norms)
+**Reference:** Extensive simulation results in memory, but no automated regression suite.
 
-**Gaps requiring validation:**
-- Actual spread statistics from user's recorded sessions
-- True sample size (may have more/fewer than estimated 120 trades)
-- Whether conservative's edge is statistically significant with actual data
-- Real execution costs in user's Polymarket copy trading context
+**Sources:**
+- [Regression Testing Guide 2026](https://www.leapwork.com/blog/regression-testing)
+- [Regression Testing in Agile](https://www.aiotests.com/blog/regression-testing-in-agile)
+- [Trading Bot Development](https://appinventiv.com/blog/crypto-trading-bot-development/)
+
+---
+
+### Pitfall 6: Race Condition: Own Orders Interpreted as Leader Orders
+
+**What goes wrong:**
+- You submit order via py-clob-client
+- WebSocket receives your order as "new trade event"
+- Bot thinks: "Leader bought! I should buy too!"
+- Infinite loop: your buy triggers another buy → another buy → ...
+
+**Why it happens:**
+- WebSocket subscribed to all trades for a market
+- Your own trades appear in same stream as leader trades
+- No filtering: "Is this MY order or leader's order?"
+- Async timing: Order submitted → confirmed → WebSocket event (race)
+
+**Consequences:**
+- MONEY LOSS: Deploy 2x-10x intended capital before catching error
+- BUDGET VIOLATION: Hourly budget $50 → spend $500 in 30 seconds
+- POSITION OVEREXPOSURE: Intended 5 shares → end up with 50 shares
+- EXCHANGE BAN: Spam exchange with orders, get rate-limited or banned
+
+**Prevention:**
+1. **Order tracking** (similar to documented Hyperliquid solution):
+   ```python
+   # Before submitting order
+   my_pending_orders.add(order_id)
+
+   # In WebSocket event handler
+   if event.order_id in my_pending_orders:
+       logger.info("Received confirmation of MY order")
+       my_pending_orders.remove(order_id)
+       return  # Don't process as leader trade
+
+   # Process as leader trade
+   self.handle_leader_trade(event)
+   ```
+
+2. **Address filtering**:
+   ```python
+   # In WebSocket handler
+   if event.user_address == self.my_address:
+       return  # Ignore my own trades
+   if event.user_address != self.leader_address:
+       return  # Ignore other users' trades
+   ```
+
+3. **Idempotency keys**:
+   - Tag each order with unique ID
+   - On WebSocket event: check if order_id already processed
+   - Deduplicate events (some exchanges send duplicate messages)
+
+4. **Circuit breaker for runaway trading**:
+   ```python
+   if orders_this_minute > 10:
+       logger.error("RUNAWAY TRADING DETECTED")
+       self.emergency_stop()
+   ```
+
+**Detection (warning signs):**
+- Logs show repeated "Leader bought X" for same market
+- Position size 10x larger than expected
+- Hourly budget depleted in first minute
+- Order submission rate spikes to 10+/second
+
+**Phase to address:** Phase 2 (WebSocket Event Handling)
+
+**Reference:** No evidence of this filter in current codebase. `live_source.py` fetches trades but no deduplication logic visible.
+
+**Sources:**
+- [Building Copy Trading Bot with Spot Order Mirroring](https://docs.chainstack.com/docs/hyperliquid-copy-trading-websocket)
+- [WebSocket Overview Polymarket](https://docs.polymarket.com/developers/CLOB/websocket/wss-overview)
+
+---
+
+### Pitfall 7: Strategy Overfitting to Historical Data
+
+**What goes wrong:**
+- Sharpe 0.345 in simulation, -0.10 in live trading
+- Train/test/holdout all profitable, but live loses money
+- Parameter changes that "improved" backtest hurt live performance
+- Market regime changed, strategy no longer works
+
+**Why it happens:**
+- Optimized parameters on 86 hours of data (small sample)
+- Leader behavior changes (they learned, or market changed)
+- Data leakage: Used future information in simulation
+- Overfitted to specific market conditions (bull market, high volatility)
+
+**Consequences:**
+- MONEY LOSS: Profitable backtest → losing live trades
+- FALSE CONFIDENCE: Thought strategy was robust, wasn't
+- WASTED TIME: Spent weeks optimizing parameters that don't generalize
+- CAPITAL RISK: Deploy full $50/hour, lose it all
+
+**Prevention:**
+1. **Walk-forward validation** (beyond train/test/holdout):
+   - Train on Week 1, test on Week 2
+   - Retrain on Week 1-2, test on Week 3
+   - Verify performance doesn't degrade over time
+
+2. **Out-of-sample testing** (critical):
+   - Hold back LATEST data for final validation
+   - Never touch holdout set until final test
+   - If holdout fails: don't deploy, investigate
+
+3. **Conservative parameterization**:
+   - Prefer simple rules over complex
+   - Wide parameter ranges that work (not single magic number)
+   - Robust to +/- 20% parameter changes
+
+4. **Live monitoring with kill switch**:
+   - Track live Sharpe ratio hour-by-hour
+   - If 8-hour Sharpe < 0: STOP trading
+   - If 24-hour Sharpe < 0.1: reduce capital 50%
+   - Manual review before resuming
+
+5. **Regime detection**:
+   - Track: Leader WR, leader trade frequency, market volatility
+   - Alert if metrics diverge from historical (leader WR 95% → 60%)
+   - Consider: "This regime looks different, should I trade?"
+
+**Detection (warning signs):**
+- Live WR 50% → 35% (below profitable threshold)
+- Leader behavior changes (trade size, frequency, timing)
+- Macro environment shifts (regulation, Polymarket policy change)
+- Conviction filter no longer predicts winners
+
+**Phase to address:** Phase 6 (Live Performance Monitoring)
+
+**Reference:** Memory shows robust train/test/holdout split, but small sample size (86 hours).
+
+**Sources:**
+- [Trading Bot Common Mistakes](https://monday.com/blog/ai-agents/best-ai-trading-bot-for-beginners/)
+- [Overfitting in Trading Strategies](https://appinventiv.com/blog/crypto-trading-bot-development/)
+
+---
+
+### Pitfall 8: Insufficient Liquidity for Position Sizing
+
+**What goes wrong:**
+- Strategy wants $10 position, order book only has $3 at acceptable price
+- FOK order rejected due to insufficient liquidity
+- Market order executes but slippage 20%+ (ate your edge)
+- Large position accumulates slowly, miss the edge window
+
+**Why it happens:**
+- Polymarket markets can be thin (especially low-volume tokens)
+- Order book depth not checked before submission
+- Simulation assumes infinite liquidity at mid price
+- Your order IS the market (you move price with each trade)
+
+**Consequences:**
+- FILLS MISS: High-conviction trades don't execute
+- SLIPPAGE: Partial fills at progressively worse prices
+- ADVERSE SELECTION: Only fill when market moves against you
+- STRATEGY DEGRADATION: Can't deploy capital at good prices
+
+**Prevention:**
+1. **Pre-trade liquidity check**:
+   ```python
+   orderbook = client.get_order_book(token_id)
+   available_liquidity = sum(level['size'] for level in orderbook['asks'][:5])
+
+   if request.amount_dollars > available_liquidity * 0.5:
+       # Reduce size or skip trade
+       logger.warning(f"Insufficient liquidity: want ${request.amount_dollars}, available ${available_liquidity}")
+   ```
+
+2. **Dynamic position sizing**:
+   ```python
+   target_size = base_size * liquidity_multiplier
+   liquidity_multiplier = min(1.0, available_liquidity / base_size / 2.0)
+   ```
+
+3. **Fallback to smaller orders**:
+   - Try: $10 order (rejected)
+   - Retry: $5 order (filled)
+   - Better: partial fill than no fill
+
+4. **Market hours awareness**:
+   - Low liquidity at night (US timezone)
+   - High liquidity during news events
+   - Track: Fill rate by hour-of-day, skip low-liquidity hours
+
+**Detection (warning signs):**
+- High rejection rate for FOK orders (> 20%)
+- Orders fill at prices far from mid (> 10 cents slippage)
+- Can't deploy full hourly budget despite signals
+
+**Phase to address:** Phase 4 (Order Sizing & Liquidity)
+
+**Sources:**
+- [Slippage in Copy Trading](https://copytrading.combiz.org/blogs/understanding-slippage-in-copy-trading-and-how-to-avoid-it)
+- [Market Making on Prediction Markets](https://newyorkcityservers.com/blog/prediction-market-making-guide)
+
+---
+
+## MINOR PITFALLS
+
+These cause annoyance but are fixable. Address opportunistically.
+
+---
+
+### Pitfall 9: Logging Verbosity Extremes
+
+**What goes wrong:**
+- Too verbose: Logs fill disk, can't find critical errors
+- Too quiet: Production issue, no logs to debug
+- Sensitive data logged (private keys, API secrets)
+- Logs not structured, can't parse for alerts
+
+**Why it happens:**
+- Debug mode left on in production
+- No log rotation (logs grow to GB)
+- Print statements instead of proper logging
+- No logging levels (everything is INFO)
+
+**Consequences:**
+- DEBUGGING PAIN: Can't diagnose production issues
+- SECURITY RISK: Private key appears in log file
+- DISK FULL: Logs consume all space, bot crashes
+- NOISE: Can't spot critical warnings in sea of debug logs
+
+**Prevention:**
+1. **Structured logging levels**:
+   - DEBUG: Strategy decisions, calculations
+   - INFO: Orders submitted, positions opened/closed
+   - WARNING: Rejections, retries, connection issues
+   - ERROR: Exceptions, failures requiring action
+   - CRITICAL: Emergency stop, catastrophic failures
+
+2. **Production log config**:
+   ```python
+   logging.basicConfig(
+       level=logging.INFO,  # Not DEBUG in production
+       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+       handlers=[
+           logging.FileHandler('bot.log'),
+           logging.StreamHandler()  # Also to console
+       ]
+   )
+   ```
+
+3. **Log rotation**:
+   ```python
+   from logging.handlers import RotatingFileHandler
+   handler = RotatingFileHandler('bot.log', maxBytes=10*1024*1024, backupCount=5)
+   # Keep 5 files of 10MB each = 50MB max
+   ```
+
+4. **Sensitive data filtering**:
+   ```python
+   # NEVER log private keys
+   logger.info(f"Using wallet: {address}")  # OK
+   logger.debug(f"Private key: {private_key}")  # NEVER DO THIS
+
+   # Redact in logs
+   logger.info(f"API key: {api_key[:8]}...{api_key[-4:]}")
+   ```
+
+5. **Structured logging for parsing**:
+   ```python
+   logger.info("ORDER_SUBMITTED", extra={
+       "order_id": order_id,
+       "market_id": market_id,
+       "side": side,
+       "amount": float(amount)
+   })
+   ```
+
+**Phase to address:** Phase 1 (Initial Setup)
+
+**Sources:**
+- [Trading Bot Development Best Practices](https://appinventiv.com/blog/crypto-trading-bot-development/)
+
+---
+
+### Pitfall 10: Clock Skew and Timestamp Mismatches
+
+**What goes wrong:**
+- System clock 5 minutes fast, order timestamps wrong
+- Timestamp comparison bugs (timezone-naive vs timezone-aware)
+- Staleness check fails (think data is stale when it's fresh)
+- Hourly budget reset at wrong time (59 minutes vs 61 minutes)
+
+**Why it happens:**
+- System clock not synced with NTP
+- Mixing timezone-aware and timezone-naive datetimes
+- Server timezone different from UTC
+- Polymarket API returns UTC, system uses local time
+
+**Consequences:**
+- MISSED TRADES: Think data is stale, skip valid trades
+- BUDGET ERRORS: Budget resets at wrong time
+- LOG CONFUSION: Timestamps don't match order book timestamps
+- DEBUGGING PAIN: Event ordering appears wrong
+
+**Prevention:**
+1. **Always use UTC timezone-aware datetimes**:
+   ```python
+   from datetime import datetime, timezone
+   now = datetime.now(timezone.utc)  # Always timezone-aware
+   ```
+
+2. **NTP sync check at startup**:
+   ```bash
+   # Verify system clock synced
+   timedatectl status  # Should show "System clock synchronized: yes"
+   ```
+
+3. **Timestamp validation**:
+   ```python
+   # Verify API timestamp is reasonable
+   api_time = datetime.fromisoformat(api_timestamp)
+   now = datetime.now(timezone.utc)
+   if abs((api_time - now).total_seconds()) > 300:  # 5 minutes
+       logger.error(f"Clock skew detected: API time {api_time}, system time {now}")
+   ```
+
+**Phase to address:** Phase 1 (Initial Setup)
+
+**Sources:**
+- Codebase analysis shows timezone-aware datetimes used (`src/data/live_source.py`)
+
+---
+
+### Pitfall 11: API Rate Limiting and Throttling
+
+**What goes wrong:**
+- Poll API too frequently, get rate-limited or banned
+- Rate limit hit during critical trade decision
+- No backoff, retry loop makes it worse
+- Different endpoints have different rate limits
+
+**Why it happens:**
+- No rate limiting in code
+- Aggressive polling (every 100ms instead of 1s)
+- Retry logic without backoff
+- Multiple threads/processes hitting same API
+
+**Consequences:**
+- MISSED TRADES: Can't submit order, rate-limited
+- TEMPORARY BAN: IP blocked for 1 hour
+- RESOURCE WASTE: Spam API with requests that get rejected
+- DATA STALENESS: Can't fetch fresh prices
+
+**Prevention:**
+1. **Rate limiting in code** (already present, verify):
+   ```python
+   # src/data/live_source.py has _rate_limit() method
+   def _rate_limit(self, endpoint: str) -> None:
+       # Ensure minimum 1s between requests per endpoint
+   ```
+
+2. **Exponential backoff on errors**:
+   ```python
+   for attempt in range(5):
+       try:
+           resp = client.get(url)
+           if resp.status_code == 429:  # Rate limited
+               sleep_time = (2 ** attempt) + random.uniform(0, 1)
+               time.sleep(sleep_time)
+               continue
+           break
+       except Exception:
+           pass
+   ```
+
+3. **Caching**:
+   - Cache market metadata (doesn't change often)
+   - Cache order book for 1-2 seconds (reduce API load)
+
+**Phase to address:** Phase 2 (API Reliability)
+
+**Reference:** Basic rate limiting present in `live_source.py` line 41-45.
+
+**Sources:**
+- [Polymarket API Documentation](https://docs.polymarket.com/)
+
+---
+
+## PHASE-SPECIFIC WARNINGS
+
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| **Phase 1: Environment Setup** | Wrong env vars, clock skew | Validation script, NTP check |
+| **Phase 2: WebSocket Integration** | Connection drops, race condition | Heartbeat, reconnect logic, order deduplication |
+| **Phase 3: Order Management** | Rejections not handled, budget leak | Confirmation flow, min size validation |
+| **Phase 4: Slippage & Liquidity** | Excessive slippage, thin orderbooks | Pre-trade liquidity check, slippage monitoring |
+| **Phase 5: Testing Pipeline** | Regressions from refactoring | Regression test suite, staged rollout |
+| **Phase 6: Live Monitoring** | Strategy overfitting, regime change | Kill switch, Sharpe monitoring, regime detection |
+
+---
+
+## CONFIDENCE ASSESSMENT
+
+| Area | Confidence | Rationale |
+|------|------------|-----------|
+| Environment Variables | HIGH | Official docs + security research + codebase analysis |
+| WebSocket Reliability | HIGH | Official docs + GitHub issues + community reports |
+| Order Rejections | HIGH | py-clob-client docs + Polymarket API docs |
+| Slippage & Timing | MEDIUM | Community reports, some specifics not verified |
+| Regression Testing | MEDIUM | General trading bot best practices, not Polymarket-specific |
+| Overfitting | MEDIUM | Based on research memory (86-hour sample is small) |
+| Race Conditions | HIGH | Documented in Hyperliquid/Polymarket community |
+| Liquidity Issues | MEDIUM | General copy trading issue, not Polymarket-specific data |
+
+---
+
+## VERIFICATION NOTES
+
+**Verified with official sources:**
+- Polymarket WebSocket docs (heartbeat, reconnection)
+- py-clob-client minimum sizes ($1 market, 5 shares limit)
+- Environment variable security concerns
+- Order confirmation flow in py-clob-client
+
+**Verified with codebase analysis:**
+- Current env loading has basic validation but needs hardening
+- Order rejection handling present but budget reconciliation missing
+- Timezone-aware datetimes used correctly
+- Rate limiting present in live_source.py
+
+**Requires validation:**
+- Actual slippage in live trading (will measure during Phase 4)
+- WebSocket stability with current py-clob-client version
+- Optimal polling intervals for REST fallback
+
+---
+
+## CRITICAL ACTION ITEMS
+
+**Before deploying to live trading:**
+
+1. [ ] **Environment validation script** - Verify env vars match expected wallet
+2. [ ] **Preflight test order** - Submit $1 test order, verify execution
+3. [ ] **WebSocket heartbeat** - Implement PING every 10 seconds
+4. [ ] **Order confirmation flow** - Budget only decrements on confirmed fill
+5. [ ] **Minimum size validation** - Reject orders below $1 / 5 shares
+6. [ ] **Order deduplication** - Track own orders, don't copy yourself
+7. [ ] **Regression test suite** - Replay 86-hour dataset, verify PnL within 5%
+8. [ ] **Kill switch** - Stop trading if 8-hour Sharpe < 0
+9. [ ] **Connection monitoring** - Alert if no data received for 60 seconds
+10. [ ] **Slippage tracking** - Log fill price vs expected price
+
+---
+
+## SOURCES
+
+### Official Documentation
+- [Polymarket WebSocket Overview](https://docs.polymarket.com/developers/CLOB/websocket/wss-overview)
+- [Polymarket Place Order API](https://docs.polymarket.com/developers/CLOB/orders/create-order)
+- [py-clob-client GitHub](https://github.com/Polymarket/py-clob-client)
+
+### Community Issues & Reports
+- [WebSocket data stream stops after some time](https://github.com/Polymarket/real-time-data-client/issues/26)
+- [Websocket reconnection mechanism not working](https://github.com/Polymarket/rs-clob-client/issues/185)
+- [FOK order decimal places error](https://github.com/Polymarket/py-clob-client/issues/121)
+
+### Copy Trading Best Practices
+- [Building Copy Trading Bot with Order Mirroring](https://docs.chainstack.com/docs/hyperliquid-copy-trading-websocket)
+- [Understanding Slippage in Copy Trading](https://copytrading.combiz.org/blogs/understanding-slippage-in-copy-trading-and-how-to-avoid-it)
+- [News-Driven Polymarket Bots Guide](https://www.quantvps.com/blog/news-driven-polymarket-bots)
+
+### Trading Bot Development
+- [Step-by-Step Crypto Trading Bot Development Guide (2026)](https://appinventiv.com/blog/crypto-trading-bot-development/)
+- [How to Build an AI Trading Bot](https://www.alchemy.com/blog/how-to-build-an-ai-trading-bot)
+- [Market Making on Prediction Markets Guide](https://newyorkcityservers.com/blog/prediction-market-making-guide)
+
+### Testing & Quality Assurance
+- [Regression Testing Guide 2026](https://www.leapwork.com/blog/regression-testing)
+- [Regression Testing in Agile](https://www.aiotests.com/blog/regression-testing-in-agile)
+
+### Security
+- [Are Environment Variables Safe for Secrets in 2026?](https://securityboulevard.com/2025/12/are-environment-variables-still-safe-for-secrets-in-2026/)
+
+---
+
+**END OF PITFALLS DOCUMENTATION**
+
+**Next step for orchestrator:** Use these pitfalls to inform roadmap phase structure and research requirements for each phase.

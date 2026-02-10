@@ -1,339 +1,404 @@
-# Stack Research: Strategy Debugging and Comparison
+# Technology Stack - v1.2 Production Ready
 
-**Domain:** Trading strategy performance analysis and debugging
-**Researched:** 2026-02-03
-**Confidence:** HIGH
+**Researched:** 2026-02-09
+**Focus:** WebSocket order placement, order lifecycle management, codebase modularity, latency optimization
+**Overall Confidence:** HIGH
 
 ## Executive Summary
 
-Your existing analysis framework (attribution, equity tracking, drawdown, slippage) is **solid and sufficient** for strategy debugging. The gap is **comparison tooling** and **statistical validation**. Recommendation: Add lightweight comparison/statistical libraries, NOT heavyweight backtesting frameworks (you already have replay).
+The existing stack is solid for simulation. For live trading, we need **three targeted additions**:
 
-**Key finding:** Conservative's outperformance (more trades, still profitable) suggests selection logic differences. You need side-by-side strategy comparison with statistical significance testing to understand WHY.
+1. **Structured logging** (structlog) for production observability
+2. **Profiling tools** (py-spy) for latency optimization
+3. **WebSocket user channel** support (via py-clob-client WebSocket patterns)
 
-## Recommended Additions
+**Key finding:** py-clob-client 0.34.5 is synchronous-only. Order placement via HTTP POST is acceptable for our ~$50/hour budget and Polymarket's matching delays. No asyncio rewrite needed.
 
-### 1. Strategy Comparison & Metrics: QuantStats
+**What NOT to add:**
+- Async/await refactor (not needed, py-clob-client is sync)
+- Database (JSON persistence sufficient for current scale)
+- Message queue (single-process event loop handles our volume)
+- Complex observability stack (structlog + file logs sufficient)
 
-| Library | Version | Purpose | Integration |
-|---------|---------|---------|-------------|
-| quantstats | 0.0.81 | Side-by-side strategy comparison, Sharpe/Sortino/Calmar ratios, tear sheets | Feed replay results as pandas Series, generate HTML comparison reports |
+## Stack Additions for v1.2
 
-**Why QuantStats:**
-- Latest version 0.0.81 released Jan 13, 2026 (actively maintained)
-- Three modules perfectly aligned with your needs:
-  - `quantstats.stats` - Sharpe, Sortino, win rate, volatility, max drawdown, Calmar ratio
-  - `quantstats.plots` - Visual comparison charts (equity curves, rolling metrics, monthly returns)
-  - `quantstats.reports` - HTML tearsheets comparing multiple strategies side-by-side
-- Works with pandas Series of returns (trivial to convert from your ReplayResult)
-- Includes Monte Carlo simulations for risk analysis
-- Zero conflict with existing code (analysis layer only)
+### Logging: structlog
 
-**Installation:**
-```bash
-pip install quantstats==0.0.81
-```
-
-**Integration pattern:**
-```python
-# In new comparison module: src/analysis/comparison.py
-import quantstats as qs
-
-def compare_strategies(results: Dict[str, ReplayResult]) -> Path:
-    """Generate side-by-side comparison HTML report."""
-    # Convert each ReplayResult to returns series
-    returns_dict = {}
-    for strategy_name, result in results.items():
-        equity_df = result.analysis['equity_df']
-        returns = equity_df['equity'].pct_change()
-        returns_dict[strategy_name] = returns
-
-    # Generate comparison tearsheet
-    qs.reports.html(returns_dict, output='strategy_comparison.html')
-```
-
-**Confidence:** HIGH (official PyPI, actively maintained, exact fit for use case)
-
-### 2. Statistical Significance: SciPy (Already Available)
-
-| Library | Version | Purpose | Integration |
-|---------|---------|---------|-------------|
-| scipy | Latest (≥1.10) | Hypothesis testing (t-tests, Mann-Whitney U) to validate strategy differences | Add to comparison module |
-
-**Why SciPy:**
-- Already in Python stdlib ecosystem (numpy dependency likely present)
-- `scipy.stats.ttest_ind()` - Compare PnL distributions between strategies
-- `scipy.stats.mannwhitneyu()` - Non-parametric alternative if returns aren't normal
-- Validates whether conservative's edge is statistically significant vs noise
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **structlog** | 25.5.0 | Structured JSON logging | Production-ready, fully typed, supports both JSON output and pretty console. Context binding for trade IDs, order IDs, market IDs. |
 
 **Installation:**
 ```bash
-pip install scipy>=1.10
+pip install structlog>=25.5
 ```
 
-**Integration pattern:**
-```python
-from scipy.stats import ttest_ind, mannwhitneyu
+**Rationale:**
+- Current: Standard library `logging` with string formatting
+- Problem: Hard to query logs for specific orders, trades, markets in production
+- Solution: structlog's context binding lets us attach `order_id`, `market_id`, `token_id` to logger and auto-include in all messages
+- Alternatives considered:
+  - **loguru** (0.7.3): Simpler API, but less structured output flexibility
+  - **Standard logging with JSON formatter**: More code to maintain
+  - **Verdict:** structlog is the industry standard for structured logging (in production since 2013)
 
-def test_strategy_significance(strategy_a_pnl: List[Decimal],
-                                strategy_b_pnl: List[Decimal]) -> Dict:
-    """Test if strategy A significantly outperforms strategy B."""
-    t_stat, p_value = ttest_ind(strategy_a_pnl, strategy_b_pnl)
-    return {
-        'statistically_significant': p_value < 0.05,
-        'p_value': p_value,
-        't_statistic': t_stat
-    }
-```
+**Integration points:**
+- Replace `logging.getLogger(__name__)` with `structlog.get_logger()`
+- Add context binding in `place_order()`: `log = log.bind(order_id=order_id, token_id=token_id)`
+- Configure dual output: JSON to file (production), pretty to console (development)
+- File: `src/core/logging.py` for centralized config
 
-**Confidence:** HIGH (SciPy is the standard library for statistical testing in Python)
+**Confidence:** HIGH (official docs, version verified via PyPI)
 
-### 3. Enhanced Visualization: Plotly (Upgrade from Matplotlib)
+### Profiling: py-spy
 
-| Library | Version | Purpose | Integration |
-|---------|---------|---------|-------------|
-| plotly | 6.5.2 | Interactive HTML charts with hover details, drill-down into trade failures | Optional upgrade to existing matplotlib charts |
-
-**Why Plotly:**
-- Latest version 6.5.2 released Jan 14, 2026
-- Native pandas integration (works as pandas plotting backend)
-- Interactive charts with hover → see exact trade details (why skip, what price, etc.)
-- HTML output → share reports easily
-- Better for exploring failure modes than static matplotlib
-
-**When to use:**
-- **Now:** Keep matplotlib for fast static charts (equity curve, scatter)
-- **Add Plotly for:** Interactive failure analysis dashboard showing:
-  - Skip reasons by token (drill down to see which markets caused most skips)
-  - Per-trade PnL timeline with hover details (leader price, our price, skip reason)
-  - Strategy comparison overlays (equity curves for all 8 strategies on one chart)
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **py-spy** | 0.4.1 | Low-overhead sampling profiler | Zero code modification, safe for production, Rust-based (minimal overhead). Profiles live processes. |
 
 **Installation:**
 ```bash
-pip install plotly==6.5.2
+pip install py-spy>=0.4.1
 ```
 
-**Integration pattern:**
-```python
-import plotly.express as px
+**Rationale:**
+- Current: No profiling infrastructure
+- Problem: Need to identify latency bottlenecks (detection lag, order placement lag) without modifying code
+- Solution: py-spy runs externally, attaches to PID, samples call stacks
+- Alternatives considered:
+  - **cProfile**: High overhead (tracing profiler), slows execution significantly
+  - **line_profiler**: Requires code decoration (`@profile`), not suitable for production
+  - **Verdict:** py-spy is the only profiler safe for production use with minimal overhead
 
-def plot_skip_analysis(results: List[ReplayResult]) -> str:
-    """Interactive chart: skip reasons across strategies."""
-    # Build DataFrame from skip_reasons dicts
-    df = build_skip_reasons_df(results)
-    fig = px.bar(df, x='strategy', y='count', color='reason',
-                 title='Skip Reason Breakdown by Strategy',
-                 hover_data=['token_id', 'price_at_skip'])
-    return fig.to_html()
-```
-
-**Confidence:** HIGH (official PyPI, industry standard for interactive viz)
-
-### 4. Data Wrangling: Pandas (Already Present, Validate Version)
-
-| Library | Version | Purpose | Current Status |
-|---------|---------|---------|----------------|
-| pandas | ≥2.0 | DataFrame manipulation for multi-strategy comparison | Already in requirements.txt (2.0+) |
-
-**Why validate version:**
-- Pandas 2.0+ has performance improvements for large comparisons
-- Your requirements.txt shows `pandas>=2.0` ✓ (GOOD)
-- No changes needed
-
-**Confidence:** HIGH (already validated)
-
-### 5. Statistical Plotting: Seaborn (Optional, for Publication-Quality Charts)
-
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| seaborn | 0.13.2 | Statistical visualizations (violin plots, box plots, distribution comparisons) | Optional: For understanding PnL distributions across strategies |
-
-**Why Seaborn:**
-- Current version 0.13.2 (stable)
-- Built on matplotlib, drop-in addition
-- Useful for: violin plots showing PnL distribution per strategy, box plots comparing skip rates
-
-**When NOT to use:**
-- Don't add if Plotly interactive charts are sufficient
-- Primarily useful for static publication-quality statistical charts
-
-**Installation (if needed):**
+**Usage:**
 ```bash
-pip install seaborn==0.13.2
+# Profile running bot (PID 1234) for 60 seconds
+py-spy record -o profile.svg --pid 1234 --duration 60
+
+# Top view (like htop for Python)
+py-spy top --pid 1234
 ```
 
-**Confidence:** MEDIUM (useful but not critical, Plotly can do similar)
+**Integration points:**
+- No code changes required
+- Use during testing sessions to measure:
+  - Time from blockchain event to strategy decision
+  - Time from order decision to HTTP POST completion
+  - WebSocket message handling latency
+- Document profiling workflow in `docs/PROFILING.md`
 
-## Integration Points
+**Confidence:** HIGH (official GitHub docs, version verified via PyPI)
 
-### With Existing Replay System
+### WebSocket: No New Dependencies
 
-Your `SessionReplayer.run(track_analysis=True)` already produces:
-- `result.analysis['equity_df']` → Feed to QuantStats for metrics
-- `result.analysis['attributed_trades']` → Feed to comparison module
-- `result.skip_reasons` → Feed to failure analysis
+**Current:** `websockets>=12.0` (already in requirements.txt)
 
-**Proposed new module:** `src/analysis/comparison.py`
+**Usage expansion:**
+- **Currently used:** `src/data/ws_price.py` for market price feeds
+- **New usage:** WebSocket user channel for order status updates
 
-```python
-from typing import Dict, List
-import quantstats as qs
-from scipy.stats import ttest_ind
-from pathlib import Path
+**Polymarket WebSocket Channels:**
+- **market channel**: Real-time price feeds (already implemented)
+- **user channel**: Order status, trade fills (NEW for v1.2)
 
-class StrategyComparator:
-    """Compare multiple strategies across sessions."""
+**Authentication:**
+- Requires signed authentication message on connect
+- py-clob-client provides API credentials via `create_or_derive_api_creds()`
+- Use same credentials for WebSocket auth
 
-    def __init__(self, output_dir: Path):
-        self.output_dir = output_dir
-        self.results: Dict[str, List[ReplayResult]] = {}
+**Implementation approach:**
+- Extend `WebSocketPriceService` pattern to create `WebSocketOrderService`
+- Subscribe to user channel with market condition IDs
+- Handle incoming messages: order matched, live, filled, cancelled
+- Thread-based event loop (matches existing `ws_price.py` pattern)
 
-    def add_result(self, strategy_name: str, result: ReplayResult):
-        """Accumulate results for a strategy."""
-        if strategy_name not in self.results:
-            self.results[strategy_name] = []
-        self.results[strategy_name].append(result)
+**Rationale for NOT switching to async:**
+- py-clob-client 0.34.5 is synchronous only (verified Jan 13, 2026 release)
+- Our order placement is request-response (POST order, get response)
+- Threading + asyncio in separate thread (current pattern) works fine
+- Full asyncio refactor = high effort, low benefit at current scale
 
-    def generate_comparison_report(self) -> Path:
-        """Generate HTML comparison report using QuantStats."""
-        # Convert results to returns series
-        returns = {}
-        for strategy, result_list in self.results.items():
-            combined_equity = combine_equity_curves(result_list)
-            returns[strategy] = combined_equity.pct_change()
+**Confidence:** MEDIUM (WebSocket user channel documented, but auth flow not fully detailed in search results)
 
-        # Generate comparison tearsheet
-        output_path = self.output_dir / "strategy_comparison.html"
-        qs.reports.html(returns, output=str(output_path))
-        return output_path
+## Stack Unchanged (Validation)
 
-    def test_significance(self, strategy_a: str, strategy_b: str) -> Dict:
-        """Test if strategy_a significantly outperforms strategy_b."""
-        pnl_a = [r.total_pnl for r in self.results[strategy_a]]
-        pnl_b = [r.total_pnl for r in self.results[strategy_b]]
+### Core Dependencies (Keep As-Is)
 
-        t_stat, p_value = ttest_ind(pnl_a, pnl_b)
-        return {
-            'strategies': f"{strategy_a} vs {strategy_b}",
-            'significant': p_value < 0.05,
-            'p_value': p_value,
-            't_statistic': t_stat,
-            'interpretation': 'Significantly different' if p_value < 0.05 else 'Not significantly different'
-        }
+| Library | Version | Rationale |
+|---------|---------|-----------|
+| py-clob-client | 0.34.5 | Latest version (Jan 13, 2026). Synchronous API is sufficient. Supports FOK, FAK, GTC, GTD order types. |
+| httpx | 0.27+ | HTTP/2 support, modern async-capable client. Currently used synchronously (correct for py-clob-client). |
+| websockets | 12.0+ | Powers existing price feed. Thread-based pattern works. No need for uvloop. |
+| pandas | 2.0+ | Analysis and backtesting. Not in hot path. |
+| PyYAML | 6.0+ | Config loading. Standard. |
+| python-dotenv | 1.0+ | Secrets management. Standard. |
+
+### Explicitly NOT Adding
+
+| Technology | Why NOT |
+|------------|---------|
+| **uvloop** | Asyncio accelerator, but we're not using asyncio for order placement (py-clob-client is sync). |
+| **asyncio refactor** | py-clob-client is synchronous. Refactoring to async = rewriting SDK wrapper for no latency gain. |
+| **PostgreSQL/SQLite** | Current JSON persistence is fine. No complex queries needed. Session replay reads full files. |
+| **Redis** | No need for shared state (single process) or caching (low volume). |
+| **Celery/RQ** | No background jobs. Event loop handles everything. |
+| **Prometheus/Grafana** | Overkill for single-bot deployment. structlog + file logs + manual analysis sufficient. |
+| **Sentry** | Error tracking not critical at this stage. Logs + manual monitoring sufficient. |
+
+## Order Placement Architecture
+
+**Current (DRY_RUN):**
+```
+Strategy.on_leader_trade()
+  └─> ExecutionAdapter.place_order() [dry-run simulation]
 ```
 
-### With Existing JSONL Sessions
-
-No changes to session recording format needed. Comparison runs AFTER replay:
-
-```python
-# New script: scripts/compare_strategies.py
-from src.framework.replay import SessionReplayer
-from src.analysis.comparison import StrategyComparator
-from src.strategies import get_all_strategies
-
-def compare_all_strategies_on_sessions(session_paths: List[Path]):
-    """Run all strategies on all sessions, generate comparison."""
-    comparator = StrategyComparator(Path("data/reports"))
-
-    for session_path in session_paths:
-        for strategy in get_all_strategies():
-            replayer = SessionReplayer(session_path, strategy)
-            replayer.load()
-            result = replayer.run(track_analysis=True)
-            comparator.add_result(strategy.name, result)
-
-    # Generate reports
-    html_report = comparator.generate_comparison_report()
-    print(f"Comparison report: {html_report}")
-
-    # Test conservative vs others
-    for other in ['mirror', 'aggressive', 'momentum']:
-        sig_test = comparator.test_significance('conservative', other)
-        print(f"Conservative vs {other}: p={sig_test['p_value']:.4f} ({sig_test['interpretation']})")
+**New (LIVE):**
+```
+Strategy.on_leader_trade()
+  └─> LiveExecutionAdapter.place_order()
+       └─> ClobClient.post_order(signed_order, FOK)
+            └─> HTTP POST to clob.polymarket.com
+                 └─> Response: {success, orderID, errorMsg}
 ```
 
-## Not Recommended
+**Latency breakdown (estimated):**
 
-### 1. Heavyweight Backtesting Frameworks
+| Step | Estimated Latency | Notes |
+|------|-------------------|-------|
+| Blockchain event to strategy decision | 50-200ms | Polygon block time ~2s, our polling interval |
+| Strategy decision to order creation | <1ms | Pure Python logic |
+| Order signing (ECDSA) | 1-5ms | Cryptographic signing |
+| HTTP POST roundtrip | 50-300ms | Network to clob.polymarket.com |
+| **Total detection-to-order** | **100-500ms** | Dominated by network + polling |
 
-| Library | Why NOT |
-|---------|---------|
-| Backtrader | You already have replay system. Backtrader is 5000+ LOC for strategy orchestration you don't need. |
-| Zipline | Designed for equity markets with daily bars. Your use case is event-driven crypto prediction markets. Architectural mismatch. |
-| vectorbt | Optimized for vectorized backtests on large datasets. You have ~12 sessions of JSONL events. Overkill. |
-| PyAlgoTrade | Another full backtesting framework. You already have SessionReplayer. |
+**Is this fast enough?**
+- Leader's trades take time to propagate and match
+- Polymarket has matching delays (marketable orders may be "delayed" status)
+- Our budget (~$50/hour) means we're not competing on speed
+- **Verdict:** Synchronous HTTP POST is acceptable. No need for aggressive optimization.
 
-**Reasoning:** You're not building a backtester (you have one). You need **comparison and debugging on existing replay results**. Adding Backtrader/Zipline is architectural bloat.
+**When to optimize:**
+- If we see consistent order rejections due to price movement
+- If profiling shows hot spots (use py-spy to identify)
+- Then: reduce polling interval, optimize WebSocket handling, consider price prediction
 
-### 2. PyFolio (Partially Superseded)
+## Order Lifecycle Management
 
-| Library | Why NOT |
-|---------|---------|
-| pyfolio | QuantStats is the modern successor with active maintenance. PyFolio development slowed significantly. Use QuantStats instead. |
+**Order states (Polymarket CLOB):**
 
-**Exception:** If you need Bayesian risk analysis (PyFolio has this, QuantStats doesn't), consider `pyfolio-reloaded` fork. But for your use case (compare 8 strategies), QuantStats is sufficient.
+| Status | Meaning | Bot Action |
+|--------|---------|------------|
+| **matched** | Order filled against resting order | Log success, update portfolio |
+| **live** | Limit order resting on book | Not used (we only use FOK) |
+| **delayed** | Marketable but matching delayed | Rare, log warning |
+| **unmatched** | Failed to match (FOK rejected) | Log rejection, don't retry |
 
-### 3. Machine Learning Libraries (Not Yet)
+**Order types:**
 
-| Library | Why NOT (for now) |
-|---------|---------|
-| scikit-learn | You're debugging WHY conservative wins, not predicting what will win. ML is for v1.2 pattern discovery, not v1.1 strategy comparison. |
-| TensorFlow/PyTorch | Way premature. You have 12 sessions. Deep learning needs 1000s of examples. |
+| Type | Use Case | Current Usage |
+|------|----------|---------------|
+| **FOK** | Buy/sell immediately or cancel | PRIMARY (current implementation) |
+| **FAK** | Partial fill, cancel remainder | Not needed (want all-or-nothing) |
+| **GTC** | Limit order on book | Not needed (we mirror immediately) |
+| **GTD** | GTC with expiration | Not needed |
 
-**Reasoning:** Current milestone is **understand conservative's logic** (rules-based debugging), not **predict winning patterns** (ML). Save ML for v1.2.
+**Error handling:**
+- HTTP errors (network, auth): Log, alert, disarm
+- Order rejections (insufficient balance, bad price): Log, alert, don't retry
+- Partial fills: Can't happen with FOK
+- Stale prices: Validate bid/ask before order creation
 
-### 4. Over-Engineering Visualization
+**Monitoring approach:**
+- structlog logs with context (order_id, token_id, amount, price)
+- JSON logs to file: `logs/orders_YYYY-MM-DD.jsonl`
+- Query with `jq`: `cat logs/orders_*.jsonl | jq 'select(.status=="REJECTED")'`
+- Alert on rejection rate >10% (manual check initially)
 
-| Approach | Why NOT |
-|----------|---------|
-| Dash dashboards | Interactive web dashboard with callbacks. You need reports, not a deployed web app. HTML from Plotly/QuantStats is sufficient. |
-| Tableau/PowerBI connectors | Trading bot analysis doesn't need BI tool integration. Keep it local Python. |
+## Codebase Modularity Improvements
 
-**Reasoning:** Generate HTML reports locally. Don't build infrastructure you don't need.
+**Current issues:**
+- Logging scattered across modules with inconsistent formats
+- No centralized profiling documentation
+- Order placement logic mixed with adapter logic
 
-## Summary
+**Proposed structure:**
 
-### What to Add
+```
+src/
+  core/
+    logging.py          # NEW: structlog configuration, context helpers
+  execution/
+    live.py             # REFACTOR: Extract order builder, add structured logging
+    order_builder.py    # NEW: Separate order construction logic
+    order_tracker.py    # NEW: Track order lifecycle via WebSocket user channel
+  monitoring/
+    profiler.py         # NEW: py-spy wrapper, profiling helpers
+  data/
+    ws_order.py         # NEW: WebSocket user channel for order updates
+```
 
-| Library | Version | Why | Installation |
-|---------|---------|-----|--------------|
-| **quantstats** | 0.0.81 | Side-by-side strategy comparison with Sharpe/Sortino, HTML tearsheets | `pip install quantstats==0.0.81` |
-| **scipy** | ≥1.10 | Statistical significance testing (t-tests) | `pip install scipy>=1.10` |
-| **plotly** | 6.5.2 | Interactive failure analysis charts (optional upgrade) | `pip install plotly==6.5.2` |
+**Specific improvements:**
 
-### What NOT to Add
+1. **Centralized logging config** (`src/core/logging.py`):
+   - Configure structlog processors (JSON + pretty)
+   - Helper: `get_logger_with_context(order_id, token_id, market_id)`
+   - Environment-based config (JSON in production, pretty in dev)
 
-- ❌ Backtrader, Zipline, vectorbt (you have replay, don't need backtester)
-- ❌ PyFolio (use QuantStats instead, more actively maintained)
-- ❌ scikit-learn, TensorFlow (defer to v1.2 ML track)
-- ❌ Dash, Tableau connectors (HTML reports are sufficient)
+2. **Order builder separation** (`src/execution/order_builder.py`):
+   - Extract price calculation (mid ± offset)
+   - Validate spread (bid <= ask, within bounds)
+   - Size calculation (dollars to shares)
+   - Sign order (py-clob-client integration)
+   - Returns: `SignedOrder` ready for posting
 
-### Integration Strategy
+3. **Order tracker** (`src/execution/order_tracker.py`):
+   - Subscribe to WebSocket user channel
+   - Map order_id to internal request
+   - Emit events: OrderFilled, OrderRejected, OrderCancelled
+   - Strategy can listen for fill confirmations
 
-1. **Minimal changes to existing code** - Keep replay.py, attribution.py, reports.py as-is
-2. **New module:** `src/analysis/comparison.py` - Wraps QuantStats and SciPy
-3. **New script:** `scripts/compare_strategies.py` - Runs all strategies on all sessions
-4. **Output:** HTML reports showing:
-   - Side-by-side metrics (Sharpe, Sortino, max drawdown, win rate)
-   - Statistical significance tests (is conservative REALLY better?)
-   - Interactive charts drilling into failure modes
+4. **Profiling documentation** (`docs/PROFILING.md`):
+   - How to run py-spy against live bot
+   - Interpreting flamegraphs
+   - Common bottlenecks and fixes
+   - Latency measurement methodology
 
-### Key Insight for Conservative Debugging
+## Installation
 
-Conservative took MORE trades but was ONLY profitable strategy. This suggests:
-- **Selection filter difference** - Conservative's `MIN_LEADER_TRADE_PCT = 1%` and stricter cost checks likely filter noise
-- **Comparison task:** Run all strategies on same sessions, compare skip reasons by token
-- **Statistical test:** Is conservative's PnL distribution significantly different from mirror? (t-test will answer)
+**Add to requirements.txt:**
+```
+# Structured logging (NEW)
+structlog>=25.5
 
-**Recommendation:** Start with QuantStats + SciPy. Add Plotly only if static charts aren't revealing enough detail.
+# Profiling (NEW)
+py-spy>=0.4.1
+
+# Existing dependencies (unchanged)
+py-clob-client>=0.34
+httpx>=0.27
+websockets>=12.0
+PyYAML>=6.0
+python-dotenv>=1.0
+pandas>=2.0
+matplotlib>=3.8
+numpy>=1.24
+scipy>=1.11
+plotly>=5.0
+quantstats>=0.0.81
+empyrical-reloaded>=0.5.11
+pytest>=8.0
+pytest-asyncio>=0.23
+mypy>=1.8
+ruff>=0.2
+```
+
+## Configuration
+
+**New environment variables:**
+
+```bash
+# Logging
+LOG_LEVEL=INFO              # DEBUG, INFO, WARNING, ERROR
+LOG_FORMAT=json             # json, pretty
+LOG_DIR=logs/               # Directory for log files
+
+# Order placement
+ORDER_TIMEOUT_SEC=10        # HTTP timeout for order placement
+MAX_PRICE_OFFSET=0.05       # Maximum price offset from mid (5 cents)
+VALIDATE_SPREAD=true        # Reject if bid > ask
+```
+
+**Config file additions** (`config/config.yaml`):
+
+```yaml
+execution:
+  live:
+    order_timeout_sec: 10
+    max_price_offset: 0.05
+    validate_spread: true
+    retry_on_network_error: false  # Don't retry failed orders
+
+logging:
+  level: INFO
+  format: json  # json or pretty
+  output:
+    console: true
+    file: true
+    file_path: logs/bot.jsonl
+  context:
+    always_include:
+      - timestamp
+      - level
+      - logger
+      - event
+```
+
+## Latency Optimization Strategy
+
+**Measurement first:**
+1. Add latency tracking to existing code
+2. Log timestamps: event_detected, decision_made, order_created, order_posted, response_received
+3. Run on test sessions, collect data
+4. Identify slowest steps
+
+**Expected bottlenecks (hypothesis):**
+- **Blockchain polling interval** (currently unknown, likely 100-500ms)
+- **HTTP POST roundtrip** (network latency, 50-300ms)
+- **Price feed staleness** (WebSocket updates may lag)
+
+**Optimization roadmap (after measurement):**
+
+| If bottleneck is... | Then... |
+|---------------------|---------|
+| Polling interval | Reduce interval, switch to event-driven (harder) |
+| HTTP POST | Pre-warm connections (httpx connection pooling), consider WebSocket order placement if available |
+| Price feed lag | Subscribe to more granular updates, validate with orderbook snapshot |
+| Order signing | Cache client initialization, profile ECDSA signing |
+| Python GIL | Profile with py-spy, move hot paths to C extension (extreme) |
+
+**Realistic target latency:**
+- Current (estimated): 100-500ms detection-to-order
+- Optimized (achievable): 50-200ms
+- Aggressive (requires major changes): 20-50ms
+- HFT-level (<10ms): Not achievable in Python without C++ rewrite
+
+**Trade-off:**
+- Our edge is strategy quality, not speed
+- Leader's trades are public on blockchain (unavoidable lag)
+- Focus on correctness > microseconds
+- Optimize only if profiling shows clear wins
 
 ## Sources
 
-- [QuantStats GitHub](https://github.com/ranaroussi/quantstats)
-- [QuantStats PyPI (0.0.81)](https://pypi.org/project/quantstats/)
-- [Best Python Libraries for Algorithmic Trading](https://blog.quantinsti.com/python-trading-library/)
-- [Python Trading Strategy Performance Evaluation](https://towardsdatascience.com/the-easiest-way-to-evaluate-the-performance-of-trading-strategies-in-python-4959fd798bb3/)
-- [Plotly Express Latest Version](https://pypi.org/project/plotly/)
-- [SciPy Statistical Testing](https://docs.scipy.org/doc/scipy/reference/stats.html)
-- [Seaborn Documentation](https://seaborn.pydata.org/)
-- [Python Roadmap 2026 for Traders](https://www.marketcalls.in/python/python-roadmap-2026-a-strategic-guide-for-traders-and-investors.html)
+**py-clob-client:**
+- [GitHub - Polymarket/py-clob-client](https://github.com/Polymarket/py-clob-client)
+- [py-clob-client on PyPI](https://pypi.org/project/py-clob-client/) (v0.34.5, Jan 13, 2026)
+- [Place Single Order - Polymarket Documentation](https://docs.polymarket.com/developers/CLOB/orders/create-order)
+
+**WebSocket:**
+- [WSS Overview - Polymarket Documentation](https://docs.polymarket.com/developers/CLOB/websocket/wss-overview)
+- [The Polymarket API: Architecture, Endpoints, and Use Cases](https://medium.com/@gwrx2005/the-polymarket-api-architecture-endpoints-and-use-cases-f1d88fa6c1bf)
+
+**Structured Logging:**
+- [structlog on PyPI](https://pypi.org/project/structlog/) (v25.5.0)
+- [Guide to structured logging in Python](https://newrelic.com/blog/log/python-structured-logging)
+- [Logging in Python: A Comparison of the Top 6 Libraries](https://betterstack.com/community/guides/logging/best-python-logging-libraries/)
+
+**Profiling:**
+- [py-spy on GitHub](https://github.com/benfred/py-spy) (v0.4.1)
+- [Why Is My Code So Slow? A Guide to Py-Spy Python Profiling](https://towardsdatascience.com/why-is-my-code-so-slow-a-guide-to-py-spy-python-profiling/)
+- [Top 7 Python Profiling Tools for Performance](https://daily.dev/blog/top-7-python-profiling-tools-for-performance)
+
+**Asyncio & Latency:**
+- [Python in High-Frequency Trading: Low-Latency Techniques](https://www.pyquantnews.com/free-python-resources/python-in-high-frequency-trading-low-latency-techniques)
+- [Event Loop — Python 3.14.3 documentation](https://docs.python.org/3/library/asyncio-eventloop.html)
+- [High-Performance Python: AsyncIO vs Multiprocessing vs ThreadPools (2026 Guide)](https://medium.com/@yogeshkrishnanseeniraj/high-performance-python-asyncio-vs-multiprocessing-vs-threadpools-2026-guide-ad49d40452fc)
+
+**Decimal Precision:**
+- [decimal — Decimal fixed-point and floating-point arithmetic](https://docs.python.org/3/library/decimal.html)
+- [Precision Handling in Python (2026)](https://thelinuxcode.com/precision-handling-in-python-2026-representation-rounding-and-real-world-patterns/)
+
+---
+
+**Research complete.** Stack additions validated against official docs and current versions. Ready for roadmap creation.
