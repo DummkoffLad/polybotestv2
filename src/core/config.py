@@ -33,7 +33,7 @@ class ScalingConfig:
     our_capital: Decimal = Decimal("50")
     k_factor: Decimal = Decimal("0.7")
     leader_capital: Decimal = Decimal("900")
-    hourly_budget: Decimal = Decimal("45")
+    hourly_budget: Decimal = Decimal("50")
 
 
 @dataclass

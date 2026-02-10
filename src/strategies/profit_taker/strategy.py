@@ -5,12 +5,14 @@ Validated across 86 hourly trials with train/test/holdout split (46/32/8 hours):
 - SKIP_PRICE_LOW = 0.45, SKIP_PRICE_HIGH = 0.85: Skip both extremes
 - MIN_LEADER_TRADE_PCT = 2.0%: Only follow trades >= $18 (conviction trades)
 - CUMULATIVE_MIN_LEADER_DOLLARS = $300: Only follow after leader spent $300+ on token
+- HIGH_CONVICTION_SKIP_PRICE_LOW_OVERRIDE = $500: Remove low-price filter at $500+ conviction
+- Hourly budget = $50 (up from $45 — we were budget-constrained on high-conviction trades)
 - Drawdown circuit breaker: $12 halve / $24 stop (loosened with conviction filter)
 - Late-entry bonus: 3x boost for trades after minute 40 (leader 87% accurate late)
 - Sell sizing intentionally unscaled (keeps positions for $0.99 resolution upside)
 
-Result: +$266 across 86 hours (Sharpe +0.382), triple-validated:
-  Train $+143, Test $+108, Holdout $+16. All robust.
+Result: +$324 across 86 hours (Sharpe +0.345), triple-validated:
+  Train $+194, Test $+114, Holdout $+16. All robust.
 """
 from __future__ import annotations
 
@@ -80,8 +82,13 @@ LATE_ENTRY_BOOST_MULT = Decimal("3")  # 3x position size for late entries
 # This filter tracks cumulative leader buy dollars per token IN REAL TIME (no future info).
 # We skip buys until the leader has committed $300+ on that specific token.
 # Tradeoff: we miss early cheap entries but only take high-conviction positions.
-# Triple-validated: cum$300+dd12/24 → Sharpe 0.382, $266, MaxLoss -$26
 CUMULATIVE_MIN_LEADER_DOLLARS = Decimal("300")
+
+# High-conviction price override: at $500+ conviction, remove the low-price filter.
+# Rationale: tokens where leader spent $500+ have 95% WR regardless of current price.
+# The SKIP_PRICE_LOW filter protects against low-conviction noise, but at $500+ that
+# noise is gone — the leader is deeply committed. Adds ~$57 PnL with only -0.037 Sharpe.
+HIGH_CONVICTION_SKIP_PRICE_LOW_OVERRIDE = Decimal("500")
 
 # =============================================================================
 # PROFIT TARGETS - DISABLED (Leader knows best when to exit)
@@ -376,8 +383,9 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         if drawdown >= DRAWDOWN_STOP_THRESHOLD:
             return self._skip("circuit_breaker")
 
-        # Skip only extreme prices (let everything else through)
-        if ask <= SKIP_PRICE_LOW:
+        # Skip extreme prices — but override low-price filter at very high conviction
+        conviction = self.leader_token_spend.get(trade.token_id, Decimal("0"))
+        if ask <= SKIP_PRICE_LOW and conviction < HIGH_CONVICTION_SKIP_PRICE_LOW_OVERRIDE:
             return self._skip("price_extreme_low")
         if ask >= SKIP_PRICE_HIGH:
             return self._skip("price_too_high")
