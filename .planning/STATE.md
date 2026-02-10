@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Reproduce the leader's profitable trades at a smaller scale using conviction-based filtering to maximize risk-adjusted returns.
-**Current focus:** Planning next milestone
+**Current focus:** v1.2 Production Ready — cleanup + live trading
 
 ## Current Position
 
-Phase: N/A — between milestones
-Plan: N/A
-Status: v1.1 complete, ready for /gsd:new-milestone
-Last activity: 2026-02-09 — v1.1 milestone completed
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.2
+Last activity: 2026-02-09 — Milestone v1.2 started
 
 Progress: v1.0 (21 plans) + v1.1 (13 plans) = 34 plans complete
 
@@ -83,7 +83,7 @@ None.
 Last session: 2026-02-09
 Stopped at: v1.1 milestone completion
 Resume file: None
-Next action: /gsd:new-milestone
+Next action: Define requirements and create roadmap for v1.2
 
 **Strategy config (current best):**
 - Sharpe 0.345, PnL $324, WR 50%, MaxLoss -$26
@@ -92,4 +92,4 @@ Next action: /gsd:new-milestone
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-09 after v1.1 milestone completion*
+*Last updated: 2026-02-09 after v1.2 milestone start*

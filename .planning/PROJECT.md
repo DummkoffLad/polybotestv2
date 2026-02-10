@@ -33,10 +33,14 @@ Reproduce the leader's profitable trades at a smaller scale using conviction-bas
 
 ### Active
 
-- [ ] Small-scale live testing with real money
+- [ ] Codebase modularity: single source of truth for trade logic (sim/runner/live share code)
+- [ ] Root directory cleanup: remove/organize 60+ experiment scripts
+- [ ] Detection latency optimization: minimize time from leader trade to our detection
+- [ ] Execution speed optimization: minimize time from decision to order placed
+- [ ] Live WebSocket order placement: market and limit orders on Polymarket
+- [ ] Order lifecycle management: detect rejections/cancellations and adapt quickly
+- [ ] Live environment hardening: handle env var issues, connectivity, edge cases
 - [ ] Live execution monitoring and alerting
-- [ ] Capital scaling analysis (how does PnL scale with budget?)
-- [ ] Automated session recording for continuous data collection
 
 ### Out of Scope
 
@@ -66,10 +70,13 @@ Reproduce the leader's profitable trades at a smaller scale using conviction-bas
 - **Minimum orders**: Polymarket requires min $1 market orders, min 5 shares limit orders
 - **Data**: 86 hours of recorded sessions across 6 days (Feb 3-8, 2026)
 
-## Current State
+## Current Milestone: v1.2 Production Ready
 
-**Milestone v1.1 Complete** — profit_taker with conviction filters beats conservative
-**Next:** Planning next milestone
+**Goal:** Clean up codebase for modularity and scalability, then enable live WebSocket trading with robust order management.
+
+**Target features:**
+- Codebase cleanup: shared trade logic modules, remove clutter, optimize speed
+- Live trading: WebSocket order placement, rejection handling, environment hardening
 
 **Best Strategy Config (2026-02-09):**
 - Sharpe 0.345, PnL $324, WR 50%, MaxLoss -$26
@@ -91,4 +98,4 @@ Reproduce the leader's profitable trades at a smaller scale using conviction-bas
 | Pattern discovery deferred | v1.2 research track, not blocking strategy work | — Pending |
 
 ---
-*Last updated: 2026-02-09 after v1.1 milestone completion*
+*Last updated: 2026-02-09 after v1.2 milestone start*
