@@ -1,215 +1,366 @@
-# Feature Landscape: Production Live Copy Trading Bot
+# Features Research: v1.2 Production Ready
 
-**Domain:** Production-ready copy trading for prediction markets (Polymarket)
-**Researched:** 2026-02-09
-**Confidence:** MEDIUM (WebSearch verified with Polymarket docs, copy trading best practices)
+**Domain:** Live trading on Polymarket prediction markets (copy trading bot)
+**Researched:** 2026-02-10
+**Confidence:** HIGH (verified with official Polymarket docs and py-clob-client)
 
-## Table Stakes
+## Executive Summary
 
-Features users expect from production live trading systems. Missing = unacceptable risk or incomplete product.
+Moving from dry-run to live trading requires **safety-first architecture** with clear execution boundaries. The bot already has strong strategy logic (profit_taker: Sharpe 0.345, $324 PnL) — the challenge is adding reliable order placement without introducing new failure modes.
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **Order State Machine** | Track order lifecycle (pending → filled → rejected) | Medium | FIX protocol standard: Submitted, Accepted, Working, Filled, Cancelled, Rejected. Critical for reconciliation. |
-| **Position Reconciliation** | Verify our positions match exchange reality | Medium | Every 5 minutes fetch from API, compare to internal state. Prevents divergence after API failures. Currently exists but needs hardening. |
-| **Kill Switch** | Emergency stop all trading | Low | Manual trigger + automatic circuit breakers. Industry standard for capital protection. |
-| **Daily Loss Limits** | Auto-pause if drawdown exceeds threshold | Low | Stop trading if -15% to -20% in 24h. Already have hourly drawdown ($12/$24), extend to daily. |
-| **Order Timeout Handling** | Cancel stale limit orders automatically | Medium | Polymarket orders can sit unfilled. Need timeout (30-60s) then cancel or convert to market. |
-| **Idempotent Order Placement** | Prevent duplicate orders on retry | Medium | Use idempotency keys (UUID per logical order). Critical for reconnection scenarios. |
-| **Connection Recovery** | Resume trading after WebSocket drop | Medium | Existing WebSocket has reconnect. Extend to: refetch positions, replay missed events, verify no duplicates. |
-| **Order Rejection Handling** | Gracefully handle API rejections | Low | Polymarket rejects: insufficient balance, invalid price, minimum not met. Log, skip, don't crash. |
-| **Minimum Order Validation** | Enforce Polymarket minimums pre-submission | Low | Market orders >= $1, limit orders >= 5 shares. Validate BEFORE API call to avoid rejection spam. Already exists in TradeDecision. |
-| **Balance Checking** | Verify sufficient capital before order | Low | Check available balance before placing order. Prevents "insufficient funds" rejections. |
-| **Execution Logs** | Audit trail of all orders placed | Low | Append-only log: timestamp, order details, API response, fill status. Essential for debugging and compliance. |
-| **Error Retry Logic** | Retry transient API errors with backoff | Medium | Network errors, rate limits: exponential backoff (1s, 2s, 4s). Non-retryable errors (invalid market): fail immediately. |
-| **Order Cancellation** | Cancel pending orders on demand | Low | Needed for hourly cleanup, kill switch, manual intervention. Already in ExecutionAdapter interface. |
+**Key feature decisions:**
+1. **Market orders (FOK) only** — simplifies execution, matches copy trading speed requirements
+2. **Pre-flight safety checks** — validate environment/connectivity before arming
+3. **Reconciliation on every poll** — catch execution drift early
+4. **Kill switch with manual disarm** — deliberate action required to trade live
+5. **NO complex order lifecycle management** — FOK orders either fill or fail immediately, no partial fills to track
 
-## Differentiators
+**Anti-features (deliberately skip for $50/hr bot):**
+- Limit order management and cancellation logic
+- Position averaging or re-entry after partial fills
+- Order book modeling or spread analysis
+- Dynamic position sizing based on liquidity
+- Multi-venue execution or routing logic
 
-Features that set production bots apart. Not expected, but provide competitive edge.
+This is a small-scale copy trading bot. Keep execution simple, monitoring comprehensive, safety paranoid.
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Partial Fill Handling** | Maximize capital efficiency on slow fills | High | Track partially filled limit orders, adjust remaining size, handle multi-part fills. Rare on Polymarket but possible. |
-| **Smart Order Routing** | Choose market vs limit based on urgency | Medium | Leader trade at minute 5 → limit order (time available). Minute 55 → market order (urgency). Improves fill rate + reduces slippage. |
-| **Fill Quality Monitoring** | Track slippage and execution quality | Medium | Compare intended price vs actual fill. Alert if slippage consistently > 2%. Drives strategy improvements. Already have slippage analysis module. |
-| **Position Size Limits** | Cap per-token exposure automatically | Low | Max $20 per position or 40% of hourly budget. Prevents over-concentration from rapid leader trades. |
-| **Rate Limit Awareness** | Throttle requests proactively | Medium | Polymarket likely has limits. Track request count, stay under threshold, queue orders if needed. Better than hitting 429 errors. |
-| **Duplicate Detection Hardening** | Prevent same trade execution twice | Medium | Already have content-based keys. Add: database-backed dedup (MongoDB), cross-restart persistence, 24h window. Prevents costly mistakes. |
-| **Order Amendment** | Modify pending limit order price | Medium | Leader buys more → update our limit price up. Faster than cancel + resubmit. Requires WebSocket order updates. |
-| **Live Profit/Loss Tracking** | Real-time P&L updates during session | Low | Calculate unrealized P&L from current bid/ask. Alert on significant moves. Already have portfolio tracking. |
-| **Multi-Strategy Coordination** | Run multiple strategies without conflicts | High | Ensure profit_taker + conservative don't double-buy same token. Shared order manager, position tracking. Defer to post-MVP. |
-| **Graceful Degradation** | Continue trading on partial failures | Medium | If WebSocket price feed fails, fall back to REST API polling. Slower but functional. Resilience over perfection. |
+---
 
-## Anti-Features
+## Table Stakes (Must Have)
 
-Features to explicitly NOT build yet. Common mistakes or premature optimization.
+### 1. Order Placement
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Automatic Position Exits** | We validated selling destroys value | Track position to resolution, manual exits only. Profit_taker strategy proved: hold = optimal. |
-| **Complex Order Types** | Polymarket CLOB is simple (market/limit only) | Stick to market orders for speed, limit orders for price improvement. No stop-loss, no trailing stops on-chain. |
-| **Multi-Exchange Support** | Polymarket-specific logic throughout | Build for Polymarket only. Other exchanges have different APIs, order books, fee structures. |
-| **High-Frequency Trading** | Our edge is strategy, not speed | Leader trades are 1-3 per hour. No need for microsecond latency or co-location. |
-| **Portfolio Rebalancing** | Copy trading follows leader, not portfolio theory | Don't rebalance across tokens. Each position is independent. Exit at resolution only. |
-| **Margin/Leverage** | Polymarket is cash markets only | No margin trading. Each trade requires full capital upfront. |
-| **Backtesting Against Live Fills** | We have replay system for historical testing | Don't build separate backtester. Replay recorded sessions for optimization (already works). |
-| **GUI Dashboard** | CLI-first, logs + Grafana later | Focus on reliability. Add visualization post-MVP (Prometheus metrics → Grafana). |
-| **Dynamic Strategy Switching** | Strategy selection is pre-session decision | Don't auto-switch strategies mid-session. Pick strategy at start, run to completion. |
-| **Social Features** | Not a retail product | No leaderboards, sharing, or social trading. B2B tool for serious traders. |
+**Market orders via FOK (Fill-Or-Kill)**
+- **What:** Submit orders that execute immediately at best available price or cancel entirely
+- **Why table stakes:** Copy trading requires speed. Polymarket min order = $1 market orders. FOK removes partial fill complexity.
+- **Complexity:** LOW
+- **Implementation:** Use `py_clob_client.post_order()` with `ClobOrderType.FOK`, price = mid ± 5c buffer
+- **Notes:**
+  - Polymarket represents market orders as limit orders priced to cross the spread
+  - FOK = "fill entire order immediately or cancel all" — no partial fills, no resting orders
+  - Rate limit: 60 orders/minute per API key (burst 3,500/10s)
+  - Min $1 market orders, min 5 shares limit orders (we only need market)
+
+**Order validation before submission**
+- **What:** Check token_id, amount > 0, price in [0.01, 0.99], side is valid
+- **Why table stakes:** Invalid orders waste API calls and delay execution
+- **Complexity:** LOW
+- **Implementation:** Pre-submit validation in `place_order()` (already present in live.py)
+- **Notes:** Current code validates amount_dollars, shares, market_id, token_id
+
+### 2. Safety Mechanisms
+
+**Explicit arming with pre-flight checks**
+- **What:** Require manual arm command after validating environment, connectivity, credentials
+- **Why table stakes:** Prevent accidental live trading. Fail fast on misconfiguration.
+- **Complexity:** LOW
+- **Implementation:**
+  - Pre-flight: check POLYMARKET_PRIVATE_KEY, POLYMARKET_FUNDER_ADDRESS env vars
+  - Connectivity: `client.get_ok()` health check
+  - API auth: `create_or_derive_api_creds()` succeeds
+  - Only then allow `arm()` to succeed
+- **Notes:** Current code has arm/disarm pattern, needs comprehensive pre-flight
+
+**Kill switch (manual disarm)**
+- **What:** Immediate stop of all order placement, preserve existing positions
+- **Why table stakes:** Emergency brake when bot behaves unexpectedly or market goes chaotic
+- **Complexity:** LOW
+- **Implementation:** `disarm()` sets `_armed = False`, all `place_order()` calls rejected
+- **Notes:** Already implemented in live.py, needs CLI command exposure
+
+**Per-hour budget cap enforcement**
+- **What:** Track total spent this hour, reject orders exceeding `HOURLY_BUDGET`
+- **Why table stakes:** Prevents runaway spending if strategy logic has bug
+- **Complexity:** LOW
+- **Implementation:** HourlyBudgetMixin already tracks `_spent_this_hour`, enforce hard cap
+- **Notes:** Current code has soft budget (strategy aware), needs hard cap (execution enforced)
+
+**Maximum drawdown circuit breaker**
+- **What:** If unrealized + realized loss exceeds threshold, stop buying (already in strategy)
+- **Why table stakes:** Limits damage when hour goes badly (multiple simultaneous losers)
+- **Complexity:** LOW (already implemented)
+- **Implementation:** profit_taker has DRAWDOWN_STOP_THRESHOLD = $24
+- **Notes:** Strategy-level feature, move to execution adapter for hard enforcement
+
+### 3. Position Reconciliation
+
+**Reconcile expected vs actual positions on every poll**
+- **What:** Query actual USDC balance and token holdings, compare to portfolio tracker
+- **Why table stakes:** Catch execution drift (failed orders we think succeeded, fills we missed)
+- **Complexity:** MEDIUM
+- **Implementation:**
+  - Add `get_balances()` to LiveExecutionAdapter
+  - Use `py_clob_client` balance queries (requires blockchain RPC or Polymarket API)
+  - Compare to `Portfolio.positions`, log discrepancies
+  - Option: auto-correct portfolio state or alert and stop
+- **Notes:** Critical for multi-hour runs. Execution can fail silently (network issues, rejections).
+
+**Order status tracking for FOK orders**
+- **What:** After `post_order()`, verify response status = FILLED or REJECTED
+- **Why table stakes:** FOK orders resolve immediately, must confirm outcome before continuing
+- **Complexity:** LOW
+- **Implementation:** Parse `post_order()` response: `success` field + `orderID` (already done in live.py)
+- **Notes:** No async tracking needed for FOK — synchronous response tells us everything
+
+### 4. Environment & Configuration
+
+**Secure credential management**
+- **What:** Load private key, funder address from environment variables, never hardcode
+- **Why table stakes:** Security. Private key = full wallet access.
+- **Complexity:** LOW (already implemented)
+- **Implementation:** `os.getenv("POLYMARKET_PRIVATE_KEY")`, `POLYMARKET_FUNDER_ADDRESS`
+- **Notes:** Current code follows best practice. Document .env.example for setup.
+
+**Rate limit awareness**
+- **What:** Track order submission count, pause if approaching 60/min limit
+- **Why table stakes:** Avoid throttling during high-activity periods
+- **Complexity:** LOW
+- **Implementation:** Simple counter with 1-minute sliding window, warn at 50 orders/min
+- **Notes:** Polymarket queues over-limit requests (not drops), but delays hurt copy trading
+
+**Connection health monitoring**
+- **What:** Periodic health check (every 60s) to Polymarket API
+- **Why table stakes:** Detect API outages or network issues before orders fail
+- **Complexity:** LOW
+- **Implementation:** Call `client.get_ok()` or fetch midpoint for a known token, alert on failure
+- **Notes:** If health check fails 3x consecutive, auto-disarm and alert
+
+### 5. Logging & Observability
+
+**Structured order logs**
+- **What:** Log every order submission with: timestamp, token_id, side, amount, price, outcome, order_id
+- **Why table stakes:** Audit trail for reconciliation, debugging, performance analysis
+- **Complexity:** LOW
+- **Implementation:** JSON log per order to `data/logs/orders_live_{session_id}.jsonl`
+- **Notes:** Current code logs to logger, needs structured file output
+
+**Per-hour PnL summary**
+- **What:** Print summary at hour end: trades executed, dollars spent, realized PnL, unrealized PnL
+- **Why table stakes:** Quick sanity check that bot is behaving as expected
+- **Complexity:** LOW (already exists in dry-run)
+- **Implementation:** Reuse existing portfolio PnL calculation, print on hour boundary
+- **Notes:** Current runner.py has hourly trade logs, expand to include PnL
+
+**Error alerting**
+- **What:** Log errors to console AND file: order rejections, API errors, reconciliation mismatches
+- **Why table stakes:** Human must see when things break
+- **Complexity:** LOW
+- **Implementation:** Python logging to both stdout and `data/logs/errors.log`
+- **Notes:** Current code logs to console, add file handler
+
+---
+
+## Differentiators (Competitive Advantage)
+
+### 1. Execution Speed Optimization
+
+**Parallel order submission for simultaneous leader trades**
+- **What:** If leader buys 3 tokens in same block, submit our orders in parallel (async)
+- **Why differentiator:** Reduces execution lag from 3× poll interval to 1× poll interval
+- **Value:** Small latency edge when copying rapid leader activity
+- **Complexity:** MEDIUM
+- **Implementation:** Use asyncio to submit multiple FOK orders concurrently
+- **Notes:** Diminishing returns for current bot (typically 1-2 positions/hour). Consider post-v1.2.
+
+**WebSocket price feeds instead of polling**
+- **What:** Subscribe to token price updates via WebSocket for real-time midpoint tracking
+- **Why differentiator:** Sub-second price updates vs 10-30s polling lag
+- **Value:** Better execution prices on fast-moving markets
+- **Complexity:** MEDIUM
+- **Implementation:** Polymarket supports WebSocket subscriptions for order book updates
+- **Notes:** Overkill for $50/hr bot. Most trades execute fine with polling. Defer.
+
+### 2. Adaptive Execution
+
+**Dynamic price improvement on market orders**
+- **What:** Instead of mid ± 5c fixed buffer, calculate buffer based on current spread width
+- **Why differentiator:** Narrow spreads = less slippage, wide spreads = ensure fill
+- **Value:** ~1-2% better execution price on average
+- **Complexity:** MEDIUM
+- **Implementation:** Fetch bid/ask from order book, set price = mid + (spread * 0.3)
+- **Notes:** Polymarket spreads typically 2-10c. Fixed buffer works fine. Low priority.
+
+**Retry logic for transient failures**
+- **What:** If order fails with network error (not rejection), retry 2x with exponential backoff
+- **Why differentiator:** Improves fill rate during network hiccups
+- **Value:** Avoids missed trades due to temporary connectivity issues
+- **Complexity:** LOW
+- **Implementation:** Detect network errors vs API rejections, retry network errors only
+- **Notes:** Worth implementing. py-clob-client can throw exceptions on network issues.
+
+### 3. Risk Management Enhancements
+
+**Daily loss limit with auto-shutdown**
+- **What:** If total loss across all hours today exceeds $X, disarm and stop trading
+- **Why differentiator:** Protects against catastrophic strategy failure (bug, regime change)
+- **Value:** Caps worst-case daily loss
+- **Complexity:** LOW
+- **Implementation:** Track daily cumulative PnL, check before each new hour, disarm if < -$100
+- **Notes:** Reasonable safeguard. Current bot has per-hour limits but no daily cap.
+
+**Position concentration limits**
+- **What:** Reject orders if they'd put >40% of capital in single token
+- **Why differentiator:** Diversification safety net (strategy already limits, this is hard cap)
+- **Value:** Prevents strategy bugs from creating concentrated positions
+- **Complexity:** LOW
+- **Implementation:** Check `portfolio.positions` before order, calculate new position pct
+- **Notes:** profit_taker naturally diversifies (5x boost = ~$5-10 per position). Low urgency.
+
+---
+
+## Anti-Features (Don't Build)
+
+### Order Lifecycle Complexity
+
+**Limit order management with cancellations/updates**
+- **Why not:** FOK market orders are sufficient for copy trading. Leader trades execute immediately, we must match speed. Limit orders add complexity (cancellation logic, expiration handling, partial fills) with no benefit.
+- **What to do instead:** Stick to FOK market orders exclusively.
+
+**Partial fill tracking and position averaging**
+- **Why not:** FOK orders never partial fill (all-or-nothing). FAK orders (fill-and-kill) could partial fill, but we don't use them. No need to track unfilled portions.
+- **What to do instead:** If FOK order fails (rejected), log and move on. Don't retry or adjust size.
+
+**GTC (Good-Til-Cancelled) or GTD (Good-Til-Date) order types**
+- **Why not:** Copy trading = immediate execution. Resting orders on book defeat the purpose (we want to match leader timing, not predict future).
+- **What to do instead:** Market orders only. Follow leader when they trade, not before.
+
+### Advanced Execution Strategies
+
+**Order book depth modeling**
+- **Why not:** Polymarket hourly markets have thin liquidity (often $100-500 on each side). Modeling depth provides no edge for $1-5 orders.
+- **What to do instead:** Market orders with fixed buffer. Accept slippage as cost of speed.
+
+**Smart order routing or liquidity seeking**
+- **Why not:** Polymarket is single-venue (CLOB). No alternative liquidity sources.
+- **What to do instead:** Single-venue execution via py-clob-client.
+
+**Post-only orders for maker rebates**
+- **Why not:** Post-only orders rest on book without immediate fill, creating execution uncertainty. Copy trading requires speed, not fee optimization.
+- **What to do instead:** Accept taker fees as cost of immediacy.
+
+### Over-Engineered Monitoring
+
+**Real-time dashboard or UI**
+- **Why not:** Bot runs on VPS with CLI logging. Adding UI increases complexity (web server, frontend) with no operational benefit.
+- **What to do instead:** Structured logs + CLI output. Query logs for analysis.
+
+**Slack/Discord/email alerting**
+- **Why not:** Bot runs autonomously for hours. Alert fatigue from every small issue. For $50/hr operation, manual log review is sufficient.
+- **What to do instead:** Comprehensive file logging. Review logs daily. Add alerting if bot scales to $500+/hr.
+
+**Machine learning anomaly detection**
+- **Why not:** Insufficient data (~200 trades total). ML models would overfit. Simple heuristics (circuit breakers, budget caps) are more robust.
+- **What to do instead:** Rule-based risk limits.
+
+---
 
 ## Feature Dependencies
 
-```
-Core Foundation (already exists):
-├── ExecutionAdapter interface → OrderRequest/OrderResponse types
-├── Portfolio tracking → Position reconciliation
-└── SessionRecorder → Execution logs
+**Execution flow for live trading:**
 
-Live Trading Prerequisites:
-├── Order State Machine
-│   ├── Requires: OrderStatus enum extension
-│   └── Enables: Timeout handling, partial fills
-├── Idempotent Order Placement
-│   ├── Requires: UUID generation per order
-│   └── Enables: Safe retries, duplicate prevention
-├── Connection Recovery
-│   ├── Requires: Position reconciliation
-│   └── Enables: Resilient operation
-└── Kill Switch
-    ├── Requires: Order cancellation
-    └── Enables: Daily loss limits, emergency stop
-
-Advanced Features (post-MVP):
-├── Smart Order Routing
-│   ├── Requires: Order state machine
-│   └── Enables: Fill quality monitoring
-└── Partial Fill Handling
-    ├── Requires: Order state machine
-    └── Enables: Order amendment
 ```
+1. Startup
+   ├─ Load environment variables (PRIVATE_KEY, FUNDER_ADDRESS)
+   ├─ Initialize py-clob-client
+   ├─ Pre-flight checks (connectivity, auth, balance)
+   └─ Require manual arm command
+
+2. Per-poll cycle
+   ├─ Detect leader trade (existing)
+   ├─ Strategy decides: buy/sell/skip (existing)
+   ├─ If BUY/SELL: validate order (NEW)
+   │  ├─ Check armed status
+   │  ├─ Check hourly budget remaining
+   │  ├─ Check rate limits
+   │  └─ Check position concentration
+   ├─ Submit FOK order via py-clob-client (NEW)
+   ├─ Parse order response (FILLED/REJECTED) (NEW)
+   ├─ Update portfolio state (existing)
+   └─ Log outcome (NEW: structured file)
+
+3. Every 60s (health check)
+   ├─ Ping Polymarket API (NEW)
+   ├─ Reconcile positions (NEW)
+   └─ If failure 3x → auto-disarm (NEW)
+
+4. Every hour boundary
+   ├─ Print PnL summary (existing)
+   ├─ Reset hourly budget (existing)
+   └─ Save state to disk (existing)
+
+5. Shutdown (SIGINT/SIGTERM)
+   ├─ Disarm (stop new orders)
+   ├─ Cancel pending orders (N/A for FOK)
+   ├─ Save final state
+   └─ Print session summary
+```
+
+**Critical path (must work for bot to function):**
+- Pre-flight checks → arm() → place_order() → parse response → update portfolio
+
+**Safety net (prevents disasters):**
+- Budget caps, drawdown breakers, kill switch, reconciliation
+
+**Nice-to-have (improves reliability):**
+- Health monitoring, retry logic, daily loss limits
+
+---
 
 ## MVP Recommendation
 
-For safe live trading MVP, prioritize:
+**For v1.2 Production Ready, prioritize:**
 
-### Phase 1: Order Lifecycle (Critical Path)
-1. **Order State Machine** - Track pending/filled/rejected lifecycle
-2. **Idempotent Order Placement** - Prevent duplicate orders
-3. **Order Timeout Handling** - Cancel stale limit orders (30-60s)
-4. **Order Rejection Handling** - Gracefully handle API errors
+1. **Pre-flight safety checks** — validate environment before arming (1-2 hours)
+2. **FOK market order placement** — integrate py-clob-client FOK orders (2-3 hours)
+3. **Order response handling** — parse FILLED/REJECTED, update portfolio (1 hour)
+4. **Structured order logging** — JSONL audit trail (1 hour)
+5. **Hard budget cap enforcement** — reject orders exceeding hourly limit (30 min)
+6. **Kill switch CLI command** — manual disarm for emergencies (30 min)
+7. **Basic reconciliation** — compare expected vs actual positions every 5 min (2-3 hours)
+8. **Connection health check** — detect API outages, auto-disarm (1-2 hours)
 
-### Phase 2: Safety Mechanisms (Risk Mitigation)
-5. **Kill Switch** - Manual emergency stop + API endpoint
-6. **Daily Loss Limits** - Auto-pause on -15% daily drawdown
-7. **Balance Checking** - Pre-validate sufficient capital
-8. **Execution Logs** - Append-only audit trail
+**Total estimated effort: 10-14 hours of focused development**
 
-### Phase 3: Operational Reliability (Production Polish)
-9. **Connection Recovery** - Resume after WebSocket drop
-10. **Position Reconciliation Hardening** - Compare every 5min, alert on divergence
-11. **Error Retry Logic** - Exponential backoff on transient errors
-12. **Rate Limit Awareness** - Proactive throttling
+**Defer to post-v1.2:**
+- WebSocket price feeds (polling works fine for current scale)
+- Parallel order submission (rarely needed with 1-2 trades/hour)
+- Dynamic spread-based pricing (fixed buffer sufficient)
+- Daily loss limits (nice-to-have, not critical for initial rollout)
+- External alerting (file logs + manual review adequate for now)
 
-Defer to post-MVP:
-- **Partial Fill Handling**: Rare on Polymarket (high liquidity markets), can handle manually
-- **Smart Order Routing**: Market orders work, limit order logic is optimization
-- **Order Amendment**: Cancel + resubmit is simpler, amendment is edge case
-- **Multi-Strategy Coordination**: Run one strategy at a time initially
-- **Fill Quality Monitoring**: Nice-to-have, slippage analysis exists for post-session
-- **Graceful Degradation**: WebSocket is reliable, REST fallback is complexity
+**Testing strategy before live:**
+1. **Unit tests:** Mock py-clob-client responses (FILLED, REJECTED, network errors)
+2. **Integration tests:** Testnet or paper trading if Polymarket supports it
+3. **Dry-run validation:** Run live.py with `_armed = False`, log what orders WOULD be placed
+4. **Small capital trial:** First live session with $10 budget, verify reconciliation works
 
-## Production Readiness Checklist
-
-Before going live with real capital:
-
-**Safety:**
-- [ ] Kill switch tested (manual trigger stops all trading)
-- [ ] Daily loss limit tested (auto-pauses at -15%)
-- [ ] Order timeout tested (stale orders cancelled after 60s)
-- [ ] Duplicate prevention tested (same order not placed twice)
-- [ ] Balance check tested (insufficient funds rejected gracefully)
-
-**Reliability:**
-- [ ] WebSocket reconnection tested (resume after disconnect)
-- [ ] Position reconciliation tested (divergence detected and alerted)
-- [ ] API error handling tested (retries transient, skips permanent)
-- [ ] Order state transitions tested (pending → filled, pending → rejected)
-- [ ] Execution logs verified (all orders logged with full details)
-
-**Operational:**
-- [ ] Monitoring in place (order fill rate, rejection rate, P&L)
-- [ ] Alerting configured (kill switch trigger, loss limit hit, reconciliation mismatch)
-- [ ] Runbook documented (how to start, stop, emergency procedures)
-- [ ] Capital controls set (max per order, max daily deployment)
-- [ ] Manual override tested (can cancel orders, disable trading mid-session)
-
-**Validation:**
-- [ ] Dry-run tested 7 days (no crashes, positions reconcile)
-- [ ] Paper trading tested 7 days (simulated fills match strategy expectations)
-- [ ] Small-capital test 7 days ($5/hour, verify fills, P&L tracking)
-- [ ] Strategy parameters validated (train/test/holdout split, Sharpe > 0.3)
-
-## Complexity vs Impact Matrix
-
-**High Impact, Low Complexity (Do First):**
-- Kill switch
-- Balance checking
-- Order rejection handling
-- Execution logs
-- Daily loss limits
-
-**High Impact, Medium Complexity (Critical Path):**
-- Order state machine
-- Idempotent order placement
-- Order timeout handling
-- Connection recovery
-- Position reconciliation hardening
-
-**Medium Impact, Low Complexity (Quick Wins):**
-- Live P&L tracking
-- Position size limits
-
-**Medium Impact, Medium Complexity (Phase 2+):**
-- Smart order routing
-- Fill quality monitoring
-- Rate limit awareness
-- Error retry logic
-
-**Low Impact, High Complexity (Defer):**
-- Partial fill handling
-- Order amendment
-- Multi-strategy coordination
-- Graceful degradation
+---
 
 ## Sources
 
-### Copy Trading Best Practices
+**Official Polymarket Documentation:**
+- [Place Single Order - Polymarket Documentation](https://docs.polymarket.com/developers/CLOB/orders/create-order) — order types, time-in-force, minimum sizes
+- [API Rate Limits - Polymarket Documentation](https://docs.polymarket.com/quickstart/introduction/rate-limits) — trading endpoint limits, throttling behavior
+
+**py-clob-client:**
+- [GitHub - Polymarket/py-clob-client](https://github.com/Polymarket/py-clob-client) — official Python SDK, code examples, order management methods
+
+**Trading Bot Best Practices:**
+- [Crypto Trading Bots 2026: Complete Guide To Automated Trading | MEXC](https://blog.mexc.com/news/crypto-trading-bots-2026-complete-guide-to-automated-trading/)
 - [Step-by-Step Crypto Trading Bot Development Guide (2026)](https://appinventiv.com/blog/crypto-trading-bot-development/)
-- [Copy Trading Bot Features - Cryptohopper](https://www.cryptohopper.com/features/copy-bot)
-- [Polymarket Copy Trading Bot 2026 Guide](https://tradingvps.io/polymarket-copy-trading-bot/)
+- [Market Making on Prediction Markets: Complete 2026 Guide](https://newyorkcityservers.com/blog/prediction-market-making-guide)
+- [Polymarket Trading Bot Setup Tutorial — Automate Your Prediction Market Trading | TradingVPS](https://tradingvps.io/polymarket-trading-bot-setup-tutorial/)
 
-### Order Management & State Machines
-- [Order State Changes - FIX Trading Community](https://www.fixtrading.org/online-specification/order-state-changes/)
-- [Rejected Orders in Futures Trading: Causes & Fixes in 2026](https://blog.pickmytrade.trade/rejected-orders-futures-trading-causes-fixes-2026/)
+**API Error Handling:**
+- [How to Handle API Rate Limits Gracefully (2026 Guide) | API Status Check Blog](https://apistatuscheck.com/blog/how-to-handle-api-rate-limits)
+- [Best practices for handling API rate limits and 429 errors – Docebo Help & Support](https://help.docebo.com/hc/en-us/articles/31803763436946-Best-practices-for-handling-API-rate-limits-and-429-errors)
 
-### Safety Mechanisms & Circuit Breakers
-- [Crypto Trading Bot Development: Technical Guide](https://shivlab.com/blog/crypto-trading-bot-development-guide/)
-- [Trading Bot Crypto: Complete Guide to Automation 2026](https://tickerly.net/trading-bot-crypto-complete-guide-2026/)
+**Confidence notes:**
+- **HIGH confidence** on Polymarket-specific details (order types, rate limits, FOK behavior) — verified with official docs
+- **HIGH confidence** on py-clob-client integration — read existing live.py implementation, cross-referenced with GitHub repo
+- **MEDIUM confidence** on reconciliation approach — standard pattern for trading bots, but Polymarket-specific balance queries need validation during implementation
+- **LOW confidence** on WebSocket performance gains — theoretical benefit, needs real-world testing to quantify
 
-### Idempotency & Duplicate Prevention
-- [What Is an Idempotency Key? Preventing Duplicate Crypto Orders](https://www.tokenmetrics.com/blog/idempotency-keys-order-placement?74e29fd5_page=7)
-- [Idempotency Keys Prevent Duplicate Trades in Digital Finance](https://www.ainvest.com/news/idempotency-keys-prevent-duplicate-trades-digital-finance-2508/)
+---
 
-### Position Reconciliation
-- [What is Trade Reconciliation? Importance and Challenges](https://www.highradius.com/resources/Blog/trade-reconciliation/)
-- [A guide to Cash and position reconciliation](https://www.limina.com/blog/cash-position-reconciliation-guide)
-
-### Polymarket CLOB API
-- [WSS Overview - Polymarket Documentation](https://docs.polymarket.com/developers/CLOB/websocket/wss-overview)
-- [The Polymarket API: Architecture, Endpoints, and Use Cases](https://medium.com/@gwrx2005/the-polymarket-api-architecture-endpoints-and-use-cases-f1d88fa6c1bf)
-- [How to Use Polymarket API: Complete Developer Guide (2026)](https://hypereal.tech/a/polymarket-api)
-
-### System Architecture
-- [A Modular Architecture for Systematic Quantitative Trading Systems](https://hiya31.medium.com/a-modular-architecture-for-systematic-quantitative-trading-systems-2a8d46463570)
-- [Designing a Production-Style Algorithmic Trading Platform](https://medium.com/@kaur.exe/designing-a-production-style-algorithmic-trading-platform-5dc326faacc8)
+*Last updated: 2026-02-10*

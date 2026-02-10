@@ -1,991 +1,643 @@
-# Architecture Patterns: Live WebSocket Trading Integration
+# Architecture Research: v1.2 Production Ready
 
-**Domain:** Polymarket copy trading bot
-**Researched:** 2026-02-09
-**Confidence:** HIGH
+**Researched:** 2026-02-10
+**Domain:** Live trading bot with real-time order execution
+**Confidence:** HIGH (existing codebase analysis + verified industry patterns)
 
 ## Executive Summary
 
-The current architecture has **simulation (replay) and live (runner) executing trade logic separately**, leading to divergence. To add WebSocket order placement while preventing future divergence, we must:
+Your existing architecture is **well-structured for live trading** with one critical modification and several new components needed. The event-driven framework (Runner → Strategy → Adapter) is production-ready. The adapter pattern allows seamless switching between simulation and live execution. The primary architectural changes are:
 
-1. **Extract shared trade decision logic** into reusable components
-2. **Use dependency injection** to swap execution adapters (simulation vs live)
-3. **Add order lifecycle management** for WebSocket fills/rejections/cancellations
-4. **Optimize for latency** from leader detection → order placed
+1. **Fix Portfolio position keying** (token_id only → composite key with market_id + side)
+2. **Add OrderLifecycleManager** for tracking order states and fills
+3. **Add WebSocket order channel** alongside existing price WebSocket
+4. **Separate experiment scripts** from production code into dedicated directory
+5. **Enhance reconciliation** with periodic exchange position queries
 
-**Critical pattern:** Strategy should produce `TradeDecision` objects. Execution adapters should consume them. Runner/Replayer should orchestrate but never duplicate trade logic.
+**Key insight:** Your simulation replay uses the SAME strategy code as live execution. This is architecturally correct and must be preserved. The integration point is the ExecutionAdapter—simulation returns SIMULATED status, live returns FILLED/REJECTED.
 
----
+## Current Architecture
 
-## Current State Analysis
-
-### What Exists
-
-| Component | Purpose | Location |
-|-----------|---------|----------|
-| **Strategy** | Trade decision logic (buy/sell/skip) | `src/strategies/profit_taker/strategy.py` |
-| **Portfolio** | Position tracking, PnL calculation | `src/core/portfolio.py` |
-| **UniversalRunner** | Live trading orchestrator | `src/framework/runner.py` |
-| **SessionReplayer** | Simulation orchestrator | `src/framework/replay/replayer.py` |
-| **SessionRecorder** | Records events to JSONL for replay | `src/framework/recorder.py` |
-| **ExecutionAdapter** | Order placement interface | `src/execution/base.py` |
-| **LiveExecutionAdapter** | py-clob-client wrapper (FOK orders only) | `src/execution/live.py` |
-| **DryRunAdapter** | No-op for testing | `src/execution/dry_run.py` |
-
-### Current Flow (Live)
+### Data Flow (Validated from Code)
 
 ```
-BlockchainDetector.poll()
-  → UniversalRunner._make_event()
-    → Strategy.on_event() → TradeDecision
-      → UniversalRunner._exec() → ExecutionAdapter.place_order()
-        → Strategy.on_fill()
+BlockchainDetector (Polygon)
+    ↓ [detects leader trades]
+LeaderTrade + PriceSnapshot
+    ↓ [wrapped in MarketEvent]
+Strategy.on_event()
+    ↓ [returns TradeDecision]
+UniversalRunner._exec()
+    ↓ [builds OrderRequest]
+ExecutionAdapter.place_order()
+    ↓ [DRY_RUN: log only | LIVE: API call]
+Strategy.on_fill()
+    ↓ [updates portfolio]
+Portfolio.apply_buy/sell()
 ```
 
-### Current Flow (Simulation)
+**Strengths:**
+- Clean separation of concerns (detection → decision → execution)
+- Strategy logic identical in simulation and live
+- Pluggable execution via adapter pattern
+- Session recording for deterministic replay
+- Hourly market transitions handled correctly
+
+**Existing Components (Keep):**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| UniversalRunner | src/framework/runner.py | Main event loop, orchestration |
+| Strategy (base + implementations) | src/strategies/ | Decision-making logic |
+| ExecutionAdapter (base + DryRun + Live) | src/execution/ | Order placement abstraction |
+| Portfolio | src/core/portfolio.py | Position tracking, PnL calculation |
+| SessionRecorder | src/framework/recorder.py | Event logging for replay |
+| SessionReplayer | src/framework/replay/ | Deterministic replay |
+| BlockchainDetector | src/data/blockchain_detector.py | Leader trade detection |
+| WebSocketPriceService | src/data/ws_price.py | Real-time market prices |
+
+## Target Architecture
+
+### Enhanced Data Flow (with Live Trading)
 
 ```
-SessionLoader.load()
-  → SessionReplayer.run()
-    → EventProcessor.process_event()
-      → Strategy.on_event() → TradeDecision
-        → Portfolio.apply_buy/sell() (no execution adapter!)
-          → Strategy.on_fill()
+BlockchainDetector (Polygon)          WebSocketOrderChannel (new)
+    ↓ [leader trades]                      ↓ [our order fills]
+    |                                      |
+    ├─ Strategy.on_event() ────────────────┤
+    |      ↓ [TradeDecision]               |
+    |  OrderRequest                        |
+    |      ↓                                |
+    |  LiveAdapter.place_order()           |
+    |      ↓ [POST to CLOB]                |
+    |  OrderLifecycleManager (new) ────────┘
+    |      ↓ [tracks pending → filled]
+    |  Strategy.on_fill()
+    |      ↓
+    |  Portfolio.apply_buy/sell()
+    |
+    └─ PositionReconciler (enhanced)
+           ↓ [periodic: compare local vs exchange]
+           GET /positions endpoint
 ```
 
-### The Problem: Code Divergence
+**Key changes:**
+1. **OrderLifecycleManager** tracks order states (pending → filled/rejected)
+2. **WebSocketOrderChannel** subscribes to user-specific order fill events
+3. **PositionReconciler** enhanced with exchange position queries
+4. **Portfolio** uses composite key (token_id, market_id, side) not just token_id
 
-**Issue:** Simulation directly applies trades to portfolio. Live routes through execution adapter. This creates two code paths for "apply trade to strategy state."
+## Critical Bug: Portfolio Position Keying
 
-**Evidence from codebase:**
-- **Runner:** Calls `self.strategy.on_fill(event, decision)` only after `_exec()` succeeds
-- **Replayer:** Calls `processor.process_event()` which directly manipulates portfolio
+### Current Problem
 
-**Result:** Past bugs where simulation passed but live failed (or vice versa) because logic diverged.
+**File:** `src/core/portfolio.py` line 33-40
 
----
-
-## Target Architecture: Shared Execution Path
-
-### Core Principle
-
-**Single source of truth for trade execution:**
-```
-Strategy.on_event() → TradeDecision → ExecutionAdapter.execute() → Strategy.on_fill()
-```
-
-Both runner and replayer use **identical execution path**. Only difference: adapter implementation.
-
-### Component Boundaries (New)
-
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| **Strategy** | Produces `TradeDecision` from `MarketEvent` | Portfolio (read-only), Config |
-| **ExecutionEngine** | Coordinates decision → execution → fill | Strategy, ExecutionAdapter |
-| **ExecutionAdapter** | Converts `TradeDecision` to platform orders | py-clob-client, WebSocket client |
-| **OrderManager** | Tracks order lifecycle (pending/filled/rejected) | ExecutionAdapter, WebSocket |
-| **SimulationAdapter** | Simulates fills using recorded prices | SessionLoader prices |
-| **LiveAdapter** | Places real orders via WebSocket | Polymarket CLOB |
-| **Runner/Replayer** | Orchestrates event flow, manages lifecycle | ExecutionEngine, Recorder |
-
-### Data Flow (Unified)
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. Event Source (Blockchain or Recorded JSONL)                  │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 2. Orchestrator (Runner or Replayer)                            │
-│    - Loads event + all_prices context                           │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 3. Strategy.on_event(event) → TradeDecision                     │
-│    - Reads portfolio (positions, cash)                          │
-│    - Checks filters (price, conviction, drawdown)               │
-│    - Returns BUY/SELL/SKIP with dollars/shares/price            │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 4. ExecutionEngine.execute(decision, event)                     │
-│    - Validates decision (Polymarket minimums, etc.)             │
-│    - Delegates to ExecutionAdapter                              │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │
-            ┌─────────┴─────────┐
-            ▼                   ▼
-┌───────────────────┐ ┌──────────────────────┐
-│ SimulationAdapter │ │   LiveAdapter        │
-│ - Apply at price  │ │ - Place WS order     │
-│ - Instant fill    │ │ - Wait for fill/rej  │
-└─────────┬─────────┘ └──────────┬───────────┘
-          │                      │
-          └──────────┬───────────┘
-                     ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 5. ExecutionResult (filled_shares, filled_price, status)        │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 6. Strategy.on_fill(event, decision, result)                    │
-│    - Portfolio.apply_buy/sell (same code for sim + live)        │
-│    - Update cash, entries, conviction tracking                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**Key insight:** Steps 3-6 are identical for simulation and live. Only step 4's adapter implementation differs.
-
----
-
-## New Components Needed
-
-### 1. ExecutionEngine (NEW)
-
-**Purpose:** Orchestrate decision → execution → fill. Prevent orchestrators from handling execution logic.
-
-**Interface:**
 ```python
-class ExecutionEngine:
-    def __init__(self, strategy: Strategy, adapter: ExecutionAdapter):
-        self.strategy = strategy
-        self.adapter = adapter
-
-    def process_event(self, event: MarketEvent, all_prices: Dict) -> ExecutionResult:
-        """Process event through strategy → adapter → fill."""
-        # 1. Get decision from strategy
-        decision = self.strategy.on_event(event)
-
-        # 2. Skip if no action
-        if decision.action == DecisionAction.SKIP:
-            return ExecutionResult.skipped(decision.skip_reason)
-
-        # 3. Validate decision
-        valid, error = decision.validate_order_constraints()
-        if not valid:
-            return ExecutionResult.rejected(error)
-
-        # 4. Execute via adapter
-        result = self.adapter.execute(decision, event, all_prices)
-
-        # 5. Apply fill to strategy
-        if result.success:
-            self.strategy.on_fill(event, decision, result)
-
-        return result
-```
-
-**Why:** Removes execution orchestration from Runner/Replayer. Both call `engine.process_event()` and get identical behavior.
-
-### 2. OrderManager (NEW)
-
-**Purpose:** Track order lifecycle for WebSocket fills/rejections/cancellations.
-
-**Responsibilities:**
-- Assign correlation IDs to orders
-- Track pending orders (order_id → OrderState)
-- Handle async fill notifications from WebSocket
-- Timeout detection (order pending >30s → cancel)
-- Retry logic for rejections (if retriable)
-
-**Interface:**
-```python
-@dataclass
-class OrderState:
-    correlation_id: str
-    order_id: str
-    decision: TradeDecision
-    event: MarketEvent
-    status: OrderStatus  # PENDING/FILLED/REJECTED/CANCELLED/TIMEOUT
-    created_at: float
-    filled_at: Optional[float] = None
-    filled_price: Optional[Decimal] = None
-    filled_shares: Optional[Decimal] = None
-    error: Optional[str] = None
-
-class OrderManager:
+class Portfolio:
     def __init__(self):
-        self._pending: Dict[str, OrderState] = {}  # correlation_id → state
-        self._order_id_map: Dict[str, str] = {}     # order_id → correlation_id
+        self._positions: Dict[str, PortfolioPosition] = {}  # Keyed by token_id ONLY
 
-    def track_order(self, correlation_id: str, order_id: str,
-                    decision: TradeDecision, event: MarketEvent) -> None:
-        """Start tracking a pending order."""
-        self._pending[correlation_id] = OrderState(
-            correlation_id=correlation_id,
-            order_id=order_id,
-            decision=decision,
-            event=event,
-            status=OrderStatus.PENDING,
-            created_at=time.time(),
-        )
-        self._order_id_map[order_id] = correlation_id
-
-    def on_fill(self, order_id: str, filled_price: Decimal,
-                filled_shares: Decimal) -> Optional[OrderState]:
-        """Handle fill notification from WebSocket."""
-        corr_id = self._order_id_map.get(order_id)
-        if not corr_id:
-            return None
-        state = self._pending.get(corr_id)
-        if state:
-            state.status = OrderStatus.FILLED
-            state.filled_at = time.time()
-            state.filled_price = filled_price
-            state.filled_shares = filled_shares
-        return state
-
-    def on_rejection(self, order_id: str, error: str) -> Optional[OrderState]:
-        """Handle rejection notification."""
-        corr_id = self._order_id_map.get(order_id)
-        if not corr_id:
-            return None
-        state = self._pending.get(corr_id)
-        if state:
-            state.status = OrderStatus.REJECTED
-            state.error = error
-        return state
-
-    def check_timeouts(self, timeout_sec: float = 30.0) -> List[OrderState]:
-        """Return orders pending longer than timeout."""
-        now = time.time()
-        timeouts = []
-        for state in self._pending.values():
-            if state.status == OrderStatus.PENDING:
-                if now - state.created_at > timeout_sec:
-                    state.status = OrderStatus.TIMEOUT
-                    timeouts.append(state)
-        return timeouts
-
-    def cleanup(self, correlation_id: str) -> None:
-        """Remove completed order from tracking."""
-        state = self._pending.pop(correlation_id, None)
-        if state and state.order_id in self._order_id_map:
-            del self._order_id_map[state.order_id]
+    def get(self, token_id: str, market_id: str = "", side: Side = Side.UP) -> PortfolioPosition:
+        if token_id not in self._positions:
+            self._positions[token_id] = PortfolioPosition(token_id, market_id, side)
+        return self._positions[token_id]  # ← WRONG: ignores market_id and side
 ```
 
-**Why:** WebSocket fills arrive asynchronously. Need centralized tracking to correlate fill messages with original decisions.
+**Impact:** If the leader trades BOTH sides of the same market (UP and DOWN), or trades the same token in different markets, positions collide. You'll track only one position when you actually have two.
 
-### 3. WebSocketOrderClient (NEW)
+### Solution
 
-**Purpose:** Maintain persistent WebSocket connection for order placement and lifecycle notifications.
+Change keying from `token_id` (string) to `(token_id, market_id, side)` (tuple).
 
-**Responsibilities:**
-- Connect to `wss://ws-subscriptions-clob.polymarket.com/ws/orders`
-- Subscribe to order updates for our wallet address
-- Place orders via WebSocket (lower latency than REST)
-- Notify OrderManager of fills/rejections/cancellations
-- Handle reconnection if connection drops
-
-**Interface:**
 ```python
-class WebSocketOrderClient:
-    def __init__(self, wallet_address: str, on_fill: Callable,
-                 on_rejection: Callable):
-        self.wallet_address = wallet_address
-        self.on_fill = on_fill  # Callback: (order_id, price, shares) → None
-        self.on_rejection = on_rejection  # Callback: (order_id, error) → None
-        self._ws = None
-        self._running = False
+class Portfolio:
+    def __init__(self):
+        self._positions: Dict[Tuple[str, str, Side], PortfolioPosition] = {}
 
-    async def connect(self) -> bool:
-        """Connect to WebSocket and subscribe to order updates."""
-        # Connect to wss://ws-subscriptions-clob.polymarket.com/ws/orders
-        # Subscribe to {"type": "subscribe", "channel": "orders", "address": wallet_address}
-        pass
-
-    async def place_order(self, order_id: str, token_id: str,
-                         side: str, size: float, price: float) -> bool:
-        """Place order via WebSocket (faster than REST POST)."""
-        # Send {"type": "order", "order_id": order_id, "token_id": token_id, ...}
-        pass
-
-    async def cancel_order(self, order_id: str) -> bool:
-        """Cancel pending order."""
-        pass
-
-    def _handle_message(self, msg: dict) -> None:
-        """Handle incoming WebSocket message."""
-        if msg.get("type") == "fill":
-            self.on_fill(msg["order_id"], msg["price"], msg["shares"])
-        elif msg.get("type") == "rejection":
-            self.on_rejection(msg["order_id"], msg["error"])
+    def get(self, token_id: str, market_id: str, side: Side) -> PortfolioPosition:
+        key = (token_id, market_id, side)
+        if key not in self._positions:
+            self._positions[key] = PortfolioPosition(token_id, market_id, side)
+        return self._positions[key]
 ```
 
-**Why:** WebSocket order placement is 50-200ms faster than REST POST. For copy trading, latency = slippage.
+**Build order:** Fix this BEFORE going live. It's a data corruption bug that will cause incorrect position tracking in live trading.
 
-### 4. LiveExecutionAdapter (MODIFIED)
+## New Components
 
-**Current:** Uses REST POST (`client.post_order()`) with FOK orders only.
+### 1. OrderLifecycleManager
 
-**Modified:** Delegates to `WebSocketOrderClient` for order placement, uses `OrderManager` for lifecycle tracking.
+**Purpose:** Track order states from submission to fill/rejection, handle partial fills, manage timeouts.
+
+**Location:** `src/execution/order_lifecycle.py`
+
+**Interfaces:**
+
+```python
+class OrderLifecycleManager:
+    def submit_order(self, order_request: OrderRequest) -> str:
+        """Submit order, return order_id, track as PENDING."""
+
+    def mark_filled(self, order_id: str, filled_shares: Decimal, filled_price: Decimal) -> OrderFill:
+        """Mark order as filled (from WebSocket or API response)."""
+
+    def mark_rejected(self, order_id: str, reason: str) -> None:
+        """Mark order as rejected."""
+
+    def get_pending_orders(self) -> List[PendingOrder]:
+        """Return all orders awaiting fill."""
+
+    def cleanup_stale_orders(self, timeout_seconds: int = 60) -> None:
+        """Cancel orders older than timeout."""
+```
+
+**Talks to:**
+- LiveExecutionAdapter (submit orders)
+- WebSocketOrderChannel (receive fill notifications)
+- UniversalRunner (query pending orders for reconciliation)
+
+**Why needed:** Currently, `LiveAdapter.place_order()` submits via API and immediately returns success/failure. For FOK (Fill-Or-Kill) orders this works. But for limit orders or if you switch to GTC (Good-Til-Cancelled), you need to track order lifecycle asynchronously. Even with FOK, WebSocket fill confirmations provide better reliability than trusting the POST response.
+
+### 2. WebSocketOrderChannel
+
+**Purpose:** Subscribe to user-specific order fill events from Polymarket CLOB WebSocket.
+
+**Location:** `src/data/ws_orders.py`
+
+**Interfaces:**
+
+```python
+class WebSocketOrderChannel:
+    def __init__(self, user_address: str):
+        """Initialize with user address for authenticated channel."""
+
+    def start(self) -> None:
+        """Connect to wss://ws-subscriptions-clob.polymarket.com and authenticate."""
+
+    def subscribe_orders(self) -> None:
+        """Subscribe to user order fills channel."""
+
+    def on_fill(self, callback: Callable[[OrderFillEvent], None]) -> None:
+        """Register callback for order fill events."""
+
+    def stop(self) -> None:
+        """Disconnect WebSocket."""
+```
+
+**Talks to:**
+- OrderLifecycleManager (notify fills)
+- UniversalRunner (lifecycle: start on init, stop on shutdown)
+
+**Pattern:** Similar to existing `WebSocketPriceService` (src/data/ws_price.py) but subscribes to user channel instead of market channel.
+
+**Why needed:** Per Polymarket CLOB API docs, WebSocket provides real-time order fill notifications. This is more reliable than polling GET /orders and has lower latency than waiting for blockchain confirmation.
+
+### 3. PositionReconciler (Enhanced)
+
+**Purpose:** Periodically compare local portfolio tracking with exchange positions, flag discrepancies.
+
+**Location:** `src/core/reconciler.py` (new) or enhance existing `UniversalRunner._maybe_reconcile()`
+
+**Current state (runner.py line 339-365):**
+- Fetches positions every 5 minutes
+- Logs warnings on mismatch
+- Does NOT auto-correct (intentional—don't silently overwrite local state)
+
+**Enhancements needed:**
+1. Use new composite portfolio key (token_id, market_id, side)
+2. Store reconciliation history for debugging
+3. Alert on persistent discrepancies (3+ consecutive mismatches)
+4. Optionally pause trading if discrepancy exceeds threshold
+
+**Build order:** Enhance after portfolio keying fix.
+
+### 4. Experiment Script Organization
+
+**Problem:** 75 experiment scripts in root directory (analyze_*.py, experiment_*.py, debug_*.py, grid_search_*.py). This is research code, not production code.
+
+**Solution:** Separate directories by purpose.
+
+```
+scripts/
+├── experiments/       # Strategy experiments (experiment_*.py, grid_search_*.py)
+├── analysis/          # Post-session analysis (analyze_*.py, deep_analysis.py)
+├── debug/             # One-off debug scripts (debug_*.py, sanity_check.py)
+└── data_collection/   # Data fetching (fetch_*.py, test_api_*.py)
+
+src/                   # Production code only
+├── strategies/
+├── execution/
+├── framework/
+└── ...
+```
+
+**Migration:**
+- Move scripts to appropriate directories
+- Update any imports (if scripts import from src/, paths stay the same)
+- Add scripts/README.md explaining each directory's purpose
+- Update .gitignore to prevent future root-level script sprawl
+
+**Build order:** Early (Phase 1-2) to clean workspace before live integration work.
+
+## Modified Components
+
+### UniversalRunner (src/framework/runner.py)
+
+**Current:** Polls blockchain, feeds events to strategy, calls adapter.place_order(), updates portfolio.
 
 **Changes:**
+
+1. **Integrate OrderLifecycleManager:**
+   - Initialize in `_init()`
+   - Submit orders through manager instead of directly to adapter
+   - Register fill callback to update portfolio
+
+2. **Integrate WebSocketOrderChannel:**
+   - Start in `_init()` alongside WebSocketPriceService
+   - Stop in `_shutdown()` and `_hourly_cleanup()`
+   - Connect fill events to `OrderLifecycleManager.mark_filled()`
+
+3. **Enhanced reconciliation:**
+   - Call `PositionReconciler.reconcile()` every 5 minutes
+   - Store reconciliation results for audit trail
+   - Optionally halt trading on critical discrepancies
+
+**No changes to core loop:** Event detection → strategy decision → execution flow stays identical.
+
+### LiveExecutionAdapter (src/execution/live.py)
+
+**Current:** Submits FOK orders via POST /order, returns FILLED/REJECTED immediately.
+
+**Changes:**
+
+1. **Return order_id:** Currently returns `OrderResponse` with order_id, but that ID isn't tracked anywhere. Pass it to `OrderLifecycleManager`.
+
+2. **Support limit orders:** Add support for GTC (Good-Til-Cancelled) orders in addition to FOK. Requires order lifecycle tracking.
+
+3. **Handle partial fills:** If switching from FOK to GTC, handle partial fills (WebSocket may report multiple fill events for one order).
+
+**Build order:** After OrderLifecycleManager exists.
+
+### Strategy.on_fill() (base class pattern)
+
+**Current:** Called after successful order execution, updates internal strategy state.
+
+**Enhancement:** Provide `OrderFill` object with actual fill price/shares (not just requested amounts). Strategies can track slippage, adjust future sizing based on realized execution quality.
+
 ```python
-class LiveExecutionAdapter(ExecutionAdapter):
-    def __init__(self, clob_client: ClobClient, ws_client: WebSocketOrderClient,
-                 order_manager: OrderManager):
-        self.clob_client = clob_client  # Still needed for midpoint, balances
-        self.ws_client = ws_client
-        self.order_manager = order_manager
-
-    async def execute(self, decision: TradeDecision, event: MarketEvent,
-                     all_prices: Dict) -> ExecutionResult:
-        """Execute decision via WebSocket order placement."""
-        # 1. Build order (same as current)
-        token_id = self._get_token_id(event.trade.market_id, event.trade.side)
-        mid = self.clob_client.get_midpoint(token_id)["mid"]
-        price = mid + 0.05 if decision.action == "BUY" else mid - 0.05
-        size = decision.dollars if decision.action == "BUY" else decision.shares
-
-        # 2. Generate correlation ID
-        correlation_id = str(uuid.uuid4())[:8]
-        order_id = self._generate_order_id()  # UUID
-
-        # 3. Place via WebSocket (async, faster than REST)
-        success = await self.ws_client.place_order(
-            order_id, token_id, decision.action, size, price
-        )
-
-        if not success:
-            return ExecutionResult.rejected("WebSocket send failed")
-
-        # 4. Track order in OrderManager
-        self.order_manager.track_order(correlation_id, order_id, decision, event)
-
-        # 5. Wait for fill/rejection (with timeout)
-        # For FOK orders: fills come back in <1 second
-        # For GTD orders: may be pending, return PENDING status
-        await asyncio.sleep(0.1)  # Brief wait for FOK fill
-
-        state = self.order_manager._pending.get(correlation_id)
-        if state.status == OrderStatus.FILLED:
-            return ExecutionResult.filled(state.filled_price, state.filled_shares)
-        elif state.status == OrderStatus.REJECTED:
-            return ExecutionResult.rejected(state.error)
-        else:
-            return ExecutionResult.pending(order_id)
+@dataclass
+class OrderFill:
+    order_id: str
+    token_id: str
+    market_id: str
+    side: Side
+    requested_shares: Decimal
+    filled_shares: Decimal
+    requested_price: Decimal
+    filled_price: Decimal
+    timestamp: datetime
 ```
 
-**Why:** WebSocket placement + async lifecycle tracking enables GTD/GTC orders (not just FOK) and reduces latency.
-
-### 5. SimulationExecutionAdapter (NEW)
-
-**Purpose:** Simulate order execution using recorded prices. Replaces current direct portfolio manipulation in replayer.
-
-**Interface:**
-```python
-class SimulationExecutionAdapter(ExecutionAdapter):
-    def __init__(self, session_loader: SessionLoader):
-        self.loader = session_loader  # Access to recorded prices
-
-    def execute(self, decision: TradeDecision, event: MarketEvent,
-                all_prices: Dict) -> ExecutionResult:
-        """Simulate fill at recorded price."""
-        # 1. Get price from all_prices (from SessionLoader)
-        price_snap = all_prices.get(event.trade.token_id)
-        if not price_snap:
-            return ExecutionResult.rejected("No price data")
-
-        # 2. Determine fill price (ask for buy, bid for sell)
-        if decision.action == DecisionAction.BUY:
-            fill_price = price_snap.ask
-        else:
-            fill_price = price_snap.bid
-
-        if not fill_price or fill_price <= 0:
-            return ExecutionResult.rejected("Invalid price")
-
-        # 3. Apply slippage model (same as current strategy logic)
-        # ... (reuse SLIPPAGE_PER_SHARE logic from strategy)
-
-        # 4. Instant fill (simulation assumption)
-        return ExecutionResult.filled(fill_price, decision.shares)
-```
-
-**Why:** Encapsulates simulation-specific logic (instant fills, slippage model). Keeps replayer clean.
-
----
+**Build order:** After WebSocketOrderChannel provides fill details.
 
 ## Integration Points
 
-### 1. Runner → ExecutionEngine
+### Detection → Strategy (Unchanged)
+
+**Current:** BlockchainDetector emits LeaderTrade → wrapped in MarketEvent → Strategy.on_event()
+
+**Keep as-is.** This works correctly.
+
+### Strategy → Execution (Enhanced)
 
 **Current:**
+```
+Strategy.on_event() → TradeDecision
+Runner._exec() → OrderRequest
+Adapter.place_order() → OrderResponse
+Strategy.on_fill()
+```
+
+**Target:**
+```
+Strategy.on_event() → TradeDecision
+Runner._exec() → OrderRequest
+OrderLifecycleManager.submit_order() → order_id
+    ↓ [async]
+WebSocketOrderChannel receives fill
+OrderLifecycleManager.mark_filled() → OrderFill
+Strategy.on_fill(OrderFill)
+Portfolio.apply_buy/sell()
+```
+
+**Migration path:** Initially keep synchronous flow (FOK orders), add async path for GTC orders later.
+
+### Simulation → Live (Critical: No Duplication)
+
+**Problem statement:** How to share trade logic between replay simulation and live execution?
+
+**Answer:** You already solved this correctly. The logic is in the **Strategy**, not in the runner or adapter.
+
+**Current pattern (KEEP THIS):**
+
+| Component | Simulation | Live |
+|-----------|------------|------|
+| Strategy | Same code | Same code |
+| Runner | SessionReplayer | UniversalRunner |
+| Adapter | NullExecutionAdapter | LiveExecutionAdapter |
+| Portfolio | Same code | Same code |
+
+**What to avoid:**
+- ❌ Duplicating decision logic in UniversalRunner
+- ❌ Putting trade logic in ExecutionAdapter
+- ❌ Different code paths for simulation vs live
+
+**What to do:**
+- ✅ Keep all trade logic in Strategy
+- ✅ Adapters only handle I/O (API calls vs logging)
+- ✅ Runner orchestrates but doesn't decide
+
+**Testing protocol:**
+1. Record live session with SessionRecorder
+2. Replay recorded session with profit_taker strategy
+3. Compare trade-by-trade: same decisions at same events
+4. If divergence: fix Strategy, not runner/adapter
+
+## Data Flow Changes
+
+### Before (Simulation)
+
+```
+SessionLoader reads JSONL
+    ↓
+For each MarketEvent:
+    Strategy.on_event() → TradeDecision
+    NullAdapter.place_order() → SIMULATED
+    Strategy.on_fill()
+    Portfolio.apply_buy/sell()
+```
+
+### After (Live with Order Lifecycle)
+
+```
+BlockchainDetector polls Polygon
+    ↓
+For each leader trade:
+    Build MarketEvent (leader trade + price snapshot)
+    Strategy.on_event() → TradeDecision
+    OrderLifecycleManager.submit_order()
+        ↓ [LiveAdapter.place_order() → POST to CLOB]
+    [ASYNC WAIT]
+    WebSocketOrderChannel receives fill notification
+    OrderLifecycleManager.mark_filled()
+    Strategy.on_fill(OrderFill)
+    Portfolio.apply_buy/sell(composite_key)
+```
+
+**Key difference:** Simulation is synchronous (immediate fill). Live is asynchronous (wait for WebSocket fill). But Strategy code is identical—it just receives `on_fill()` at different times.
+
+## Build Order (Suggested Sequencing)
+
+### Phase 1: Foundation (Low Risk)
+1. **Organize experiment scripts** into scripts/ directory
+2. **Fix portfolio composite keying** (token_id, market_id, side)
+3. **Add unit tests** for new portfolio keying
+
+**Why first:** Zero impact on existing functionality, reduces workspace clutter.
+
+### Phase 2: Order Lifecycle (Core Feature)
+4. **Build OrderLifecycleManager** (submit, track, mark_filled)
+5. **Integrate with LiveAdapter** (return order_id)
+6. **Add integration test** (mock WebSocket fill)
+
+**Why second:** Foundation for async order tracking, testable in isolation.
+
+### Phase 3: WebSocket Orders (Real-time Integration)
+7. **Build WebSocketOrderChannel** (similar to WebSocketPriceService)
+8. **Connect to OrderLifecycleManager** (on_fill callback)
+9. **Test with live API** in dry-run mode (log fills, don't trade)
+
+**Why third:** Requires live API, but can be tested without real orders.
+
+### Phase 4: Runner Integration (Live Trading Path)
+10. **Integrate OrderLifecycleManager into UniversalRunner**
+11. **Start/stop WebSocketOrderChannel** in runner lifecycle
+12. **Enhance on_fill()** to use OrderFill object with actual prices
+
+**Why fourth:** Touches critical path, requires all previous components.
+
+### Phase 5: Reconciliation (Safety)
+13. **Enhance PositionReconciler** with composite key support
+14. **Add reconciliation audit trail** (log to data/reconciliation/)
+15. **Add trading halt** on critical discrepancies
+
+**Why last:** Safety feature, depends on portfolio keying and order lifecycle.
+
+## Architectural Patterns to Follow
+
+### 1. Single Responsibility
+
+**Good:**
+- Strategy decides WHAT to trade
+- Adapter decides HOW to execute
+- Portfolio decides WHAT we own
+
+**Bad:**
+- Strategy calling API directly
+- Adapter making trade decisions
+- Runner duplicating strategy logic
+
+### 2. Dependency Injection
+
+**Good:**
 ```python
-# runner.py line 277-306
-decision = self.strategy.on_event(event)
-if decision.action in (BUY, SELL):
-    success = self._exec(event, decision)
-    if success:
-        self.strategy.on_fill(event, decision)
+runner = UniversalRunner(config, strategy, execution_adapter, recorder)
 ```
 
-**New:**
+**Bad:**
 ```python
-# runner.py line 277+
-result = self.execution_engine.process_event(event, all_prices)
-if result.success:
-    # on_fill already called by ExecutionEngine
-    self.stats["buys" if result.action == "BUY" else "sells"] += 1
+class UniversalRunner:
+    def __init__(self):
+        self.strategy = ProfitTakerStrategy()  # ← hardcoded
 ```
 
-**Change impact:** Remove `_exec()` method entirely. ExecutionEngine handles it.
+### 3. Async-Aware but Sync-Default
 
-### 2. Replayer → ExecutionEngine
+**Pattern:** Keep synchronous flow for simple cases (FOK orders), add async path for complex cases (GTC orders, partial fills).
 
-**Current:**
-```python
-# replayer.py line 105
-processor.process_event(i, event, all_prices_at_time)
-# EventProcessor directly manipulates portfolio
-```
+**Implementation:**
+- OrderLifecycleManager tracks all orders
+- For FOK: submit → immediate fill → callback in same loop iteration
+- For GTC: submit → fill arrives later → callback in future iteration
 
-**New:**
-```python
-# replayer.py line 105
-result = self.execution_engine.process_event(event, all_prices_at_time)
-# Same code path as live runner!
-```
+### 4. Event Sourcing (Already Implemented Correctly)
 
-**Change impact:** Remove EventProcessor's direct portfolio manipulation. Use ExecutionEngine.
+**Keep this:** SessionRecorder writes all events to JSONL. SessionReplayer reads JSONL and deterministically replays. This is textbook event sourcing and it's production-ready.
 
-### 3. Strategy → No Changes
-
-**Critical:** Strategy interface remains unchanged. Strategies return `TradeDecision`, receive `on_fill()` callbacks. Zero migration needed.
-
-### 4. Recorder → Capture Order Lifecycle
-
-**Current:** Records leader trades + our decisions.
-
-**New:** Also record order lifecycle events (placed/filled/rejected) for replay.
-
-**Changes:**
-```python
-# recorder.py add new event types
-def record_order_placed(self, order_id: str, decision: TradeDecision):
-    self._write_all({
-        "type": "order_placed",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "order_id": order_id,
-        "action": decision.action.value,
-        "dollars": str(decision.dollars),
-        "shares": str(decision.shares),
-        "price": str(decision.price),
-    })
-
-def record_order_filled(self, order_id: str, filled_price: Decimal,
-                       filled_shares: Decimal):
-    # ... similar
-```
-
-**Why:** Enables replay to simulate realistic order lifecycle (e.g., partial fills, rejections).
-
----
-
-## Latency Optimization Strategy
-
-**Goal:** Minimize time from leader trade detection → our order placed.
-
-**Current bottlenecks:**
-1. Blockchain polling (2-second blocks on Polygon)
-2. WebSocket price fetch (10-50ms)
-3. Strategy decision logic (1-5ms)
-4. REST POST to CLOB (50-200ms)
-
-**Optimizations:**
-
-### 1. WebSocket Order Placement (HIGH IMPACT)
-
-**Current:** REST POST to `https://clob.polymarket.com/order`
-**Latency:** 50-200ms (HTTP round-trip)
-
-**Optimized:** WebSocket send
-**Latency:** 10-30ms (persistent connection, no TCP handshake)
-
-**Implementation:** Use `WebSocketOrderClient` instead of `client.post_order()`.
-
-**Expected improvement:** 40-170ms reduction per order.
-
-### 2. Pre-computed Strategy State (MEDIUM IMPACT)
-
-**Current:** Strategy recomputes drawdown, budget used, conviction on every event.
-
-**Optimized:** Cache computations, only invalidate on state change.
-
-**Example:**
-```python
-# Current: recomputed every event
-def _get_hourly_drawdown(self, all_prices):
-    drawdown = self._hourly_realized_loss
-    for token_id, pos in self.portfolio.get_positions().items():
-        # ... loops through all positions
-    return drawdown
-
-# Optimized: cache until position changes
-@cached_property
-def _hourly_drawdown(self):
-    # ... same logic, but cached
-    pass
-
-def on_fill(self, event, decision):
-    # Invalidate cache when position changes
-    del self._hourly_drawdown
-```
-
-**Expected improvement:** 1-3ms reduction per event (more if many open positions).
-
-### 3. Async Pipeline (MEDIUM IMPACT)
-
-**Current:** Sequential processing:
-```
-blockchain.poll() → make_event() → strategy.on_event() → execute()
-```
-
-**Optimized:** Pipeline with async:
-```python
-async def _cycle(self):
-    # Fetch blockchain + prices in parallel
-    trades_task = asyncio.create_task(self.blockchain.poll())
-    prices_task = asyncio.create_task(self.price_service.fetch_all())
-
-    trades = await trades_task
-    prices = await prices_task
-
-    # Process trades with fresh prices
-    for bt in trades:
-        event = self._make_event(bt, prices)
-        await self.execution_engine.process_event_async(event)
-```
-
-**Expected improvement:** 10-20ms reduction (parallel price fetch while waiting for blockchain).
-
-### 4. VPS Placement (HIGH IMPACT)
-
-**Current:** Run on local machine or random VPS.
-
-**Optimized:** VPS in same AWS region as Polymarket CLOB (us-east-1).
-
-**Expected improvement:** 20-100ms reduction in network latency.
-
-### 5. Eliminate Duplicate API Calls (LOW IMPACT)
-
-**Current:** `LiveExecutionAdapter` calls `client.get_midpoint()` for every order.
-
-**Optimized:** Use WebSocket price feed midpoint (already subscribed).
-
-**Expected improvement:** 5-10ms per order.
-
----
+**Don't break this:** Any new components must integrate with session recording (e.g., log order submissions to JSONL).
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Duplicating Logic in Adapter
+### 1. Mixing Simulation and Live Logic
 
-**What goes wrong:** Putting position tracking, cash management, or risk checks inside execution adapter.
-
-**Why bad:** Breaks separation of concerns. Simulation and live diverge because logic lives in adapter, not strategy.
-
-**Instead:** Adapter ONLY converts `TradeDecision` to platform orders. All logic in strategy.
-
-### Anti-Pattern 2: Synchronous WebSocket Handling
-
-**What goes wrong:** Blocking main thread waiting for WebSocket responses.
-
-**Why bad:** If WebSocket is slow, entire bot freezes. Miss subsequent leader trades.
-
-**Instead:** Async WebSocket client + OrderManager tracks pending orders. Main loop continues processing events.
-
-### Anti-Pattern 3: No Order Timeout Handling
-
-**What goes wrong:** Order gets stuck in PENDING state forever. Strategy thinks it has open position but doesn't.
-
-**Why bad:** Portfolio state diverges from reality. Risk management fails.
-
-**Instead:** OrderManager checks timeouts (30s), auto-cancels, reports to strategy.
-
-### Anti-Pattern 4: Mixing Simulation and Live Code
-
-**What goes wrong:** `if mode == "LIVE": ... else: ...` conditionals in shared components.
-
-**Why bad:** Creates divergent code paths. Defeats purpose of shared execution engine.
-
-**Instead:** Use dependency injection. Swap adapters, not logic.
-
----
-
-## Build Order Recommendation
-
-### Phase 1: Extract Shared Execution (CLEANUP)
-
-**Goal:** Make simulation and live use identical code path.
-
-**Tasks:**
-1. Create `ExecutionEngine` class
-2. Create `SimulationExecutionAdapter` (encapsulates current replay logic)
-3. Refactor `SessionReplayer` to use `ExecutionEngine` + `SimulationExecutionAdapter`
-4. Refactor `UniversalRunner` to use `ExecutionEngine` + `LiveExecutionAdapter`
-5. Remove `_exec()` from runner, direct portfolio manipulation from replayer
-6. Test: Run replay on historical sessions, verify PnL matches previous implementation
-
-**Why first:** Establishes shared foundation. Prevents adding live WebSocket on top of divergent code.
-
-**Validation:** Replay produces identical results before/after refactor.
-
-### Phase 2: Add Order Lifecycle Tracking (FOUNDATION)
-
-**Goal:** Track order states before adding WebSocket complexity.
-
-**Tasks:**
-1. Create `OrderManager` class
-2. Modify `LiveExecutionAdapter` to use `OrderManager` for correlation IDs
-3. Add timeout detection (30s) + logging
-4. Add order lifecycle recording to `SessionRecorder`
-5. Test: Dry run with REST orders, verify order tracking works
-
-**Why second:** Order tracking is needed for WebSocket fills. Test with simpler REST first.
-
-**Validation:** Dry run logs show order_placed → order_filled with correlation IDs.
-
-### Phase 3: WebSocket Order Placement (LIVE TRADING)
-
-**Goal:** Replace REST POST with WebSocket for lower latency.
-
-**Tasks:**
-1. Create `WebSocketOrderClient` class
-2. Connect to `wss://ws-subscriptions-clob.polymarket.com/ws/orders`
-3. Implement `place_order()`, `cancel_order()` via WebSocket
-4. Wire callbacks to `OrderManager.on_fill()` / `on_rejection()`
-5. Modify `LiveExecutionAdapter` to use `WebSocketOrderClient`
-6. Test: Paper trade with WebSocket, verify fills arrive async
-7. Add reconnection logic (WebSocket drops → reconnect + resubscribe)
-
-**Why third:** Latency optimization only matters after foundation is solid.
-
-**Validation:** WebSocket orders execute 40-170ms faster than REST (measure with correlation ID timestamps).
-
-### Phase 4: Async Pipeline Optimization (PERFORMANCE)
-
-**Goal:** Reduce total latency through parallelization.
-
-**Tasks:**
-1. Convert `UniversalRunner._cycle()` to async
-2. Parallelize blockchain poll + price fetch
-3. Make `ExecutionEngine.process_event()` async
-4. Add async order placement (don't block on fill for GTD orders)
-5. Test: Measure end-to-end latency (leader trade → our order placed)
-
-**Why fourth:** Async refactor is risky. Do after WebSocket works synchronously.
-
-**Validation:** Latency reduces by 10-20ms (measure with timestamps).
-
-### Phase 5: Advanced Order Types (OPTIONAL)
-
-**Goal:** Support GTD/GTC orders (not just FOK).
-
-**Tasks:**
-1. Add order type parameter to `TradeDecision`
-2. Modify `OrderManager` to handle long-lived pending orders
-3. Add order status monitoring (check fills after event loop)
-4. Add cancellation logic (cancel unfilled orders at hour boundary)
-
-**Why fifth:** FOK orders work for most copy trading. GTD adds complexity (unfilled orders at hour end).
-
-**Validation:** GTD orders fill correctly or cancel gracefully.
-
----
-
-## Dependency Injection Pattern
-
-**Goal:** Swap execution adapters without changing orchestrator or strategy code.
-
-**Implementation:**
-
+**Bad:**
 ```python
-# config.py
-class ExecutionConfig:
-    mode: ExecutionMode  # LIVE or SIMULATION
-    # ... other settings
-
-# factory.py
-class ExecutionFactory:
-    @staticmethod
-    def create_adapter(config: ExecutionConfig, **deps) -> ExecutionAdapter:
-        if config.mode == ExecutionMode.SIMULATION:
-            return SimulationExecutionAdapter(
-                session_loader=deps["session_loader"]
-            )
-        elif config.mode == ExecutionMode.LIVE:
-            return LiveExecutionAdapter(
-                clob_client=deps["clob_client"],
-                ws_client=deps["ws_client"],
-                order_manager=deps["order_manager"],
-            )
-        else:
-            raise ValueError(f"Unknown mode: {config.mode}")
-
-# runner.py
-config = ExecutionConfig(mode=ExecutionMode.LIVE)
-adapter = ExecutionFactory.create_adapter(config, **live_deps)
-engine = ExecutionEngine(strategy, adapter)
-# Now runner uses engine.process_event() — same as replayer!
-
-# replayer.py
-config = ExecutionConfig(mode=ExecutionMode.SIMULATION)
-adapter = ExecutionFactory.create_adapter(config, session_loader=loader)
-engine = ExecutionEngine(strategy, adapter)
-# Same ExecutionEngine, different adapter
+if self.mode == "LIVE":
+    # Live-specific logic
+else:
+    # Simulation logic
 ```
 
-**Why:** Zero `if mode == LIVE` conditionals. Adapters are swapped via factory. Code paths stay identical.
-
----
-
-## Migration Path (Existing Strategies)
-
-**Critical:** 7+ existing strategies in `src/strategies/`. Changes must not break them.
-
-### Compatibility Layer
-
-**Strategy interface remains unchanged:**
-- `on_event(event: MarketEvent) → TradeDecision` (no change)
-- `on_fill(event, decision)` (add optional third parameter `result`)
-- `calculate_pnl(final_prices)` (no change)
-
-**Modified signature:**
+**Good:**
 ```python
-# Old (still supported)
-def on_fill(self, event: MarketEvent, decision: TradeDecision) -> None:
-    # ... apply trade
-
-# New (optional)
-def on_fill(self, event: MarketEvent, decision: TradeDecision,
-            result: Optional[ExecutionResult] = None) -> None:
-    # ... apply trade
-    # Access result.filled_price, result.filled_shares if needed
+# Same logic everywhere, adapter handles mode differences
+adapter.place_order(request)  # Adapter knows if it's live or not
 ```
 
-**Why:** Strategies don't need to change. `ExecutionEngine` calls `on_fill()` with 2 or 3 args (introspect signature).
+### 2. State Duplication
 
-### Gradual Migration
+**Bad:**
+- Portfolio tracks positions
+- Strategy tracks positions separately
+- Runner tracks positions separately
 
-**Phase 1:** Refactor runner/replayer to use `ExecutionEngine`. Strategies unchanged.
+**Good:**
+- Portfolio is single source of truth
+- Strategy reads from portfolio
+- Runner reads from portfolio
 
-**Phase 2:** Add WebSocket order placement. Strategies unchanged.
+### 3. Blocking WebSocket in Main Loop
 
-**Phase 3 (optional):** Strategies can opt-in to `ExecutionResult` for advanced features (e.g., partial fills).
-
-**Result:** Zero breaking changes. All existing strategies work with new architecture.
-
----
-
-## Monitoring & Observability
-
-**Critical for live trading:** Must know when things go wrong.
-
-### Metrics to Track
-
-**Latency:**
-- Leader trade detected → strategy decision made
-- Decision made → order placed (WebSocket send)
-- Order placed → fill received
-- End-to-end: leader trade → our fill
-
-**Order Success Rate:**
-- Orders placed / orders attempted
-- Orders filled / orders placed
-- Orders rejected / orders placed (by reason: insufficient balance, invalid price, etc.)
-- Orders timed out / orders placed
-
-**Execution Quality:**
-- Slippage: |our fill price - leader fill price| / leader fill price
-- Miss rate: leader trades we skipped / total leader trades
-- Fill delay: our fill timestamp - leader fill timestamp
-
-### Logging
-
-**Order lifecycle logging:**
+**Bad:**
 ```python
-# When order placed
-logger.info(f"ORDER_PLACED: corr={correlation_id} token={token_id[:16]} "
-            f"action={action} size={size} price={price}")
-
-# When fill received
-logger.info(f"ORDER_FILLED: corr={correlation_id} order_id={order_id} "
-            f"filled_price={filled_price} filled_shares={filled_shares} "
-            f"latency_ms={(time.time() - state.created_at) * 1000:.1f}")
-
-# When rejection received
-logger.warning(f"ORDER_REJECTED: corr={correlation_id} order_id={order_id} "
-               f"error={error}")
-
-# When timeout detected
-logger.error(f"ORDER_TIMEOUT: corr={correlation_id} order_id={order_id} "
-             f"pending_sec={time.time() - state.created_at:.1f}")
+def _cycle():
+    # ...
+    fill_event = websocket.wait_for_fill()  # ← BLOCKS
 ```
 
-**Why:** Correlation IDs link logs across components. Latency tracking shows optimization impact.
+**Good:**
+```python
+def _cycle():
+    # ...
+    websocket.poll_non_blocking()  # Returns immediately
+    # Process fills in callback
+```
 
-### Alerting
+### 4. Silent Reconciliation Corrections
 
-**Critical alerts:**
-- Order timeout rate >5% (WebSocket connection issue)
-- Order rejection rate >20% (balance issue, price validation bug)
-- Execution latency >500ms (network issue, need VPS move)
-- WebSocket disconnect (reconnection failing)
+**Bad:**
+```python
+if exchange_position != local_position:
+    local_position = exchange_position  # ← Silently overwrites
+```
 
-**Where to send:** Log to file + send to monitoring service (e.g., Sentry, CloudWatch).
+**Good:**
+```python
+if exchange_position != local_position:
+    logger.warning(f"MISMATCH: local={local_position} exchange={exchange_position}")
+    # Manual investigation required
+```
 
----
+**Rationale:** If local tracking diverges from exchange, that's a bug. Silently correcting hides the bug. Flag it, investigate root cause, fix the bug.
 
 ## Scalability Considerations
 
-### At 100 Leader Trades/Hour
+### Current Scale
+- 1 leader address
+- ~10-20 trades per hour
+- $50 budget per hour
+- 1 strategy running
 
-**Current architecture:** Adequate. Single-threaded execution handles 1-2 trades/minute easily.
+### At 10x Scale (Future)
+- 5-10 leader addresses
+- ~100-200 trades per hour
+- $500 budget per hour
+- Multiple strategies in parallel
 
-**Bottleneck:** None. Python event loop processes trades in <10ms each.
+**Bottlenecks to watch:**
 
-### At 1000 Leader Trades/Hour
+1. **Blockchain polling:** Currently polls every 2 seconds. At 10x volume, switch to WebSocket block subscriptions.
 
-**Challenge:** 1 trade every 3-4 seconds. If execution takes >3s, events queue up.
+2. **Position reconciliation:** Currently fetches all positions every 5 minutes. At 100+ positions, use differential updates.
 
-**Solution:**
-- Async execution pipeline (process next event while waiting for fill)
-- WebSocket placement (reduces per-order latency)
-- Pre-computed strategy state (reduces decision time)
+3. **Session recording:** Currently writes to single JSONL file. At 200 trades/hour, implement log rotation.
 
-**Bottleneck:** OrderManager tracking 100+ pending orders → O(n) timeout checks.
+**Good news:** Your architecture is already modular enough to handle these. No fundamental redesign needed, just component upgrades.
 
-**Mitigation:** Use heap for timeout detection (O(log n) instead of O(n)).
+## Error Handling Philosophy
 
-### At 10K Leader Trades/Hour
+### Current Approach (Keep This)
 
-**Challenge:** 2-3 trades/second. Need true parallelism.
+**Strategy errors:** Strategy returns `TradeDecision.skip()` with reason. No exception, no crash.
 
-**Solution:**
-- Multi-threaded event processing (worker pool)
-- Separate WebSocket connection per worker
-- Redis for shared OrderManager state (cross-process tracking)
+**Execution errors:** Order rejected → log error, increment stats, DON'T update portfolio. Portfolio stays consistent.
 
-**Bottleneck:** Polymarket CLOB rate limits (likely hit at this volume).
+**Detection errors:** Blockchain poll fails → log warning, continue to next iteration. Don't crash runner.
 
-**Mitigation:** Batch orders, use smart order routing.
+### Add for Live Trading
 
-**Realistic assessment:** 10K trades/hour unlikely for copy trading (leader would need to trade every 0.36 seconds). 1000/hour is realistic ceiling.
+**Order timeout:** If order pending for >60 seconds, cancel and retry or skip.
 
----
+**WebSocket disconnect:** Auto-reconnect with exponential backoff (already implemented in WebSocketPriceService, reuse pattern).
 
-## Risk Management
+**Position mismatch:** If reconciliation fails 3+ times, halt trading and alert (don't silently continue with bad state).
 
-### Order Placement Failures
+## Testing Strategy
 
-**Scenario:** WebSocket send fails (connection dropped, server error).
+### Unit Tests
+- Portfolio with composite keys (multiple sides, multiple markets)
+- OrderLifecycleManager state transitions (pending → filled/rejected)
+- WebSocketOrderChannel message parsing
 
-**Mitigation:**
-1. Retry once with exponential backoff (wait 100ms, retry)
-2. If retry fails, fall back to REST POST (slower but more reliable)
-3. Log failure, alert if fallback rate >10%
+### Integration Tests
+- UniversalRunner with OrderLifecycleManager (mocked WebSocket)
+- SessionReplayer produces same results as before (regression test)
+- Portfolio reconciliation with mocked exchange data
 
-**Code:**
-```python
-async def execute(self, decision, event, all_prices):
-    try:
-        success = await self.ws_client.place_order(...)
-        if not success:
-            # Fallback to REST
-            logger.warning("WebSocket order failed, falling back to REST")
-            return self._place_order_rest(decision, event)
-    except Exception as e:
-        logger.error(f"WebSocket exception: {e}, falling back to REST")
-        return self._place_order_rest(decision, event)
-```
+### Live Testing Protocol
+1. **Dry-run mode:** Connect to live API, WebSockets, detect trades, but DON'T execute (NullAdapter)
+2. **Paper trading mode:** Execute with small capital ($10 budget) for 24 hours
+3. **Gradual ramp:** Start at $25/hour, increase to $50/hour after 1 week of stable operation
+4. **Session recording:** Record ALL live sessions for replay validation
 
-### Stale Price Data
+## Monitoring and Observability
 
-**Scenario:** WebSocket price feed lags, we use stale bid/ask for decision.
+### Existing (Keep)
+- Trade log CSV (continuous and per-hour)
+- JSONL session recording
+- Console output with trade summary
 
-**Mitigation:**
-1. Timestamp price snapshots
-2. Reject decisions if price >2 seconds old
-3. Fetch fresh price from REST as fallback
+### Add for Live
+- **Order fill latency:** Time from order submission to fill confirmation
+- **Reconciliation discrepancies:** Count and magnitude of position mismatches
+- **WebSocket health:** Connection uptime, reconnection count
+- **Capital utilization:** Actual vs budgeted capital usage per hour
 
-**Code:**
-```python
-def on_event(self, event):
-    price_age = time.time() - event.prices.timestamp
-    if price_age > 2.0:
-        logger.warning(f"Stale price data: {price_age:.1f}s old")
-        return TradeDecision.skip("stale_price")
-```
-
-### Portfolio Divergence
-
-**Scenario:** Live portfolio diverges from strategy's internal tracking (missed fill notification, etc.).
-
-**Mitigation:**
-1. Reconciliation: fetch actual positions from CLOB API every 5 minutes
-2. Compare with strategy portfolio
-3. Log discrepancies, alert if >10 shares difference
-4. Auto-correct: update strategy portfolio to match actual (dangerous, log heavily)
-
-**Code:** Already exists in `runner.py` line 339-365 (`_maybe_reconcile()`).
-
-### WebSocket Reconnection
-
-**Scenario:** WebSocket connection drops (network issue, server restart).
-
-**Mitigation:**
-1. Detect disconnect in `_handle_message()` (connection closed)
-2. Reconnect with exponential backoff (1s, 2s, 4s, ...)
-3. Resubscribe to order updates
-4. Mark all pending orders as UNKNOWN (may have filled during disconnect)
-5. Reconcile portfolio after reconnection
-
-**Code:**
-```python
-async def _reconnect(self):
-    for attempt in range(5):
-        wait = 2 ** attempt  # 1, 2, 4, 8, 16 seconds
-        logger.info(f"Reconnecting WebSocket (attempt {attempt+1}/5)")
-        await asyncio.sleep(wait)
-        if await self.connect():
-            logger.info("WebSocket reconnected")
-            return True
-    logger.error("WebSocket reconnection failed after 5 attempts")
-    return False
-```
-
----
+### Alerts (New)
+- Order rejected 3+ times in a row
+- Position mismatch >$10 for >15 minutes
+- WebSocket disconnected for >60 seconds
+- Actual capital >110% of hourly budget
 
 ## Sources
 
-**Architecture Patterns:**
-- [Python Dependency Injection: A Guide for Cleaner Code Design | DataCamp](https://www.datacamp.com/tutorial/python-dependency-injection)
-- [PyNest Dependency Injection](https://pythonnest.github.io/PyNest/dependency_injection/)
-- [GitHub - ets-labs/python-dependency-injector](https://github.com/ets-labs/python-dependency-injector)
+**Industry Best Practices:**
+- [Step-by-Step Crypto Trading Bot Development Guide (2026)](https://appinventiv.com/blog/crypto-trading-bot-development/)
+- [Trading System Architecture 2026 | Microservices to Agentic Mesh](https://www.tuvoc.com/blog/trading-system-architecture-microservices-agentic-mesh/)
+- [From Silos to Sequencers: 24/7 Trading Architectures](https://weareadaptive.com/trading-resources/from-silos-to-sequencers-24-7-trading-architectures/)
+- [Automated Trading on Polymarket: Bots & Execution Strategies](https://www.quantvps.com/blog/automated-trading-polymarket)
 
-**WebSocket Trading Optimization:**
-- [How To Utilize WebSockets In Creating A Profitable Trading Bot - With Python | Medium](https://konstantinmb.medium.com/how-to-utilize-websockets-in-creating-a-profitable-trading-bot-with-python-5cb840e6c753)
-- [Optimizing Real-Time Market Data Feeds: A Python WebSocket Approach | Medium](https://medium.com/@emily19980210/optimizing-real-time-market-data-feeds-a-python-websocket-approach-for-us-stocks-f141781752fb)
-- [How Latency Impacts Polymarket Bot Performance | QuantVPS](https://www.quantvps.com/blog/how-latency-impacts-polymarket-trading-performance)
+**Polymarket CLOB API:**
+- [WSS Overview - Polymarket Documentation](https://docs.polymarket.com/developers/CLOB/websocket/wss-overview)
+- [The Polymarket API: Architecture and Use Cases](https://medium.com/@gwrx2005/the-polymarket-api-architecture-endpoints-and-use-cases-f1d88fa6c1bf)
 
-**Order Lifecycle Management:**
-- [Trading API — ProjectX Python SDK 3.3.4 documentation](https://project-x-py.readthedocs.io/en/stable/api/trading.html)
-- [Websocket Streaming | Alpaca Markets](https://docs.alpaca.markets/docs/websocket-streaming)
-- [API Changelog - Kalshi](https://docs.kalshi.com/changelog)
+**Python Trading Bot Organization:**
+- [Jesse - Open-source Python Trading Bot](https://jesse.trade/)
+- [Quant Trading Systems: Architecture & Infrastructure](https://mbrenndoerfer.com/writing/quant-trading-system-architecture-infrastructure)
 
-**Polymarket CLOB Integration:**
-- [GitHub - Polymarket/py-clob-client](https://github.com/Polymarket/py-clob-client)
-- [Quickstart - Polymarket Documentation](https://docs.polymarket.com/developers/CLOB/quickstart)
-- [How to Use Polymarket API: Complete Developer Guide (2026) | Hypereal](https://hypereal.tech/a/polymarket-api)
-
-**Trading Bot Best Practices:**
-- [AI Python Trading Bot: Build Your First Binance/OKX Bot (2026) | Exmon](https://academy.exmon.pro/ai-python-trading-bot-build-your-first-binanceokx-bot-2026)
-- [Step-by-Step Crypto Trading Bot Development Guide (2026) | Appinventiv](https://appinventiv.com/blog/crypto-trading-bot-development/)
-- [GitHub - jesse-ai/jesse: Advanced crypto trading bot](https://github.com/jesse-ai/jesse)
-- [GitHub - freqtrade/freqtrade: Free, open source crypto trading bot](https://github.com/freqtrade/freqtrade)
+**Confidence Assessment:**
+- HIGH confidence on existing architecture analysis (verified from codebase)
+- HIGH confidence on portfolio keying bug (code inspection)
+- MEDIUM confidence on WebSocket order patterns (official docs + industry patterns)
+- MEDIUM confidence on build order sequencing (depends on team priorities)
