@@ -1,0 +1,1638 @@
+{
+  "baseline": {
+    "conservative_mirror": {
+      "total_pnl": 32.2269,
+      "resolved_pnl": 23.5269,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "total_pnl": 23.844966666666668,
+          "resolved_pnl": 23.844966666666668,
+          "buys": 157,
+          "sells": 153
+        },
+        {
+          "session": "02-35.jsonl",
+          "total_pnl": -7.235666666666667,
+          "resolved_pnl": -15.935666666666666,
+          "buys": 203,
+          "sells": 187
+        },
+        {
+          "session": "03-58.jsonl",
+          "total_pnl": 15.6176,
+          "resolved_pnl": 15.6176,
+          "buys": 156,
+          "sells": 149
+        }
+      ],
+      "stddev": 20.99919438139896,
+      "consistency_score": 1.0694437074428855
+    },
+    "profit_taker": {
+      "total_pnl": 28.75958,
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "total_pnl": 20.13997,
+          "resolved_pnl": 20.13997,
+          "buys": 157,
+          "sells": 144
+        },
+        {
+          "session": "02-35.jsonl",
+          "total_pnl": -3.52239,
+          "resolved_pnl": -11.18479,
+          "buys": 205,
+          "sells": 176
+        },
+        {
+          "session": "03-58.jsonl",
+          "total_pnl": 12.142,
+          "resolved_pnl": 12.142,
+          "buys": 152,
+          "sells": 140
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "consistency_score": 1.2212211508069393
+    }
+  },
+  "conservative_mirror_grid": {
+    "best": {
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "5"
+      },
+      "total_pnl": 32.2269,
+      "resolved_pnl": 23.5269,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "total_pnl": 23.844966666666668,
+          "resolved_pnl": 23.844966666666668
+        },
+        {
+          "session": "02-35.jsonl",
+          "total_pnl": -7.235666666666667,
+          "resolved_pnl": -15.935666666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "total_pnl": 15.6176,
+          "resolved_pnl": 15.6176
+        }
+      ],
+      "stddev": 20.99919438139896,
+      "consistency_score": 1.0694437074428855
+    },
+    "all_results": [
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.5",
+          "CASH_RESERVE_PCT": "15",
+          "MAX_TOTAL_COST_PCT": "5"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.5",
+          "CASH_RESERVE_PCT": "15",
+          "MAX_TOTAL_COST_PCT": "6"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.5",
+          "CASH_RESERVE_PCT": "15",
+          "MAX_TOTAL_COST_PCT": "7"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.5",
+          "CASH_RESERVE_PCT": "20",
+          "MAX_TOTAL_COST_PCT": "5"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.5",
+          "CASH_RESERVE_PCT": "20",
+          "MAX_TOTAL_COST_PCT": "6"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.5",
+          "CASH_RESERVE_PCT": "20",
+          "MAX_TOTAL_COST_PCT": "7"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.5",
+          "CASH_RESERVE_PCT": "25",
+          "MAX_TOTAL_COST_PCT": "5"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.5",
+          "CASH_RESERVE_PCT": "25",
+          "MAX_TOTAL_COST_PCT": "6"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.5",
+          "CASH_RESERVE_PCT": "25",
+          "MAX_TOTAL_COST_PCT": "7"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.7",
+          "CASH_RESERVE_PCT": "15",
+          "MAX_TOTAL_COST_PCT": "5"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.7",
+          "CASH_RESERVE_PCT": "15",
+          "MAX_TOTAL_COST_PCT": "6"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.7",
+          "CASH_RESERVE_PCT": "15",
+          "MAX_TOTAL_COST_PCT": "7"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.7",
+          "CASH_RESERVE_PCT": "20",
+          "MAX_TOTAL_COST_PCT": "5"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.7",
+          "CASH_RESERVE_PCT": "20",
+          "MAX_TOTAL_COST_PCT": "6"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.7",
+          "CASH_RESERVE_PCT": "20",
+          "MAX_TOTAL_COST_PCT": "7"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.7",
+          "CASH_RESERVE_PCT": "25",
+          "MAX_TOTAL_COST_PCT": "5"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.7",
+          "CASH_RESERVE_PCT": "25",
+          "MAX_TOTAL_COST_PCT": "6"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.7",
+          "CASH_RESERVE_PCT": "25",
+          "MAX_TOTAL_COST_PCT": "7"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.9",
+          "CASH_RESERVE_PCT": "15",
+          "MAX_TOTAL_COST_PCT": "5"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.9",
+          "CASH_RESERVE_PCT": "15",
+          "MAX_TOTAL_COST_PCT": "6"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.9",
+          "CASH_RESERVE_PCT": "15",
+          "MAX_TOTAL_COST_PCT": "7"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.9",
+          "CASH_RESERVE_PCT": "20",
+          "MAX_TOTAL_COST_PCT": "5"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.9",
+          "CASH_RESERVE_PCT": "20",
+          "MAX_TOTAL_COST_PCT": "6"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.9",
+          "CASH_RESERVE_PCT": "20",
+          "MAX_TOTAL_COST_PCT": "7"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.9",
+          "CASH_RESERVE_PCT": "25",
+          "MAX_TOTAL_COST_PCT": "5"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.9",
+          "CASH_RESERVE_PCT": "25",
+          "MAX_TOTAL_COST_PCT": "6"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      },
+      {
+        "params": {
+          "K_FACTOR_MULT": "0.9",
+          "CASH_RESERVE_PCT": "25",
+          "MAX_TOTAL_COST_PCT": "7"
+        },
+        "total_pnl": 32.2269,
+        "resolved_pnl": 23.5269,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 23.844966666666668,
+            "resolved_pnl": 23.844966666666668
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -7.235666666666667,
+            "resolved_pnl": -15.935666666666666
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 15.6176,
+            "resolved_pnl": 15.6176
+          }
+        ],
+        "stddev": 20.99919438139896,
+        "consistency_score": 1.0694437074428855
+      }
+    ]
+  },
+  "profit_taker_grid": {
+    "best": {
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "8"
+      },
+      "total_pnl": 28.75958,
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "total_pnl": 20.13997,
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "total_pnl": -3.52239,
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "total_pnl": 12.142,
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "consistency_score": 1.2212211508069393
+    },
+    "all_results": [
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "25",
+          "PROFIT_TARGET_MID": "15",
+          "PROFIT_TARGET_HIGH": "8"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "25",
+          "PROFIT_TARGET_MID": "15",
+          "PROFIT_TARGET_HIGH": "12"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "25",
+          "PROFIT_TARGET_MID": "15",
+          "PROFIT_TARGET_HIGH": "16"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "25",
+          "PROFIT_TARGET_MID": "20",
+          "PROFIT_TARGET_HIGH": "8"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "25",
+          "PROFIT_TARGET_MID": "20",
+          "PROFIT_TARGET_HIGH": "12"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "25",
+          "PROFIT_TARGET_MID": "20",
+          "PROFIT_TARGET_HIGH": "16"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "25",
+          "PROFIT_TARGET_MID": "25",
+          "PROFIT_TARGET_HIGH": "8"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "25",
+          "PROFIT_TARGET_MID": "25",
+          "PROFIT_TARGET_HIGH": "12"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "25",
+          "PROFIT_TARGET_MID": "25",
+          "PROFIT_TARGET_HIGH": "16"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "35",
+          "PROFIT_TARGET_MID": "15",
+          "PROFIT_TARGET_HIGH": "8"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "35",
+          "PROFIT_TARGET_MID": "15",
+          "PROFIT_TARGET_HIGH": "12"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "35",
+          "PROFIT_TARGET_MID": "15",
+          "PROFIT_TARGET_HIGH": "16"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "35",
+          "PROFIT_TARGET_MID": "20",
+          "PROFIT_TARGET_HIGH": "8"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "35",
+          "PROFIT_TARGET_MID": "20",
+          "PROFIT_TARGET_HIGH": "12"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "35",
+          "PROFIT_TARGET_MID": "20",
+          "PROFIT_TARGET_HIGH": "16"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "35",
+          "PROFIT_TARGET_MID": "25",
+          "PROFIT_TARGET_HIGH": "8"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "35",
+          "PROFIT_TARGET_MID": "25",
+          "PROFIT_TARGET_HIGH": "12"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "35",
+          "PROFIT_TARGET_MID": "25",
+          "PROFIT_TARGET_HIGH": "16"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "45",
+          "PROFIT_TARGET_MID": "15",
+          "PROFIT_TARGET_HIGH": "8"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "45",
+          "PROFIT_TARGET_MID": "15",
+          "PROFIT_TARGET_HIGH": "12"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "45",
+          "PROFIT_TARGET_MID": "15",
+          "PROFIT_TARGET_HIGH": "16"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "45",
+          "PROFIT_TARGET_MID": "20",
+          "PROFIT_TARGET_HIGH": "8"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "45",
+          "PROFIT_TARGET_MID": "20",
+          "PROFIT_TARGET_HIGH": "12"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "45",
+          "PROFIT_TARGET_MID": "20",
+          "PROFIT_TARGET_HIGH": "16"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "45",
+          "PROFIT_TARGET_MID": "25",
+          "PROFIT_TARGET_HIGH": "8"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "45",
+          "PROFIT_TARGET_MID": "25",
+          "PROFIT_TARGET_HIGH": "12"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      },
+      {
+        "params": {
+          "PROFIT_TARGET_LOW": "45",
+          "PROFIT_TARGET_MID": "25",
+          "PROFIT_TARGET_HIGH": "16"
+        },
+        "total_pnl": 28.75958,
+        "resolved_pnl": 21.09718,
+        "per_session": [
+          {
+            "session": "05-56.jsonl",
+            "total_pnl": 20.13997,
+            "resolved_pnl": 20.13997
+          },
+          {
+            "session": "02-35.jsonl",
+            "total_pnl": -3.52239,
+            "resolved_pnl": -11.18479
+          },
+          {
+            "session": "03-58.jsonl",
+            "total_pnl": 12.142,
+            "resolved_pnl": 12.142
+          }
+        ],
+        "stddev": 16.275478717396712,
+        "consistency_score": 1.2212211508069393
+      }
+    ]
+  }
+}

@@ -1,0 +1,1390 @@
+{
+  "conservative_baseline": {
+    "resolved_pnl": 18.280525,
+    "per_session": [
+      {
+        "session": "05-56.jsonl",
+        "resolved_pnl": 19.421666666666667
+      },
+      {
+        "session": "02-35.jsonl",
+        "resolved_pnl": -18.738841666666666
+      },
+      {
+        "session": "03-58.jsonl",
+        "resolved_pnl": 17.5977
+      }
+    ],
+    "stddev": 21.52477452825355,
+    "score": 0.8115741614669728,
+    "params": "baseline"
+  },
+  "conservative_best": {
+    "resolved_pnl": 18.280525,
+    "per_session": [
+      {
+        "session": "05-56.jsonl",
+        "resolved_pnl": 19.421666666666667
+      },
+      {
+        "session": "02-35.jsonl",
+        "resolved_pnl": -18.738841666666666
+      },
+      {
+        "session": "03-58.jsonl",
+        "resolved_pnl": 17.5977
+      }
+    ],
+    "stddev": 21.52477452825355,
+    "score": 0.8115741614669728,
+    "params": {
+      "K_FACTOR_MULT": "0.5",
+      "CASH_RESERVE_PCT": "15",
+      "MAX_TOTAL_COST_PCT": "5"
+    }
+  },
+  "conservative_all": [
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "5"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "6"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "7"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "20",
+        "MAX_TOTAL_COST_PCT": "5"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "20",
+        "MAX_TOTAL_COST_PCT": "6"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "20",
+        "MAX_TOTAL_COST_PCT": "7"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "25",
+        "MAX_TOTAL_COST_PCT": "5"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "25",
+        "MAX_TOTAL_COST_PCT": "6"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.5",
+        "CASH_RESERVE_PCT": "25",
+        "MAX_TOTAL_COST_PCT": "7"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.7",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "5"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.7",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "6"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.7",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "7"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.7",
+        "CASH_RESERVE_PCT": "20",
+        "MAX_TOTAL_COST_PCT": "5"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.7",
+        "CASH_RESERVE_PCT": "20",
+        "MAX_TOTAL_COST_PCT": "6"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.7",
+        "CASH_RESERVE_PCT": "20",
+        "MAX_TOTAL_COST_PCT": "7"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.7",
+        "CASH_RESERVE_PCT": "25",
+        "MAX_TOTAL_COST_PCT": "5"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.7",
+        "CASH_RESERVE_PCT": "25",
+        "MAX_TOTAL_COST_PCT": "6"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.7",
+        "CASH_RESERVE_PCT": "25",
+        "MAX_TOTAL_COST_PCT": "7"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.9",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "5"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.9",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "6"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.9",
+        "CASH_RESERVE_PCT": "15",
+        "MAX_TOTAL_COST_PCT": "7"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.9",
+        "CASH_RESERVE_PCT": "20",
+        "MAX_TOTAL_COST_PCT": "5"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.9",
+        "CASH_RESERVE_PCT": "20",
+        "MAX_TOTAL_COST_PCT": "6"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.9",
+        "CASH_RESERVE_PCT": "20",
+        "MAX_TOTAL_COST_PCT": "7"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.9",
+        "CASH_RESERVE_PCT": "25",
+        "MAX_TOTAL_COST_PCT": "5"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.9",
+        "CASH_RESERVE_PCT": "25",
+        "MAX_TOTAL_COST_PCT": "6"
+      }
+    },
+    {
+      "resolved_pnl": 18.280525,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 19.421666666666667
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -18.738841666666666
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 17.5977
+        }
+      ],
+      "stddev": 21.52477452825355,
+      "score": 0.8115741614669728,
+      "params": {
+        "K_FACTOR_MULT": "0.9",
+        "CASH_RESERVE_PCT": "25",
+        "MAX_TOTAL_COST_PCT": "7"
+      }
+    }
+  ],
+  "profit_baseline": {
+    "resolved_pnl": 21.09718,
+    "per_session": [
+      {
+        "session": "05-56.jsonl",
+        "resolved_pnl": 20.13997
+      },
+      {
+        "session": "02-35.jsonl",
+        "resolved_pnl": -11.18479
+      },
+      {
+        "session": "03-58.jsonl",
+        "resolved_pnl": 12.142
+      }
+    ],
+    "stddev": 16.275478717396712,
+    "score": 1.2212211508069393,
+    "params": "baseline"
+  },
+  "profit_best": {
+    "resolved_pnl": 21.09718,
+    "per_session": [
+      {
+        "session": "05-56.jsonl",
+        "resolved_pnl": 20.13997
+      },
+      {
+        "session": "02-35.jsonl",
+        "resolved_pnl": -11.18479
+      },
+      {
+        "session": "03-58.jsonl",
+        "resolved_pnl": 12.142
+      }
+    ],
+    "stddev": 16.275478717396712,
+    "score": 1.2212211508069393,
+    "params": {
+      "PROFIT_TARGET_LOW": "25",
+      "PROFIT_TARGET_MID": "15",
+      "PROFIT_TARGET_HIGH": "8"
+    }
+  },
+  "profit_all": [
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "8"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "12"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "16"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "20",
+        "PROFIT_TARGET_HIGH": "8"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "20",
+        "PROFIT_TARGET_HIGH": "12"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "20",
+        "PROFIT_TARGET_HIGH": "16"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "25",
+        "PROFIT_TARGET_HIGH": "8"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "25",
+        "PROFIT_TARGET_HIGH": "12"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "25",
+        "PROFIT_TARGET_MID": "25",
+        "PROFIT_TARGET_HIGH": "16"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "35",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "8"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "35",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "12"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "35",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "16"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "35",
+        "PROFIT_TARGET_MID": "20",
+        "PROFIT_TARGET_HIGH": "8"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "35",
+        "PROFIT_TARGET_MID": "20",
+        "PROFIT_TARGET_HIGH": "12"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "35",
+        "PROFIT_TARGET_MID": "20",
+        "PROFIT_TARGET_HIGH": "16"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "35",
+        "PROFIT_TARGET_MID": "25",
+        "PROFIT_TARGET_HIGH": "8"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "35",
+        "PROFIT_TARGET_MID": "25",
+        "PROFIT_TARGET_HIGH": "12"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "35",
+        "PROFIT_TARGET_MID": "25",
+        "PROFIT_TARGET_HIGH": "16"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "45",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "8"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "45",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "12"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "45",
+        "PROFIT_TARGET_MID": "15",
+        "PROFIT_TARGET_HIGH": "16"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "45",
+        "PROFIT_TARGET_MID": "20",
+        "PROFIT_TARGET_HIGH": "8"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "45",
+        "PROFIT_TARGET_MID": "20",
+        "PROFIT_TARGET_HIGH": "12"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "45",
+        "PROFIT_TARGET_MID": "20",
+        "PROFIT_TARGET_HIGH": "16"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "45",
+        "PROFIT_TARGET_MID": "25",
+        "PROFIT_TARGET_HIGH": "8"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "45",
+        "PROFIT_TARGET_MID": "25",
+        "PROFIT_TARGET_HIGH": "12"
+      }
+    },
+    {
+      "resolved_pnl": 21.09718,
+      "per_session": [
+        {
+          "session": "05-56.jsonl",
+          "resolved_pnl": 20.13997
+        },
+        {
+          "session": "02-35.jsonl",
+          "resolved_pnl": -11.18479
+        },
+        {
+          "session": "03-58.jsonl",
+          "resolved_pnl": 12.142
+        }
+      ],
+      "stddev": 16.275478717396712,
+      "score": 1.2212211508069393,
+      "params": {
+        "PROFIT_TARGET_LOW": "45",
+        "PROFIT_TARGET_MID": "25",
+        "PROFIT_TARGET_HIGH": "16"
+      }
+    }
+  ]
+}
