@@ -10,3 +10,4 @@ from .kelly_engine import KellyCalculator
 from .conviction import ConvictionScorer, ConvictionSignals
 from .trade_ranker import TradeRanker, TradeOpportunity
 from .adaptive_sizer import AdaptiveSizer
+from .trade_logic import liquidate_positions_at_hour_boundary, LiquidationResult
