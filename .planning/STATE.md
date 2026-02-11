@@ -10,19 +10,19 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 ## Current Position
 
 Phase: 8 of 12 (Foundation & Bug Fixes)
-Plan: 02 complete (08-01, 08-02, 08-04 done; 08-03 pending)
-Status: In progress
-Last activity: 2026-02-11 — Completed 08-02-PLAN.md (Directory organization)
+Plan: 03 complete (08-01, 08-02, 08-03, 08-04 done)
+Status: Phase complete
+Last activity: 2026-02-11 — Completed 08-03-PLAN.md (Shared trade logic)
 
-Progress: v1.0 (21 plans) + v1.1 (13 plans) + v1.2 (3 plans) = 37 plans complete
-Phase 8: ███░░ 3/TBD
+Progress: v1.0 (21 plans) + v1.1 (13 plans) + v1.2 (4 plans) = 38 plans complete
+Phase 8: █████ 4/4
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 37 (v1.0: 21, v1.1: 13, v1.2: 3)
+- Total plans completed: 38 (v1.0: 21, v1.1: 13, v1.2: 4)
 - Average duration: 4.8min (all time)
-- Total execution time: 2.98 hours (all time)
+- Total execution time: 3.03 hours (all time)
 
 **By Phase:**
 
@@ -36,9 +36,9 @@ Phase 8: ███░░ 3/TBD
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
 | 07-comparison-infrastructure | 3 | 22min | 7min | Complete |
 | 07.1-codebase-cleanup | 7 | 50min | 7min | Complete |
-| 08-foundation-bug-fixes | 3 | 10min | 3min | In progress |
+| 08-foundation-bug-fixes | 4 | 15min | 4min | Complete |
 
-*Updated: 2026-02-11 after 08-02 completion*
+*Updated: 2026-02-11 after 08-03 completion*
 
 ## Accumulated Context
 
@@ -59,6 +59,11 @@ Recent decisions affecting v1.2:
 - Preserve all experiment scripts for historical reference rather than deleting
 - Separate reusable utilities (scripts/) from one-off experiments (experiments/archive/)
 - Production code in root/src/tests, experimental code in experiments/
+
+**From 08-03:**
+- Dual-mode liquidation via use_resolution_prices parameter (resolution prices vs actual bid prices)
+- Composite key extraction pattern: split("|")[0] for token_id lookup from composite keys
+- Shared trade logic modules in src/core for operations used by both simulation and live execution
 
 **From 08-04:**
 - Upgraded websockets v12 -> v16 despite web3 conflict (websockets optional, web3 unused)
@@ -105,9 +110,9 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-11
-Stopped at: Completed 08-02-PLAN.md (Directory organization)
+Stopped at: Completed 08-03-PLAN.md (Shared trade logic) — Phase 08 complete
 Resume file: None
-Next action: Execute 08-03-PLAN.md (next in phase)
+Next action: Execute Phase 09 (next phase in v1.2 roadmap)
 
 **Strategy config (current best):**
 - Sharpe 0.345, PnL $324, WR 50%, MaxLoss -$26
@@ -116,4 +121,4 @@ Next action: Execute 08-03-PLAN.md (next in phase)
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-11 after 08-02 completion*
+*Last updated: 2026-02-11 after 08-03 completion*
