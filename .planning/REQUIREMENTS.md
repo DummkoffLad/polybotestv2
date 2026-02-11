@@ -7,10 +7,10 @@
 
 ### Codebase Cleanup
 
-- [ ] **CLEAN-01**: Portfolio positions keyed by composite (token_id, market_id, side) instead of token_id alone
-- [ ] **CLEAN-02**: Experiment scripts organized into experiments/archive/ and scripts/ directories
-- [ ] **CLEAN-03**: Shared trade logic module (src/core/trade_logic.py) used by both simulation and live execution paths
-- [ ] **CLEAN-04**: websockets library upgraded from 12.0 to 16.0
+- [x] **CLEAN-01**: Portfolio positions keyed by composite (token_id, market_id, side) instead of token_id alone
+- [x] **CLEAN-02**: Experiment scripts organized into experiments/archive/ and scripts/ directories
+- [x] **CLEAN-03**: Shared trade logic module (src/core/trade_logic.py) used by both simulation and live execution paths
+- [x] **CLEAN-04**: websockets library upgraded from 12.0 to 16.0
 
 ### Safety
 
@@ -63,10 +63,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLEAN-01 | Phase 8 | Pending |
-| CLEAN-02 | Phase 8 | Pending |
-| CLEAN-03 | Phase 8 | Pending |
-| CLEAN-04 | Phase 8 | Pending |
+| CLEAN-01 | Phase 8 | Complete |
+| CLEAN-02 | Phase 8 | Complete |
+| CLEAN-03 | Phase 8 | Complete |
+| CLEAN-04 | Phase 8 | Complete |
 | SAFE-01 | Phase 9 | Pending |
 | SAFE-02 | Phase 9 | Pending |
 | SAFE-03 | Phase 9 | Pending |
@@ -87,4 +87,4 @@
 
 ---
 *Requirements defined: 2026-02-10*
-*Last updated: 2026-02-10 after roadmap creation (100% coverage)*
+*Last updated: 2026-02-11 — CLEAN-01..04 complete (Phase 8)*

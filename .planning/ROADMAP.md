@@ -64,27 +64,20 @@
 
 **Strategy Status:** Sharpe 0.345, PnL $324, WR 50%, MaxLoss -$26 (bgt50+noLo500+conviction)
 
-### Phase 8: Foundation & Bug Fixes
+### Phase 8: Foundation & Bug Fixes ✅
 
 **Goal:** Fix critical portfolio keying bug and organize codebase for live trading
 **Depends on:** Phase 7.1
 **Requirements:** CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04
-
-**Success Criteria** (what must be TRUE):
-1. Portfolio positions are keyed by composite (token_id, market_id, side) and track accurately across multiple markets
-2. Experiment scripts are organized into experiments/archive/ and scripts/ directories, root directory contains only production code
-3. Trade logic module (src/core/trade_logic.py) exists and is used by both simulation and live execution paths with zero duplication
-4. websockets library is upgraded to v16.0 and all WebSocket connections use the updated API
-
-**Research flag:** skip-research — Code fixes and refactoring with well-known patterns
+**Status:** Complete (2026-02-11) — verified 20/20 must-haves
 
 **Plans:** 4 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Fix portfolio composite keying bug (TDD, CLEAN-01)
-- [ ] 08-02-PLAN.md — Organize root directory experiment scripts (CLEAN-02)
-- [ ] 08-03-PLAN.md — Extract shared trade logic module (CLEAN-03)
-- [ ] 08-04-PLAN.md — Upgrade websockets library to v16.0 (CLEAN-04)
+- [x] 08-01-PLAN.md — Fix portfolio composite keying bug (TDD, CLEAN-01)
+- [x] 08-02-PLAN.md — Organize root directory experiment scripts (CLEAN-02)
+- [x] 08-03-PLAN.md — Extract shared trade logic module (CLEAN-03)
+- [x] 08-04-PLAN.md — Upgrade websockets library to v16.0 (CLEAN-04)
 
 ---
 
@@ -189,7 +182,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12
 | 6. Statistical Validation | v1.1 | 3/3 | Complete | 2026-02-09 |
 | 7. Comparison Infrastructure | v1.1 | 3/3 | Complete | 2026-02-09 |
 | 7.1. Codebase Cleanup | v1.1 | 7/7 | Complete | 2026-02-09 |
-| 8. Foundation & Bug Fixes | v1.2 | 0/4 | Planned | - |
+| 8. Foundation & Bug Fixes | v1.2 | 4/4 | Complete | 2026-02-11 |
 | 9. Safety Mechanisms | v1.2 | 0/TBD | Not started | - |
 | 10. Order Lifecycle & WebSocket | v1.2 | 0/TBD | Not started | - |
 | 11. Position Reconciliation | v1.2 | 0/TBD | Not started | - |
@@ -197,4 +190,4 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12
 
 ---
 *Roadmap created: 2026-02-10*
-*Last updated: 2026-02-10 for v1.2 milestone*
+*Last updated: 2026-02-11 — Phase 8 complete*
