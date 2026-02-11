@@ -11,6 +11,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Dict, List, Optional, Set
 
+try:
+    from websockets.asyncio.client import connect as ws_connect
+    HAS_WEBSOCKETS = True
+except ImportError:
+    HAS_WEBSOCKETS = False
+    ws_connect = None
+
 logger = logging.getLogger(__name__)
 
 WS_URL = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
@@ -39,38 +46,38 @@ class WebSocketPriceService:
         self._lock = threading.Lock()
         self._reconnect_count = 0
         self._max_backoff = 60  # Max seconds between reconnect attempts
-    
+
     def start(self) -> None:
         if self._running:
             return
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True, name="ws-price")
         self._thread.start()
-    
+
     def stop(self) -> None:
         self._running = False
         if self._loop and self._loop.is_running():
             self._loop.call_soon_threadsafe(self._loop.stop)
         if self._thread:
             self._thread.join(timeout=5)
-    
+
     def subscribe(self, token_id: str) -> None:
         with self._lock:
             if token_id not in self._subscribed:
                 self._subscribed.add(token_id)
                 self._pending.append(token_id)
-    
+
     def subscribe_many(self, token_ids: List[str]) -> None:
         for tid in token_ids:
             self.subscribe(tid)
-    
+
     def get_prices(self, token_id: str) -> tuple[Optional[Decimal], Optional[Decimal]]:
         """Get (bid, ask) for token."""
         entry = self._prices.get(token_id)
         if not entry or time.time() - entry.timestamp > STALE_SEC:
             return None, None
         return entry.bid, entry.ask
-    
+
     def _run_loop(self) -> None:
         """Run the WebSocket event loop with automatic restart on failure."""
         backoff = 2  # Start with 2 second backoff
@@ -97,19 +104,17 @@ class WebSocketPriceService:
             if self._running:
                 time.sleep(backoff)
                 backoff = min(backoff * 2, self._max_backoff)
-    
+
     async def _ws_main(self) -> None:
-        try:
-            import websockets
-        except ImportError:
-            logger.error("websockets not installed")
+        if not HAS_WEBSOCKETS:
+            logger.error("websockets>=16.0 not installed, price feed disabled")
             return
 
         backoff = 2  # Start with 2 second backoff
 
         while self._running:
             try:
-                async with websockets.connect(self.ws_url, ping_interval=20, ping_timeout=10) as ws:
+                async with ws_connect(self.ws_url, ping_interval=20, ping_timeout=10) as ws:
                     self._connected = True
                     self._reconnect_count = 0  # Reset on successful connect
                     backoff = 2  # Reset backoff on success
@@ -135,7 +140,7 @@ class WebSocketPriceService:
                 if self._running:
                     await asyncio.sleep(backoff)
                     backoff = min(backoff * 2, self._max_backoff)
-    
+
     async def _resubscribe_all(self, ws) -> None:
         """Resubscribe all known tokens after reconnect."""
         with self._lock:
@@ -157,7 +162,7 @@ class WebSocketPriceService:
             except:
                 with self._lock:
                     self._pending.extend(pending)
-    
+
     def _handle(self, msg) -> None:
         now = time.time()
         if isinstance(msg, list):
@@ -168,7 +173,7 @@ class WebSocketPriceService:
             for change in msg.get("price_changes", []):
                 if isinstance(change, dict):
                     self._parse_change(change, now)
-    
+
     def _parse_book(self, item: dict, now: float) -> None:
         aid = item.get("asset_id", "")
         if not aid:
