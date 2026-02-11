@@ -78,11 +78,13 @@
 
 **Research flag:** skip-research — Code fixes and refactoring with well-known patterns
 
-**Plans:** TBD
+**Plans:** 4 plans
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
+- [ ] 08-01-PLAN.md — Fix portfolio composite keying bug (TDD, CLEAN-01)
+- [ ] 08-02-PLAN.md — Organize root directory experiment scripts (CLEAN-02)
+- [ ] 08-03-PLAN.md — Extract shared trade logic module (CLEAN-03)
+- [ ] 08-04-PLAN.md — Upgrade websockets library to v16.0 (CLEAN-04)
 
 ---
 
@@ -187,7 +189,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11 → 12
 | 6. Statistical Validation | v1.1 | 3/3 | Complete | 2026-02-09 |
 | 7. Comparison Infrastructure | v1.1 | 3/3 | Complete | 2026-02-09 |
 | 7.1. Codebase Cleanup | v1.1 | 7/7 | Complete | 2026-02-09 |
-| 8. Foundation & Bug Fixes | v1.2 | 0/TBD | Not started | - |
+| 8. Foundation & Bug Fixes | v1.2 | 0/4 | Planned | - |
 | 9. Safety Mechanisms | v1.2 | 0/TBD | Not started | - |
 | 10. Order Lifecycle & WebSocket | v1.2 | 0/TBD | Not started | - |
 | 11. Position Reconciliation | v1.2 | 0/TBD | Not started | - |
