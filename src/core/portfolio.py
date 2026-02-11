@@ -34,14 +34,22 @@ class Portfolio:
         self.realized_pnl: Decimal = Decimal("0")
         self.total_bought: Decimal = Decimal("0")
         self.total_sold: Decimal = Decimal("0")
-    
+
+    @staticmethod
+    def _position_key(token_id: str, market_id: str, side: Side) -> str:
+        """Create composite key from token_id, market_id, and side."""
+        side_str = side.value if hasattr(side, 'value') else str(side)
+        return f"{token_id}|{market_id}|{side_str}"
+
     def get(self, token_id: str, market_id: str = "", side: Side = Side.UP) -> PortfolioPosition:
-        if token_id not in self._positions:
-            self._positions[token_id] = PortfolioPosition(token_id, market_id, side)
-        return self._positions[token_id]
-    
-    def has_position(self, token_id: str) -> bool:
-        pos = self._positions.get(token_id)
+        key = self._position_key(token_id, market_id, side)
+        if key not in self._positions:
+            self._positions[key] = PortfolioPosition(token_id, market_id, side)
+        return self._positions[key]
+
+    def has_position(self, token_id: str, market_id: str, side: Side) -> bool:
+        key = self._position_key(token_id, market_id, side)
+        pos = self._positions.get(key)
         return pos is not None and pos.shares > 0
     
     def apply_buy(self, token_id: str, market_id: str, side: Side, shares: Decimal, 
@@ -113,14 +121,14 @@ class Portfolio:
     
     def get_positions(self) -> Dict[str, PortfolioPosition]:
         return {k: v for k, v in self._positions.items() if v.shares > 0}
-    
+
     def calculate_pnl(self, current_prices: Dict[str, Decimal]) -> tuple[Decimal, Decimal]:
-        unrealized = sum(pos.shares * current_prices.get(token_id, pos.avg_price) - pos.cost_basis
-                        for token_id, pos in self._positions.items() if pos.shares > 0)
+        unrealized = sum(pos.shares * current_prices.get(pos.token_id, pos.avg_price) - pos.cost_basis
+                        for pos in self._positions.values() if pos.shares > 0)
         return self.realized_pnl, unrealized
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        return {tid: pos.to_dict() for tid, pos in self._positions.items() if pos.shares > 0}
+        return {key: pos.to_dict() for key, pos in self._positions.items() if pos.shares > 0}
     
     def clear(self) -> None:
         self._positions.clear()
