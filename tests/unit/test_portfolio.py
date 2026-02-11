@@ -402,12 +402,9 @@ def test_unrealized_pnl_missing_price_uses_avg_price(fresh_portfolio):
 
 def test_multiple_markets_same_token_id(fresh_portfolio):
     """
-    BUG DISCOVERED: Portfolio positions are keyed only by token_id, not by (token_id, market_id, side).
+    FIX IMPLEMENTED: Portfolio positions are now keyed by (token_id, market_id, side).
 
-    This means if the same token_id appears in multiple markets, positions will OVERWRITE each other.
-    This is a serious bug but per phase context: document it, don't fix.
-
-    Test demonstrates the bug exists.
+    Same token_id in different markets creates separate, independent positions.
     """
     portfolio = fresh_portfolio
 
@@ -415,15 +412,86 @@ def test_multiple_markets_same_token_id(fresh_portfolio):
     pos1 = portfolio.apply_buy("token_same", "market_1", Side.UP, Decimal("10"), Decimal("0.50"))
     pos2 = portfolio.apply_buy("token_same", "market_2", Side.DOWN, Decimal("20"), Decimal("0.60"))
 
-    # BUG: Second buy ACCUMULATES into same position instead of creating separate position
-    # Expected: Two independent positions
-    # Actual: Single position with accumulated shares
+    # CORRECT BEHAVIOR: Two independent positions
+    assert pos1.shares == Decimal("10")
+    assert pos1.cost_basis == Decimal("5.00")
+    assert pos1.market_id == "market_1"
+    assert pos1.side == Side.UP
 
-    # This test documents actual behavior (not expected behavior)
-    assert pos2.shares == Decimal("30")  # BUG: Should be 20, but accumulated 10+20
-    assert pos2.cost_basis == Decimal("17.00")  # BUG: Should be 12, but accumulated 5+12
-    # BUG: market_id is NOT updated on subsequent buys - it stays as the first market_id
-    assert pos2.market_id == "market_1"  # Keeps first market_id, doesn't update to "market_2"
+    assert pos2.shares == Decimal("20")
+    assert pos2.cost_basis == Decimal("12.00")
+    assert pos2.market_id == "market_2"
+    assert pos2.side == Side.DOWN
 
-    # The portfolio only tracks ONE position for this token_id
-    assert len([p for p in portfolio._positions.values() if p.token_id == "token_same"]) == 1
+    # The portfolio now tracks TWO separate positions for this token_id
+    assert len([p for p in portfolio._positions.values() if p.token_id == "token_same"]) == 2
+
+
+def test_same_token_different_sides_independent(fresh_portfolio):
+    """Same token_id in same market but different sides creates independent positions."""
+    portfolio = fresh_portfolio
+
+    # Buy same token_id, same market, but different sides
+    pos_up = portfolio.apply_buy("token_a", "market_1", Side.UP, Decimal("10"), Decimal("0.50"))
+    pos_down = portfolio.apply_buy("token_a", "market_1", Side.DOWN, Decimal("15"), Decimal("0.60"))
+
+    # Should be two separate positions
+    assert pos_up.shares == Decimal("10")
+    assert pos_up.cost_basis == Decimal("5.00")
+    assert pos_up.side == Side.UP
+
+    assert pos_down.shares == Decimal("15")
+    assert pos_down.cost_basis == Decimal("9.00")
+    assert pos_down.side == Side.DOWN
+
+    # Both in same market
+    assert pos_up.market_id == "market_1"
+    assert pos_down.market_id == "market_1"
+
+
+def test_has_position_composite_key(fresh_portfolio):
+    """has_position checks composite key (token_id, market_id, side)."""
+    portfolio = fresh_portfolio
+
+    # Buy in market_1, UP
+    portfolio.apply_buy("token_a", "market_1", Side.UP, Decimal("10"), Decimal("0.50"))
+
+    # Should return True only for exact combo
+    assert portfolio.has_position("token_a", "market_1", Side.UP) == True
+
+    # Different market: False
+    assert portfolio.has_position("token_a", "market_2", Side.UP) == False
+
+    # Different side: False
+    assert portfolio.has_position("token_a", "market_1", Side.DOWN) == False
+
+    # Different token: False
+    assert portfolio.has_position("token_b", "market_1", Side.UP) == False
+
+
+def test_get_positions_composite_keys(fresh_portfolio):
+    """get_positions returns dict keyed by composite key strings."""
+    portfolio = fresh_portfolio
+
+    # Create several positions with different combinations
+    portfolio.apply_buy("token_a", "market_1", Side.UP, Decimal("10"), Decimal("0.50"))
+    portfolio.apply_buy("token_a", "market_2", Side.UP, Decimal("20"), Decimal("0.60"))
+    portfolio.apply_buy("token_b", "market_1", Side.DOWN, Decimal("15"), Decimal("0.55"))
+
+    positions = portfolio.get_positions()
+
+    # Should have 3 positions with composite key format
+    assert len(positions) == 3
+
+    # Keys should be composite strings (format: "token_id|market_id|side")
+    expected_keys = {
+        "token_a|market_1|UP",
+        "token_a|market_2|UP",
+        "token_b|market_1|DOWN"
+    }
+    assert set(positions.keys()) == expected_keys
+
+    # Verify position data is correct
+    assert positions["token_a|market_1|UP"].shares == Decimal("10")
+    assert positions["token_a|market_2|UP"].shares == Decimal("20")
+    assert positions["token_b|market_1|DOWN"].shares == Decimal("15")
