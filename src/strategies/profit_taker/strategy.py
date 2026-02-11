@@ -222,30 +222,20 @@ class ProfitTakerStrategy(SkipHelperMixin, HourlyBudgetMixin, Strategy):
         otherwise our side lost -> $0.01.
         If no price data available, use entry price to guess outcome.
         """
-        for token_id, pos in list(self.portfolio.get_positions().items()):
-            if pos.shares <= 0:
-                continue
-            price_snap = all_prices.get(token_id)
-            if price_snap and price_snap.bid is not None:
-                # Use actual bid — bid=0 means token lost (orderbook drained)
-                last_bid = price_snap.bid
-            else:
-                # No price snapshot at all — use entry price as best guess
-                last_bid = self.our_entries.get(token_id, Decimal("0.50"))
-            # Resolution price: winning side -> $0.99, losing side -> $0.01
-            if last_bid >= Decimal("0.50"):
-                resolution_price = Decimal("0.99")
-            else:
-                resolution_price = Decimal("0.01")
-            dollars = pos.shares * resolution_price
-            self.portfolio.apply_sell(token_id, pos.market_id, pos.side, pos.shares, resolution_price)
-            self.cash += dollars
-            self.sells += 1
-            if token_id in self.our_entries:
-                del self.our_entries[token_id]
-            if token_id in self.high_water_marks:
-                del self.high_water_marks[token_id]
-            logger.info(f"HOUR RESOLVE: {token_id} @{resolution_price} (bid={last_bid}) = ${dollars:.2f}")
+        from ...core.trade_logic import liquidate_positions_at_hour_boundary
+
+        liq_result = liquidate_positions_at_hour_boundary(
+            portfolio=self.portfolio,
+            prices=all_prices,
+            entry_prices=self.our_entries,
+            our_entries=self.our_entries,
+            high_water_marks=self.high_water_marks,
+            cash_tracker=self,
+            use_resolution_prices=True,  # Strategy uses resolution prices
+        )
+
+        self.sells += liq_result.num_sells
+
         # Clear hourly state - hourly markets reset each hour
         self.leader_positions = {}
         self._hourly_realized_loss = Decimal("0")

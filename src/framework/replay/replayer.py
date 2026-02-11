@@ -134,37 +134,21 @@ class SessionReplayer:
         if not hasattr(self.strategy, 'portfolio'):
             return
 
-        positions = self.strategy.portfolio.get_positions()
-        for token_id, pos in list(positions.items()):
-            if pos.shares <= 0:
-                continue
+        from ...core.trade_logic import liquidate_positions_at_hour_boundary
 
-            price_snap = current_prices.get(token_id)
-            if not price_snap or not price_snap.bid or price_snap.bid <= 0:
-                continue
+        liq_result = liquidate_positions_at_hour_boundary(
+            portfolio=self.strategy.portfolio,
+            prices=current_prices,
+            entry_prices=getattr(self.strategy, 'our_entries', {}),
+            our_entries=getattr(self.strategy, 'our_entries', None),
+            high_water_marks=getattr(self.strategy, 'high_water_marks', None),
+            cash_tracker=self.strategy if hasattr(self.strategy, 'cash') else None,
+            use_resolution_prices=False,  # Replayer uses actual bid prices
+        )
 
-            bid = price_snap.bid
-            shares = pos.shares
-            dollars = shares * bid
-
-            # Apply sell to portfolio (updates realized PnL)
-            self.strategy.portfolio.apply_sell(token_id, pos.market_id, pos.side, shares, bid)
-
-            # Update strategy cash if tracked
-            if hasattr(self.strategy, 'cash'):
-                self.strategy.cash += dollars
-
-            # Clean up strategy tracking
-            if hasattr(self.strategy, 'our_entries') and token_id in self.strategy.our_entries:
-                del self.strategy.our_entries[token_id]
-            if hasattr(self.strategy, 'high_water_marks') and token_id in self.strategy.high_water_marks:
-                del self.strategy.high_water_marks[token_id]
-
-            # Track in result
-            result.sells_executed += 1
-            result.sell_dollars += dollars
-
-            logger.info(f"LIQUIDATE hour boundary: {token_id} {shares} shares @{bid} = ${dollars:.2f}")
+        # Update result tracking
+        result.sells_executed += liq_result.num_sells
+        result.sell_dollars += liq_result.total_dollars
 
     def _calculate_resolved_pnl(self) -> tuple:
         """Calculate PnL assuming markets resolve at extremes.
