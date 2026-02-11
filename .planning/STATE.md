@@ -10,18 +10,19 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 ## Current Position
 
 Phase: 8 of 12 (Foundation & Bug Fixes)
-Plan: Not started (awaiting phase planning)
-Status: Ready to plan
-Last activity: 2026-02-10 — Roadmap created for v1.2
+Plan: 01 complete
+Status: In progress
+Last activity: 2026-02-11 — Completed 08-01-PLAN.md (Portfolio composite keying bug fix)
 
-Progress: v1.0 (21 plans) + v1.1 (13 plans) = 34 plans complete | v1.2: 0/TBD
+Progress: v1.0 (21 plans) + v1.1 (13 plans) + v1.2 (1 plan) = 35 plans complete
+Phase 8: █░░░░ 1/TBD
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 34 (v1.0: 21, v1.1: 13)
-- Average duration: 5.0min (all time)
-- Total execution time: 2.85 hours (all time)
+- Total plans completed: 35 (v1.0: 21, v1.1: 13, v1.2: 1)
+- Average duration: 4.9min (all time)
+- Total execution time: 2.87 hours (all time)
 
 **By Phase:**
 
@@ -35,8 +36,9 @@ Progress: v1.0 (21 plans) + v1.1 (13 plans) = 34 plans complete | v1.2: 0/TBD
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
 | 07-comparison-infrastructure | 3 | 22min | 7min | Complete |
 | 07.1-codebase-cleanup | 7 | 50min | 7min | Complete |
+| 08-foundation-bug-fixes | 1 | 2min | 2min | In progress |
 
-*Updated: 2026-02-10 after v1.2 roadmap creation*
+*Updated: 2026-02-11 after 08-01 completion*
 
 ## Accumulated Context
 
@@ -48,6 +50,10 @@ Recent decisions affecting v1.2:
 - Manual optimization over formal GSD phases (v1.1) — achieved Sharpe 0.345 in 4 days
 - Conviction filter at $300 cumulative — proven edge for capital-constrained trading
 - Pattern discovery deferred — v1.2 research track, not blocking strategy work
+
+**From 08-01:**
+- Composite key format: "token_id|market_id|side" — simple string, easy to debug, dict-compatible
+- has_position signature changed to (token_id, market_id, side) — zero external callers found
 
 ### Roadmap Evolution
 
@@ -61,10 +67,10 @@ None.
 
 ### Critical Issues for v1.2
 
-**Portfolio position keying bug (MUST FIX in Phase 8):**
-- Portfolio._positions keyed only by token_id, not (token_id, market_id, side)
-- Same token_id in different markets incorrectly accumulates into single position
-- Blocking issue for live trading — will corrupt state
+**~~Portfolio position keying bug~~** ✓ FIXED in 08-01:
+- Portfolio now uses composite (token_id, market_id, side) keying
+- Same token in different markets/sides tracked independently
+- Live trading no longer blocked by this issue
 
 **Root directory cleanup (Phase 8):**
 - 60+ untracked analysis/experiment scripts in root directory
@@ -80,10 +86,10 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-10
-Stopped at: v1.2 roadmap created
+Last session: 2026-02-11
+Stopped at: Completed 08-01-PLAN.md (Portfolio composite keying bug fix)
 Resume file: None
-Next action: `/gsd:plan-phase 8` to decompose Phase 8 into executable plans
+Next action: Continue Phase 8 remaining plans
 
 **Strategy config (current best):**
 - Sharpe 0.345, PnL $324, WR 50%, MaxLoss -$26
