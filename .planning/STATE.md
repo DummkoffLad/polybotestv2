@@ -10,19 +10,19 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 ## Current Position
 
 Phase: 8 of 12 (Foundation & Bug Fixes)
-Plan: 01 complete
+Plan: 04 complete
 Status: In progress
-Last activity: 2026-02-11 — Completed 08-01-PLAN.md (Portfolio composite keying bug fix)
+Last activity: 2026-02-11 — Completed 08-04-PLAN.md (WebSockets v16 upgrade)
 
-Progress: v1.0 (21 plans) + v1.1 (13 plans) + v1.2 (1 plan) = 35 plans complete
-Phase 8: █░░░░ 1/TBD
+Progress: v1.0 (21 plans) + v1.1 (13 plans) + v1.2 (2 plans) = 36 plans complete
+Phase 8: ██░░░ 2/TBD
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 35 (v1.0: 21, v1.1: 13, v1.2: 1)
+- Total plans completed: 36 (v1.0: 21, v1.1: 13, v1.2: 2)
 - Average duration: 4.9min (all time)
-- Total execution time: 2.87 hours (all time)
+- Total execution time: 2.93 hours (all time)
 
 **By Phase:**
 
@@ -36,9 +36,9 @@ Phase 8: █░░░░ 1/TBD
 | 06-statistical-validation | 3 | 11min | 4min | Complete |
 | 07-comparison-infrastructure | 3 | 22min | 7min | Complete |
 | 07.1-codebase-cleanup | 7 | 50min | 7min | Complete |
-| 08-foundation-bug-fixes | 1 | 2min | 2min | In progress |
+| 08-foundation-bug-fixes | 2 | 6min | 3min | In progress |
 
-*Updated: 2026-02-11 after 08-01 completion*
+*Updated: 2026-02-11 after 08-04 completion*
 
 ## Accumulated Context
 
@@ -54,6 +54,11 @@ Recent decisions affecting v1.2:
 **From 08-01:**
 - Composite key format: "token_id|market_id|side" — simple string, easy to debug, dict-compatible
 - has_position signature changed to (token_id, market_id, side) — zero external callers found
+
+**From 08-04:**
+- Upgraded websockets v12 -> v16 despite web3 conflict (websockets optional, web3 unused)
+- websockets.asyncio.client API is the new v16 standard (replaces legacy websockets.connect)
+- HAS_WEBSOCKETS flag pattern for graceful library degradation
 
 ### Roadmap Evolution
 
@@ -76,9 +81,15 @@ None.
 - 60+ untracked analysis/experiment scripts in root directory
 - Must organize before live deployment
 
+**Pre-existing test failure (validation pipeline):**
+- test_pipeline_latency_analysis fails: SessionReplayer missing final_prices attribute
+- Should be addressed in separate Phase 8 plan
+- Does not block current work
+
 **WebSocket user channel research (Phase 10):**
 - Auth flow not fully detailed in Polymarket docs
 - Needs testing with live API in dry-run mode during implementation
+- websockets v16 upgrade complete, ready for Phase 10
 
 **Live testing edge cases (Phase 12):**
 - Network errors, API rate limits, price staleness unknown in real execution
@@ -87,7 +98,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-11
-Stopped at: Completed 08-01-PLAN.md (Portfolio composite keying bug fix)
+Stopped at: Completed 08-04-PLAN.md (WebSockets v16 upgrade)
 Resume file: None
 Next action: Continue Phase 8 remaining plans
 
@@ -98,4 +109,4 @@ Next action: Continue Phase 8 remaining plans
 
 ---
 *State initialized: 2026-01-30*
-*Last updated: 2026-02-10 after v1.2 roadmap creation*
+*Last updated: 2026-02-11 after 08-04 completion*
